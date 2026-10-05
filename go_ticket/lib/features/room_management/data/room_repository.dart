@@ -161,7 +161,7 @@ class RoomRepository {
       ApiEndpoints.updateRoomStatus.replaceAll('{roomId}', roomId),
       body: {
         'status': newStatus.apiValue,
-        if (notes != null) 'notes': notes,
+        'notes': ?notes,
       },
     );
     return RoomModel.fromJson(response['data'] ?? response);

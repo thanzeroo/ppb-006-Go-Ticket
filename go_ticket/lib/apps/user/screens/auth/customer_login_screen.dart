@@ -130,6 +130,17 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.white,
+      appBar: Navigator.canPop(context)
+          ? AppBar(
+              backgroundColor: AppColors.white,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_rounded, color: AppColors.grey800),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+              title: const Text('Pilih Portal Lain', style: TextStyle(color: AppColors.grey700, fontSize: 14)),
+            )
+          : null,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),

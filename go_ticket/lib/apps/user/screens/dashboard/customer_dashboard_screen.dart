@@ -35,7 +35,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   int _currentNavIndex = 0;
 
   /// Apakah sedang memuat data hotel
-  bool _isLoadingHotels = false;
+  final bool _isLoadingHotels = false;
 
   // ---------------------------------------------------------------------------
   // BUILD

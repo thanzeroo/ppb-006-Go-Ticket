@@ -67,12 +67,15 @@ class _GuestDetailFormScreenState extends State<GuestDetailFormScreen> {
 
   void _proceedToPayment() {
     if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
     Navigator.pushNamed(context, CustomerRouter.payment, arguments: {
       'guestName': _nameController.text,
       'guestPhone': _phoneController.text,
       'guestEmail': _emailController.text,
       'guestCount': _guestCount,
       'specialRequest': _specialRequestController.text,
+    }).then((_) {
+      if (mounted) setState(() => _isLoading = false);
     });
   }
 

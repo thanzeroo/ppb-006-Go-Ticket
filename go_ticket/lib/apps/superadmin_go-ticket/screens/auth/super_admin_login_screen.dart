@@ -55,6 +55,18 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.grey950,
+      appBar: Navigator.canPop(context)
+          ? AppBar(
+              backgroundColor: AppColors.grey950,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+              title: const Text('Pilih Portal Lain',
+                  style: TextStyle(color: Colors.white70, fontSize: 14)),
+            )
+          : null,
       body: isWide ? _buildWideLayout() : _buildNarrowLayout(),
     );
   }

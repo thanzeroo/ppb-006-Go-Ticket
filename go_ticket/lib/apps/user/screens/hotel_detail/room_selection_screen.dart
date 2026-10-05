@@ -28,7 +28,7 @@ class RoomSelectionScreen extends StatefulWidget {
 class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
   // TODO: Muat daftar kamar dari RoomRepository berdasarkan hotelId & tanggal
 
-  bool _isLoading = false;
+  final bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
