@@ -1,22 +1,15 @@
 // =============================================================================
-// FILE: lib/apps/customer/screens/auth/customer_login_screen.dart
-// RESPONSIBILITY: Halaman login untuk Customer (Tamu) Go Ticket.
-// Mendukung dua metode autentikasi:
-// 1. Nomor HP + OTP (via SMS)
-// 2. Google Sign In (OAuth2)
-// Alur OTP: Masukkan HP → Kirim OTP → Masukkan 6-digit kode → Login sukses
+// FILE: lib/apps/user/screens/auth/customer_login_screen.dart
+// RESPONSIBILITY: Halaman Login & Register untuk Customer / User Go Ticket.
+// Tampilan presisi sesuai desain mockup: Tab Masuk & Daftar Akun, form input,
+// tombol login sosial (Google & Apple), dan info keamanan perbankan.
 // =============================================================================
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
-import '../../../../core/constants/app_colors.dart';
-import '../../../../core/theme/text_styles.dart';
-import '../../../../core/widgets/custom_button.dart';
-import '../../../../core/widgets/custom_text_field.dart';
+import '../../../../core/widgets/auth_logo_header.dart';
 import '../dashboard/customer_dashboard_screen.dart';
 
-/// Halaman login Customer dengan OTP HP atau Google Sign In.
 class CustomerLoginScreen extends StatefulWidget {
   const CustomerLoginScreen({super.key});
 
@@ -25,84 +18,42 @@ class CustomerLoginScreen extends StatefulWidget {
 }
 
 class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
-  // ---------------------------------------------------------------------------
-  // STATE
-  // ---------------------------------------------------------------------------
+  // 0 = Masuk (Login), 1 = Daftar Akun (Register)
+  int _tabIndex = 0;
 
-  /// Apakah sedang menampilkan form input OTP (setelah HP disubmit)
-  bool _showOtpForm = false;
+  // Controllers untuk Login
+  final _emailLoginController = TextEditingController(text: 'nama@email.com');
+  final _passwordLoginController = TextEditingController();
 
-  /// Apakah sedang memproses request (loading state)
-  bool _isLoading = false;
-
-  /// Countdown timer untuk tombol 'Kirim Ulang OTP'
-  int _resendCountdown = 0;
-
-  // Form controllers
+  // Controllers untuk Register
+  final _nameController = TextEditingController();
+  final _emailRegisterController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _otpController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
+  final _passwordRegisterController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+
+  // Status checkbox & visibility password
+  bool _rememberMe = true;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
+    _emailLoginController.dispose();
+    _passwordLoginController.dispose();
+    _nameController.dispose();
+    _emailRegisterController.dispose();
     _phoneController.dispose();
-    _otpController.dispose();
+    _passwordRegisterController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  // ---------------------------------------------------------------------------
-  // ACTIONS
-  // ---------------------------------------------------------------------------
-
-  /// Kirim OTP ke nomor HP yang diinput
-  Future<void> _requestOtp() async {
-    if (!_formKey.currentState!.validate()) return;
-
+  /// Simulasi proses login / register dan masuk ke Dashboard
+  Future<void> _submit() async {
     setState(() => _isLoading = true);
-
-    // TODO: Integrasikan dengan AuthRepository.requestOtp()
-    await Future.delayed(const Duration(seconds: 2)); // Simulasi API call
-
-    setState(() {
-      _isLoading = false;
-      _showOtpForm = true;
-      _resendCountdown = 60;
-    });
-
-    _startResendCountdown();
-  }
-
-  /// Verifikasi kode OTP dan login
-  Future<void> _verifyOtpAndLogin() async {
-    if (_otpController.text.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Masukkan 6 digit kode OTP')),
-      );
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    // TODO: Integrasikan dengan AuthRepository.verifyOtpAndLogin()
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
-    // Navigasi ke Dashboard setelah login sukses
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const CustomerDashboardScreen()),
-      (_) => false,
-    );
-  }
-
-  /// Login dengan Google Sign In
-  Future<void> _googleSignIn() async {
-    setState(() => _isLoading = true);
-
-    // TODO: Integrasikan dengan Google Sign In SDK dan AuthRepository
-    await Future.delayed(const Duration(seconds: 2));
-
+    await Future.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
     setState(() => _isLoading = false);
 
@@ -111,231 +62,567 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
       (_) => false,
     );
   }
-
-  /// Countdown timer untuk tombol kirim ulang OTP
-  void _startResendCountdown() {
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 1));
-      if (!mounted) return false;
-      setState(() => _resendCountdown--);
-      return _resendCountdown > 0;
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // BUILD
-  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: Colors.white,
       appBar: Navigator.canPop(context)
           ? AppBar(
-              backgroundColor: AppColors.white,
+              backgroundColor: Colors.white,
               elevation: 0,
               leading: IconButton(
-                icon: const Icon(Icons.arrow_back_rounded, color: AppColors.grey800),
+                icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF1E293B)),
                 onPressed: () => Navigator.of(context).pop(),
               ),
-              title: const Text('Pilih Portal Lain', style: TextStyle(color: AppColors.grey700, fontSize: 14)),
+              title: const Text(
+                'Pilih Portal Lain',
+                style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+              ),
             )
           : null,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-          child: Form(
-            key: _formKey,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Logo dengan efek cyan glow
+              const AuthLogoHeader(),
+              const SizedBox(height: 18),
+
+              // Judul Utama: "Selamat Datang di Go Ticket"
+              RichText(
+                textAlign: TextAlign.center,
+                text: const TextSpan(
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Inter',
+                    letterSpacing: -0.3,
+                  ),
+                  children: [
+                    TextSpan(
+                      text: 'Selamat Datang di ',
+                      style: TextStyle(color: Color(0xFF0F172A)),
+                    ),
+                    TextSpan(
+                      text: 'Go\nTicket',
+                      style: TextStyle(color: Color(0xFF0077B6)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // Subjudul
+              const Text(
+                'Akses kemudahan reservasi hotel & penginapan\nterbaik impianmu',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF64748B),
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 22),
+
+              // Switcher Tab: [ Masuk ] [ Daftar Akun ]
+              _buildTabSwitcher(),
+              const SizedBox(height: 24),
+
+              // Form sesuai tab yang dipilih
+              _tabIndex == 0 ? _buildLoginForm() : _buildRegisterForm(),
+              const SizedBox(height: 24),
+
+              // Badge Keamanan Enkripsi
+              _buildSecurityBadge(),
+              const SizedBox(height: 14),
+
+              // Kartu Keuntungan Member
+              _buildMemberBenefitCard(),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // WIDGETS
+  // ---------------------------------------------------------------------------
+
+  /// Tab switcher rounded pill [ Masuk ] / [ Daftar Akun ]
+  Widget _buildTabSwitcher() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE2E8F0).withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildTabButton(
+              title: 'Masuk',
+              icon: Icons.login_rounded,
+              isSelected: _tabIndex == 0,
+              onTap: () => setState(() => _tabIndex = 0),
+            ),
+          ),
+          Expanded(
+            child: _buildTabButton(
+              title: 'Daftar Akun',
+              icon: Icons.person_add_alt_1_outlined,
+              isSelected: _tabIndex == 1,
+              onTap: () => setState(() => _tabIndex = 1),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabButton({
+    required String title,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Form untuk Tab MASUK
+  Widget _buildLoginForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildInputLabel('Email atau No. WhatsApp'),
+        _buildTextField(
+          controller: _emailLoginController,
+          hintText: 'nama@email.com / 0812xxxx',
+          prefixIcon: Icons.alternate_email_rounded,
+        ),
+        const SizedBox(height: 16),
+
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _buildInputLabel('Kata Sandi'),
+            GestureDetector(
+              onTap: () {},
+              child: const Text(
+                'Lupa Kata Sandi?',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF00A8E8),
+                ),
+              ),
+            ),
+          ],
+        ),
+        _buildTextField(
+          controller: _passwordLoginController,
+          hintText: 'Masukkan kata sandi',
+          prefixIcon: Icons.lock_outline_rounded,
+          obscureText: _obscurePassword,
+          suffixIcon: IconButton(
+            icon: Icon(
+              _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+              size: 18,
+              color: const Color(0xFF94A3B8),
+            ),
+            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Checkbox Ingat Saya
+        _buildRememberMeCheckbox(),
+        const SizedBox(height: 18),
+
+        // Tombol Masuk ke Akun
+        _buildPrimaryButton(
+          title: 'Masuk ke Akun',
+          onTap: _submit,
+        ),
+        const SizedBox(height: 22),
+
+        // Divider: ATAU LANJUTKAN DENGAN
+        _buildOrDivider(),
+        const SizedBox(height: 16),
+
+        // Tombol Google & Apple
+        Row(
+          children: [
+            Expanded(
+              child: _buildSocialButton(
+                title: 'Google',
+                icon: Icons.g_mobiledata_rounded,
+                isGoogle: true,
+                onTap: _submit,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildSocialButton(
+                title: 'Apple',
+                icon: Icons.apple_rounded,
+                onTap: _submit,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Form untuk Tab DAFTAR AKUN
+  Widget _buildRegisterForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildInputLabel('Nama Lengkap'),
+        _buildTextField(
+          controller: _nameController,
+          hintText: 'Masukkan nama lengkap anda',
+          prefixIcon: Icons.person_outline_rounded,
+        ),
+        const SizedBox(height: 14),
+
+        _buildInputLabel('Email'),
+        _buildTextField(
+          controller: _emailRegisterController,
+          hintText: 'nama@email.com / 0812xxxx',
+          prefixIcon: Icons.alternate_email_rounded,
+        ),
+        const SizedBox(height: 14),
+
+        _buildInputLabel('Nomor Telepon'),
+        _buildTextField(
+          controller: _phoneController,
+          hintText: 'Masukkan nomor valid',
+          prefixIcon: Icons.chat_bubble_outline_rounded,
+        ),
+        const SizedBox(height: 14),
+
+        _buildInputLabel('Kata Sandi'),
+        _buildTextField(
+          controller: _passwordRegisterController,
+          hintText: 'Buat kata sandi',
+          prefixIcon: Icons.lock_outline_rounded,
+          obscureText: _obscurePassword,
+          suffixIcon: IconButton(
+            icon: Icon(
+              _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+              size: 18,
+              color: const Color(0xFF94A3B8),
+            ),
+            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        _buildInputLabel('Konfirmasi Kata Sandi'),
+        _buildTextField(
+          controller: _confirmPasswordController,
+          hintText: 'Masukkan kata sandi',
+          prefixIcon: Icons.lock_outline_rounded,
+          obscureText: _obscureConfirmPassword,
+          suffixIcon: IconButton(
+            icon: Icon(
+              _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+              size: 18,
+              color: const Color(0xFF94A3B8),
+            ),
+            onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        _buildRememberMeCheckbox(),
+        const SizedBox(height: 18),
+
+        _buildPrimaryButton(
+          title: 'Buat Akun',
+          onTap: _submit,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInputLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF334155),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String hintText,
+    required IconData prefixIcon,
+    bool obscureText = false,
+    Widget? suffixIcon,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: obscureText,
+        style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+          prefixIcon: Icon(prefixIcon, color: const Color(0xFF00A8E8), size: 18),
+          suffixIcon: suffixIcon,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRememberMeCheckbox() {
+    return Row(
+      children: [
+        SizedBox(
+          width: 22,
+          height: 22,
+          child: Checkbox(
+            value: _rememberMe,
+            activeColor: const Color(0xFF00C7F2),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+            side: const BorderSide(color: Color(0xFF00C7F2), width: 1.5),
+            onChanged: (val) => setState(() => _rememberMe = val ?? false),
+          ),
+        ),
+        const SizedBox(width: 8),
+        const Text(
+          'Ingat saya di perangkat ini',
+          style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPrimaryButton({
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: ElevatedButton(
+        onPressed: _isLoading ? null : onTap,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF00C7F2),
+          elevation: 0,
+          shadowColor: const Color(0xFF00C7F2).withValues(alpha: 0.4),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        ),
+        child: _isLoading
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 18),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _buildOrDivider() {
+    return Row(
+      children: [
+        const Expanded(child: Divider(color: Color(0xFFE2E8F0))),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Text(
+            'ATAU LANJUTKAN DENGAN',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFF94A3B8),
+              letterSpacing: 0.8,
+            ),
+          ),
+        ),
+        const Expanded(child: Divider(color: Color(0xFFE2E8F0))),
+      ],
+    );
+  }
+
+  Widget _buildSocialButton({
+    required String title,
+    required IconData icon,
+    bool isGoogle = false,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        height: 46,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            isGoogle
+                ? const Text(
+                    'G',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFEA4335),
+                    ),
+                  )
+                : Icon(icon, size: 20, color: const Color(0xFF0F172A)),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF334155),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSecurityBadge() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: const [
+        Icon(Icons.verified_user_rounded, color: Color(0xFF0284C7), size: 14),
+        SizedBox(width: 6),
+        Text(
+          'TERPROTEKSI ENKRIPSI 256–BIT KELAS PERBANKAN',
+          style: TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF64748B),
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMemberBenefitCard() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE0F2FE).withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.stars_rounded,
+              color: Color(0xFF0284C7),
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header Logo & Tagline
-                _buildHeader(),
-                const SizedBox(height: 40),
-
-                // Form input (HP atau OTP)
-                _showOtpForm ? _buildOtpForm() : _buildPhoneForm(),
-
-                const SizedBox(height: 32),
-
-                // Divider OR
-                if (!_showOtpForm) _buildDivider(),
-
-                // Google Sign In Button
-                if (!_showOtpForm) ...[
-                  const SizedBox(height: 16),
-                  _buildGoogleButton(),
-                ],
-
-                const SizedBox(height: 32),
-
-                // Footer teks syarat & ketentuan
-                _buildFooter(),
+              children: const [
+                Text(
+                  'Keuntungan Khusus Member',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Dapatkan poin cashback & konfirmasi instan',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF0284C7)),
+                ),
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Logo Go Ticket
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            gradient: AppColors.primaryGradient,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Icon(Icons.hotel_rounded, color: AppColors.white, size: 28),
-        ),
-        const SizedBox(height: 24),
-
-        Text(
-          _showOtpForm ? 'Masukkan Kode OTP' : 'Selamat Datang!',
-          style: AppTextStyles.displaySmall,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          _showOtpForm
-              ? 'Kode 6 digit telah dikirim ke\n${_phoneController.text}'
-              : 'Masuk atau daftar ke Go Ticket\nuntuk memesan hotel dengan mudah.',
-          style: AppTextStyles.bodyMedium.copyWith(
-            color: AppColors.textSecondaryLight,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPhoneForm() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        GoTicketTextField(
-          label: 'Nomor Handphone',
-          hint: 'Contoh: 08123456789',
-          controller: _phoneController,
-          keyboardType: TextInputType.phone,
-          prefixIcon: Icons.phone_outlined,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          maxLength: 13,
-          textInputAction: TextInputAction.done,
-          onSubmitted: _requestOtp,
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Nomor HP tidak boleh kosong';
-            }
-            if (value.length < 10) {
-              return 'Nomor HP minimal 10 digit';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 24),
-        GoTicketButton(
-          label: 'Kirim Kode OTP',
-          onPressed: _isLoading ? null : _requestOtp,
-          isLoading: _isLoading,
-          icon: Icons.sms_outlined,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildOtpForm() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        GoTicketTextField(
-          label: 'Kode OTP',
-          hint: '_ _ _ _ _ _',
-          controller: _otpController,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          maxLength: 6,
-          textInputAction: TextInputAction.done,
-          onSubmitted: _verifyOtpAndLogin,
-        ),
-        const SizedBox(height: 12),
-
-        // Tombol kirim ulang OTP
-        Row(
-          children: [
-            Text(
-              'Tidak menerima kode? ',
-              style: AppTextStyles.bodySmall,
-            ),
-            _resendCountdown > 0
-                ? Text(
-                    'Kirim ulang (${_resendCountdown}s)',
-                    style: AppTextStyles.labelSmall,
-                  )
-                : GoTicketTextButton(
-                    label: 'Kirim Ulang',
-                    onPressed: _requestOtp,
-                  ),
-          ],
-        ),
-
-        const SizedBox(height: 24),
-        GoTicketButton(
-          label: 'Masuk',
-          onPressed: _isLoading ? null : _verifyOtpAndLogin,
-          isLoading: _isLoading,
-        ),
-        const SizedBox(height: 12),
-        GoTicketOutlinedButton(
-          label: 'Ganti Nomor HP',
-          onPressed: () => setState(() {
-            _showOtpForm = false;
-            _otpController.clear();
-          }),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDivider() {
-    return Row(
-      children: [
-        const Expanded(child: Divider(color: AppColors.grey200)),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text('atau', style: AppTextStyles.bodySmall),
-        ),
-        const Expanded(child: Divider(color: AppColors.grey200)),
-      ],
-    );
-  }
-
-  Widget _buildGoogleButton() {
-    return GoTicketSocialButton(
-      label: 'Masuk dengan Google',
-      onPressed: _isLoading ? null : _googleSignIn,
-      isLoading: false,
-      icon: Container(
-        width: 24,
-        height: 24,
-        decoration: const BoxDecoration(
-          color: AppColors.grey100,
-          shape: BoxShape.circle,
-        ),
-        child: const Icon(Icons.g_mobiledata, size: 18, color: AppColors.primary),
-      ),
-    );
-  }
-
-  Widget _buildFooter() {
-    return Center(
-      child: Text(
-        'Dengan masuk, Anda menyetujui\nSyarat & Ketentuan serta Kebijakan Privasi Go Ticket.',
-        style: AppTextStyles.caption,
-        textAlign: TextAlign.center,
+        ],
       ),
     );
   }

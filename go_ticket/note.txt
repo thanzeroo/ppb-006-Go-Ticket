@@ -1,0 +1,13 @@
+buat sementara ini dijadikan 1 run, bisa milih 3 pihak, untuk awal, nanti di perbaiki lagi
+
+menggunakan monorepo buat struktur git nya
+    fokus utamanya nanti dibagain hotel_partner, user, super_admin, nanti di ubah lagi
+
+    sulthan
+    buat di sekarang aku fokus buat kerangka dasarnya dulu, di part login semua pihak
+
+    nanti farchan, setelah selesai koreksi erd, langsung ngerapihkan kerangka yang sudah ku buat
+
+    nanti yasmin, koreksi desaind cepat yang di buat farchan, nanti kayak gimana gimana nya
+
+    lanjut ke pihak hotel, setelah pihak hotel 

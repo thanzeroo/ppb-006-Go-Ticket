@@ -8,6 +8,7 @@
 import 'package:flutter/material.dart';
 
 import '../screens/auth/customer_login_screen.dart';
+import '../screens/splash/customer_loading_screen.dart';
 import '../screens/booking/guest_detail_form_screen.dart';
 import '../screens/booking/interactive_calendar_screen.dart';
 import '../screens/booking/payment_process_screen.dart';
@@ -30,8 +31,11 @@ class CustomerRouter {
   // ROUTE NAMES — Konstanta nama route
   // ---------------------------------------------------------------------------
 
-  /// Halaman awal (cek sesi login)
+  /// Halaman awal / loading (Splash screen)
   static const String initial = '/';
+
+  /// Halaman loading Customer
+  static const String loading = '/loading';
 
   /// Halaman login Customer (OTP / Google)
   static const String login = '/login';
@@ -68,6 +72,9 @@ class CustomerRouter {
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
       case initial:
+      case loading:
+        return _buildRoute(const CustomerLoadingScreen(), settings);
+
       case login:
         return _buildRoute(const CustomerLoginScreen(), settings);
 

@@ -16,8 +16,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/storage_helper.dart';
 import 'router/customer_router.dart';
-import 'screens/auth/customer_login_screen.dart';
-import 'screens/dashboard/customer_dashboard_screen.dart';
+import 'screens/splash/customer_loading_screen.dart';
 
 /// Entry point utama Customer App Go Ticket.
 ///
@@ -64,10 +63,8 @@ class GoTicketCustomerApp extends StatelessWidget {
       onGenerateRoute: CustomerRouter.onGenerateRoute,
       initialRoute: CustomerRouter.initial,
 
-      // Halaman awal berdasarkan status login
-      home: isLoggedIn
-          ? const CustomerDashboardScreen()
-          : const CustomerLoginScreen(),
+      // Halaman awal loading screen
+      home: const CustomerLoadingScreen(),
     );
   }
 }

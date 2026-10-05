@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 
 import 'apps/hotel_partner/screens/auth/staff_login_screen.dart';
 import 'apps/superadmin_go-ticket/screens/auth/super_admin_login_screen.dart';
-import 'apps/user/screens/auth/customer_login_screen.dart';
+import 'apps/user/screens/splash/customer_loading_screen.dart';
 import 'core/constants/app_colors.dart';
 import 'core/theme/app_theme.dart';
 
@@ -123,7 +123,7 @@ class PortalSelectionScreen extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const CustomerLoginScreen(),
+                          builder: (_) => const CustomerLoadingScreen(),
                         ),
                       );
                     },
