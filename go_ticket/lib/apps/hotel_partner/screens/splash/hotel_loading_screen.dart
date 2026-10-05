@@ -3,20 +3,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/utils/storage_helper.dart';
-import '../auth/customer_login_screen.dart';
-import '../dashboard/customer_dashboard_screen.dart';
+import '../auth/staff_login_screen.dart';
+import '../../router/role_guard.dart';
 
-/// Halaman Loading / Splash Screen untuk User (Customer).
-/// Menampilkan latar belakang gelap dengan logo Go Ticket di tengah,
-/// lalu secara otomatis berpindah ke halaman Login atau Dashboard.
-class CustomerLoadingScreen extends StatefulWidget {
-  const CustomerLoadingScreen({super.key});
+/// Halaman Loading / Splash Screen untuk Pihak Hotel.
+/// Menampilkan latar belakang gelap dengan logo Go Ticket Hotel di tengah,
+/// lalu secara otomatis berpindah ke RoleGuard (jika sudah login) atau StaffLoginScreen.
+class HotelLoadingScreen extends StatefulWidget {
+  const HotelLoadingScreen({super.key});
 
   @override
-  State<CustomerLoadingScreen> createState() => _CustomerLoadingScreenState();
+  State<HotelLoadingScreen> createState() => _HotelLoadingScreenState();
 }
 
-class _CustomerLoadingScreenState extends State<CustomerLoadingScreen> {
+class _HotelLoadingScreenState extends State<HotelLoadingScreen> {
   Timer? _timer;
 
   @override
@@ -31,23 +31,21 @@ class _CustomerLoadingScreenState extends State<CustomerLoadingScreen> {
     super.dispose();
   }
 
-  /// Menunggu selama 2 detik lalu mengecek sesi login user
   void _startTimer() {
     _timer = Timer(const Duration(seconds: 2), () async {
       if (!mounted) return;
 
-      // Cek apakah user sudah login
       final isLoggedIn = await StorageHelper.isLoggedIn();
+      final userRole = await StorageHelper.getUserRole();
 
       if (!mounted) return;
 
-      // Navigasi ke halaman tujuan
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => isLoggedIn
-              ? const CustomerDashboardScreen()
-              : const CustomerLoginScreen(),
+              ? RoleGuard(userRole: userRole)
+              : const StaffLoginScreen(),
         ),
       );
     });
@@ -55,7 +53,6 @@ class _CustomerLoadingScreenState extends State<CustomerLoadingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Mengatur warna ikon status bar (jam & baterai) agar terlihat putih
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -64,15 +61,19 @@ class _CustomerLoadingScreenState extends State<CustomerLoadingScreen> {
     );
 
     return Scaffold(
-      // Warna background gelap kebiruan sesuai desain mockup
       backgroundColor: const Color(0xFF13222B),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 48),
           child: Image.asset(
-            'assets/logo.png',
+            'assets/logo_hotel.png',
             width: 220,
             fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) => Image.asset(
+              'assets/logo.png',
+              width: 220,
+              fit: BoxFit.contain,
+            ),
           ),
         ),
       ),

@@ -3,20 +3,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/utils/storage_helper.dart';
-import '../auth/customer_login_screen.dart';
-import '../dashboard/customer_dashboard_screen.dart';
+import '../auth/super_admin_login_screen.dart';
+import '../dashboard/super_admin_dashboard_screen.dart';
 
-/// Halaman Loading / Splash Screen untuk User (Customer).
+/// Halaman Loading / Splash Screen untuk Super Admin Go Ticket.
 /// Menampilkan latar belakang gelap dengan logo Go Ticket di tengah,
-/// lalu secara otomatis berpindah ke halaman Login atau Dashboard.
-class CustomerLoadingScreen extends StatefulWidget {
-  const CustomerLoadingScreen({super.key});
+/// lalu secara otomatis berpindah ke Super Admin Dashboard atau Login.
+class SuperAdminLoadingScreen extends StatefulWidget {
+  const SuperAdminLoadingScreen({super.key});
 
   @override
-  State<CustomerLoadingScreen> createState() => _CustomerLoadingScreenState();
+  State<SuperAdminLoadingScreen> createState() =>
+      _SuperAdminLoadingScreenState();
 }
 
-class _CustomerLoadingScreenState extends State<CustomerLoadingScreen> {
+class _SuperAdminLoadingScreenState extends State<SuperAdminLoadingScreen> {
   Timer? _timer;
 
   @override
@@ -31,23 +32,20 @@ class _CustomerLoadingScreenState extends State<CustomerLoadingScreen> {
     super.dispose();
   }
 
-  /// Menunggu selama 2 detik lalu mengecek sesi login user
   void _startTimer() {
     _timer = Timer(const Duration(seconds: 2), () async {
       if (!mounted) return;
 
-      // Cek apakah user sudah login
       final isLoggedIn = await StorageHelper.isLoggedIn();
 
       if (!mounted) return;
 
-      // Navigasi ke halaman tujuan
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => isLoggedIn
-              ? const CustomerDashboardScreen()
-              : const CustomerLoginScreen(),
+              ? const SuperAdminDashboardScreen()
+              : const SuperAdminLoginScreen(),
         ),
       );
     });
@@ -55,7 +53,6 @@ class _CustomerLoadingScreenState extends State<CustomerLoadingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Mengatur warna ikon status bar (jam & baterai) agar terlihat putih
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -64,7 +61,6 @@ class _CustomerLoadingScreenState extends State<CustomerLoadingScreen> {
     );
 
     return Scaffold(
-      // Warna background gelap kebiruan sesuai desain mockup
       backgroundColor: const Color(0xFF13222B),
       body: Center(
         child: Padding(

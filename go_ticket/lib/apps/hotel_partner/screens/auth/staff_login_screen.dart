@@ -111,8 +111,8 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
                 const SizedBox(height: 12),
               ],
 
-              // Logo dengan cyan glow & badge HOTEL
-              const AuthLogoHeader(badgeText: 'HOTEL'),
+              // Logo dengan cyan glow & logo Hotel
+              const AuthLogoHeader(imagePath: 'assets/logo_hotel.png'),
               const SizedBox(height: 14),
 
               // Badge Role Administrator (Khusus Admin)

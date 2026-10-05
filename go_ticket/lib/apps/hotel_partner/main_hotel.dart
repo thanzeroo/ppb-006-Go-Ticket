@@ -15,8 +15,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/storage_helper.dart';
 import 'router/hotel_router.dart';
-import 'screens/auth/staff_login_screen.dart';
-import 'router/role_guard.dart';
+import 'screens/splash/hotel_loading_screen.dart';
 
 /// Entry point utama Hotel Partner App Go Ticket.
 ///
@@ -63,10 +62,8 @@ class GoTicketHotelApp extends StatelessWidget {
       themeMode: ThemeMode.system,
       onGenerateRoute: HotelRouter.onGenerateRoute,
       initialRoute: HotelRouter.initial,
-      // Role guard menentukan halaman awal berdasarkan role
-      home: isLoggedIn
-          ? RoleGuard(userRole: userRole)
-          : const StaffLoginScreen(),
+      // Loading screen dengan Logo Hotel
+      home: const HotelLoadingScreen(),
     );
   }
 }

@@ -3,10 +3,17 @@ import 'package:flutter/material.dart';
 /// Logo Go Ticket dalam card putih dengan efek cyan glow (bayangan bercahaya),
 /// digunakan secara konsisten di semua halaman login (User, Hotel, Super Admin).
 class AuthLogoHeader extends StatelessWidget {
+  /// Path asset gambar logo (default: 'assets/logo.png')
+  final String imagePath;
+
   /// Teks opsional di bawah logo, misalnya 'HOTEL'
   final String? badgeText;
 
-  const AuthLogoHeader({super.key, this.badgeText});
+  const AuthLogoHeader({
+    super.key,
+    this.imagePath = 'assets/logo.png',
+    this.badgeText,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -30,10 +37,10 @@ class AuthLogoHeader extends StatelessWidget {
           ),
           padding: const EdgeInsets.all(12),
           child: Image.asset(
-            'assets/logo.png',
+            imagePath,
             fit: BoxFit.contain,
             errorBuilder: (context, error, stackTrace) => Image.asset(
-              'assets/Go_Ticket_Short_logo 1 (1).png',
+              'assets/logo.png',
               fit: BoxFit.contain,
             ),
           ),

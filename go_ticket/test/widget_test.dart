@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_ticket/apps/hotel_partner/screens/auth/staff_login_screen.dart';
+import 'package:go_ticket/apps/hotel_partner/screens/splash/hotel_loading_screen.dart';
 import 'package:go_ticket/apps/superadmin_go-ticket/screens/auth/super_admin_login_screen.dart';
+import 'package:go_ticket/apps/superadmin_go-ticket/screens/splash/super_admin_loading_screen.dart';
 import 'package:go_ticket/apps/user/screens/auth/customer_login_screen.dart';
 import 'package:go_ticket/apps/user/screens/splash/customer_loading_screen.dart';
 import 'package:go_ticket/main.dart';
@@ -22,7 +24,32 @@ void main() {
     expect(find.byType(Scaffold), findsOneWidget);
     expect(find.byType(Image), findsWidgets);
 
-    // Majukan waktu agar timer selesai
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('HotelLoadingScreen should render hotel logo on dark background', (WidgetTester tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: HotelLoadingScreen(),
+    ));
+
+    expect(find.byType(HotelLoadingScreen), findsOneWidget);
+    expect(find.byType(Scaffold), findsOneWidget);
+    expect(find.byType(Image), findsWidgets);
+
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('SuperAdminLoadingScreen should render admin logo on dark background', (WidgetTester tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: SuperAdminLoadingScreen(),
+    ));
+
+    expect(find.byType(SuperAdminLoadingScreen), findsOneWidget);
+    expect(find.byType(Scaffold), findsOneWidget);
+    expect(find.byType(Image), findsWidgets);
+
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
   });
@@ -36,7 +63,6 @@ void main() {
     expect(find.text('Daftar Akun'), findsOneWidget);
     expect(find.text('Masuk ke Akun'), findsOneWidget);
 
-    // Beralih ke tab Daftar Akun
     await tester.tap(find.text('Daftar Akun'));
     await tester.pumpAndSettle();
 
@@ -53,12 +79,10 @@ void main() {
     expect(find.text('Portal Operasional Staf'), findsOneWidget);
     expect(find.text('Shift Pagi'), findsOneWidget);
 
-    // Klik Maintenance
     await tester.tap(find.text('Maintenance'));
     await tester.pumpAndSettle();
     expect(find.text('Portal Operasional Maintenance'), findsOneWidget);
 
-    // Klik Administrator
     await tester.tap(find.text('Administrator'));
     await tester.pumpAndSettle();
     expect(find.text('Portal Administrator Hotel'), findsOneWidget);

@@ -15,8 +15,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/storage_helper.dart';
 import 'router/super_admin_router.dart';
-import 'screens/auth/super_admin_login_screen.dart';
-import 'screens/dashboard/super_admin_dashboard_screen.dart';
+import 'screens/splash/super_admin_loading_screen.dart';
 
 /// Entry point Super Admin Web App Go Ticket.
 ///
@@ -48,9 +47,7 @@ class GoTicketSuperAdminApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       onGenerateRoute: SuperAdminRouter.onGenerateRoute,
-      home: isLoggedIn
-          ? const SuperAdminDashboardScreen()
-          : const SuperAdminLoginScreen(),
+      home: const SuperAdminLoadingScreen(),
     );
   }
 }
