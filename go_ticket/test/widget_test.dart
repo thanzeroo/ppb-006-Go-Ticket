@@ -6,5 +6,6 @@ void main() {
   testWidgets('App should render', (WidgetTester tester) async {
     await tester.pumpWidget(const GoTicketApp());
     expect(find.byType(MaterialApp), findsOneWidget);
+    await tester.pumpAndSettle();
   });
 }

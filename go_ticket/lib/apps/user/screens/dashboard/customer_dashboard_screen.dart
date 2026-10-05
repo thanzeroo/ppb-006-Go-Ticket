@@ -37,9 +37,6 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   /// Apakah sedang memuat data hotel
   bool _isLoadingHotels = false;
 
-  /// Keyword pencarian aktif
-  String _searchKeyword = '';
-
   // ---------------------------------------------------------------------------
   // BUILD
   // ---------------------------------------------------------------------------

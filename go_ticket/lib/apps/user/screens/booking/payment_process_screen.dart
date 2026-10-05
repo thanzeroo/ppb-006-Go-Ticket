@@ -39,9 +39,6 @@ class _PaymentProcessScreenState extends State<PaymentProcessScreen> {
   /// Apakah instruksi pembayaran sudah ditampilkan
   bool _showInstructions = false;
 
-  // Countdown timer — 15 menit
-  int _countdown = 15 * 60;
-
   final List<_PaymentMethod> _paymentMethods = const [
     _PaymentMethod(
         id: 'bca_va',

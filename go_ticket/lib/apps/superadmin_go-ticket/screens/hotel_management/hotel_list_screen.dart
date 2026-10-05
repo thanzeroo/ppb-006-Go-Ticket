@@ -14,7 +14,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../core/widgets/custom_text_field.dart';
-import '../../../super_admin/router/super_admin_router.dart';
+import '../../router/super_admin_router.dart';
 
 /// Halaman daftar hotel mitra untuk Super Admin.
 class HotelListScreen extends StatefulWidget {

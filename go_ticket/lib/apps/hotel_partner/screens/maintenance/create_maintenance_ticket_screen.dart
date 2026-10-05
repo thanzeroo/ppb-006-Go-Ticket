@@ -142,7 +142,6 @@ class _CreateMaintenanceTicketScreenState
                 ('medium', 'Sedang', 'Perlu ditangani segera', AppColors.warning),
                 ('high', 'Tinggi', 'Mempengaruhi operasional', AppColors.error),
               ].map((p) {
-                final isSelected = _selectedPriority == p.$1;
                 return RadioListTile<String>(
                   value: p.$1,
                   groupValue: _selectedPriority,

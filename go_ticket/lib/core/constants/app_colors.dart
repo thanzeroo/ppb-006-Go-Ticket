@@ -78,6 +78,7 @@ class AppColors {
   static const Color grey700 = Color(0xFF374151);
   static const Color grey800 = Color(0xFF1F2937);
   static const Color grey900 = Color(0xFF111827);
+  static const Color grey950 = Color(0xFF030712);
 
   // ---------------------------------------------------------------------------
   // BACKGROUND COLORS
@@ -129,6 +130,7 @@ class AppColors {
 
   /// Status: Checked-in / Kamar terisi
   static const Color statusOccupied = Color(0xFF3B82F6);
+  static const Color statusCheckedIn = Color(0xFF3B82F6);
 
   /// Status: Check-out / Selesai
   static const Color statusCheckedOut = Color(0xFF6B7280);

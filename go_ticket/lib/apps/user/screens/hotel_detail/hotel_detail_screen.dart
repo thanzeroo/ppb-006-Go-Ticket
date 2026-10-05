@@ -28,9 +28,7 @@ class HotelDetailScreen extends StatefulWidget {
 }
 
 class _HotelDetailScreenState extends State<HotelDetailScreen> {
-  bool _isLoading = false;
   bool _isFavorite = false;
-  int _currentImageIndex = 0;
 
   // TODO: Muat data hotel dari HotelRepository berdasarkan arguments
 
