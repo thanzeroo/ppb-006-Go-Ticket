@@ -9,6 +9,7 @@
 // =============================================================================
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/widgets/auth_logo_header.dart';
 import '../admin_hotel/executive_dashboard_screen.dart';
@@ -29,7 +30,7 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
   late int _roleIndex;
 
   // Controllers untuk Staff & Maintenance
-  final _staffIdController = TextEditingController(text: 'STF-2025-084');
+  final _staffIdController = TextEditingController(text: 'STF-2025-085');
   final _staffPasswordController =
       TextEditingController(text: 'HotelMaintenancePass@2025');
 
@@ -37,6 +38,11 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
   final _adminEmailController =
       TextEditingController(text: 'admingrandamora@hotel');
   final _adminPasswordController = TextEditingController(text: 'secretpassword');
+
+  // Controllers & FocusNodes untuk 6-digit PIN OTP Administrator
+  final List<TextEditingController> _pinControllers =
+      List.generate(6, (_) => TextEditingController());
+  final List<FocusNode> _pinFocusNodes = List.generate(6, (_) => FocusNode());
 
   // State form
   int _selectedShift = 0; // 0 = Pagi, 1 = Sore, 2 = Malam
@@ -56,6 +62,12 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
     _staffPasswordController.dispose();
     _adminEmailController.dispose();
     _adminPasswordController.dispose();
+    for (final controller in _pinControllers) {
+      controller.dispose();
+    }
+    for (final node in _pinFocusNodes) {
+      node.dispose();
+    }
     super.dispose();
   }
 
@@ -100,26 +112,14 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
             )
           : null,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Badge Atas (Khusus Staff & Maintenance)
-              if (_roleIndex != 2) ...[
-                _buildSystemBadge(),
-                const SizedBox(height: 12),
-              ],
-
               // Logo dengan cyan glow & logo Hotel
               const AuthLogoHeader(imagePath: 'assets/logo_hotel.png'),
-              const SizedBox(height: 14),
-
-              // Badge Role Administrator (Khusus Admin)
-              if (_roleIndex == 2) ...[
-                _buildRoleBadge('👤 Role Administrator'),
-                const SizedBox(height: 10),
-              ],
+              const SizedBox(height: 18),
 
               // Judul & Subjudul
               _buildTitleAndSubtitle(),
@@ -129,13 +129,21 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
               _buildRoleSwitcher(),
               const SizedBox(height: 20),
 
-              // Form sesuai Role
-              _roleIndex == 2 ? _buildAdminForm() : _buildStaffMaintenanceForm(),
-              const SizedBox(height: 24),
+              // Form sesuai Role di dalam scrollview
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      _roleIndex == 2 ? _buildAdminForm() : _buildStaffMaintenanceForm(),
+                      const SizedBox(height: 24),
 
-              // Bagian Bawah / Info Keamanan Tambahan
-              _buildFooterInfo(),
-              const SizedBox(height: 20),
+                      // Bagian Bawah / Info Keamanan Tambahan
+                      _buildFooterInfo(),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -147,69 +155,21 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
   // HEADER COMPONENTS
   // ---------------------------------------------------------------------------
 
-  Widget _buildSystemBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE0F2FE),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFBAE6FD)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: const [
-          Icon(Icons.shield_outlined, size: 13, color: Color(0xFF0284C7)),
-          SizedBox(width: 5),
-          Text(
-            'SISTEM AKSES INTERNAL HOTEL V3.12',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF0284C7),
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRoleBadge(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: Color(0xFF334155),
-        ),
-      ),
-    );
-  }
-
   Widget _buildTitleAndSubtitle() {
     String title;
-    String? subtitle;
 
     if (_roleIndex == 0) {
       title = 'Portal Operasional Maintenance';
-      subtitle = 'Silakan masuk menggunakan ID Petugas dan PIN / Sandi terdaftar.';
     } else if (_roleIndex == 1) {
       title = 'Portal Operasional Staf';
-      subtitle = 'Silakan masuk menggunakan ID Petugas dan PIN / Sandi terdaftar.';
     } else {
       title = 'Portal Administrator Hotel';
-      subtitle = null;
     }
 
-    return Column(
-      children: [
-        Text(
+    return SizedBox(
+      height: 52,
+      child: Center(
+        child: Text(
           title,
           textAlign: TextAlign.center,
           style: const TextStyle(
@@ -219,15 +179,7 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
             letterSpacing: -0.3,
           ),
         ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 6),
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.3),
-          ),
-        ],
-      ],
+      ),
     );
   }
 
@@ -293,7 +245,7 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildInputLabel('ID Petugas / NIK Staf *'),
+        _buildInputLabel('ID Petugas'),
         _buildTextField(
           controller: _staffIdController,
           hintText: 'STF-2025-084',
@@ -301,7 +253,7 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
         ),
         const SizedBox(height: 14),
 
-        _buildInputLabel('Kata Sandi / Kredensial Keamanan *'),
+        _buildInputLabel('Kata Sandi'),
         _buildTextField(
           controller: _staffPasswordController,
           hintText: 'HotelMaintenancePass@2025',
@@ -505,10 +457,6 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
                         style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                       ),
                       SizedBox(height: 2),
-                      Text(
-                        'Bali Regency • #PROP-2025-089',
-                        style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                      ),
                     ],
                   ),
                   Container(
@@ -539,7 +487,7 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: const [
-            Text('Email Administrator / ID Manajer', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+            Text('Email Administrator', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
             Text('Akses Terotorisasi', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0284C7))),
           ],
         ),
@@ -551,7 +499,7 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
         ),
         const SizedBox(height: 14),
 
-        _buildInputLabel('Kata Sandi / Master Password'),
+        _buildInputLabel('Kata Sandi'),
         _buildTextField(
           controller: _adminPasswordController,
           hintText: '••••••••••••',
@@ -572,12 +520,10 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: const [
-            Text('PIN OTORISASI KEUANGAN 6–DIGIT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
-            Text('Opsional (2FA)', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-          ],
+            Text('PIN OTORISASI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF334155))),          ],
         ),
         const SizedBox(height: 8),
-        _buildPinBoxes(['7', '2', '9', '•', '•', '•']),
+        _buildPinBoxes(),
         const SizedBox(height: 12),
 
         // Checkbox & Lupa Kata Sandi
@@ -622,25 +568,62 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
   // HELPER WIDGETS
   // ---------------------------------------------------------------------------
 
-  Widget _buildPinBoxes(List<String> values) {
+  Widget _buildPinBoxes() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: values.map((val) {
+      children: List.generate(6, (index) {
         return Container(
           width: 44,
-          height: 44,
+          height: 48,
           decoration: BoxDecoration(
             color: const Color(0xFFF1F5F9),
             borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: _pinControllers[index].text.isNotEmpty
+                  ? const Color(0xFF00C7F2)
+                  : Colors.transparent,
+              width: 1.5,
+            ),
           ),
           child: Center(
-            child: Text(
-              val,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            child: TextField(
+              controller: _pinControllers[index],
+              focusNode: _pinFocusNodes[index],
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              maxLength: 1,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+              ],
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A),
+              ),
+              decoration: const InputDecoration(
+                counterText: '',
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+                isDense: true,
+              ),
+              onChanged: (value) {
+                setState(() {});
+                if (value.isNotEmpty) {
+                  if (index < 5) {
+                    _pinFocusNodes[index + 1].requestFocus();
+                  } else {
+                    _pinFocusNodes[index].unfocus();
+                  }
+                } else {
+                  if (index > 0) {
+                    _pinFocusNodes[index - 1].requestFocus();
+                  }
+                }
+              },
             ),
           ),
         );
-      }).toList(),
+      }),
     );
   }
 
@@ -717,64 +700,9 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
   Widget _buildFooterInfo() {
     if (_roleIndex == 0) {
       // Maintenance Footer Info
-      return Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.verified_user_outlined, size: 18, color: Color(0xFF0284C7)),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
-                        'Validasi Biometrik & Perangkat',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                      ),
-                      SizedBox(height: 3),
-                      Text(
-                        'Sistem mendeteksi workstation internal (Front-Desk Terminal A-03). Pastikan Anda melakukan serah terima shift secara resmi.',
-                        style: TextStyle(fontSize: 10, color: Color(0xFF64748B), height: 1.3),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.support_agent_rounded, size: 16, color: Color(0xFF0284C7)),
-                SizedBox(width: 8),
-                Text(
-                  'Hubungi Admin IT / Supervisor Resepsionis',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0284C7)),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          const Text(
-            'Enkripsi Keamanan End-to-End • Standar Operasional Perhotelan\nPT Go Ticket Ekosistem Hospitality © 2025',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 9, color: Color(0xFF94A3B8), height: 1.4),
-          ),
-        ],
+      return const Text(
+        'PT Go Ticket © 2026',
+        style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
       );
     } else if (_roleIndex == 1) {
       // Staff Footer Info
@@ -786,38 +714,6 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
       // Administrator Footer Info
       return Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              Icon(Icons.circle, size: 8, color: Color(0xFF0284C7)),
-              SizedBox(width: 6),
-              Text(
-                'SSL 256–bit Encrypted Session Active',
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
-              ),
-              SizedBox(width: 6),
-              Icon(Icons.shield_outlined, size: 12, color: Color(0xFF0284C7)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.headset_mic_outlined, size: 16, color: Color(0xFF0284C7)),
-                SizedBox(width: 8),
-                Text(
-                  'Bantuan IT & Hotline GM: +62 811–3829–001',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0284C7)),
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 10),
           const Text(
             'Sistem Terintegrasi Go Ticket HQ Escrow & Channel Manager\n© 2025 Go Ticket Ops',

@@ -1,12 +1,5 @@
-// =============================================================================
-// FILE: lib/apps/superadmin_go-ticket/screens/auth/super_admin_login_screen.dart
-// RESPONSIBILITY: Layar Login Super Admin Platform Go Ticket.
-// Tampilan presisi sesuai desain mockup: Banner otorisasi level 1, ID Admin,
-// Master Security Key, input token 2FA (TOTP), audit trail AES-256,
-// dan verifikasi IP otoritas.
-// =============================================================================
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/widgets/auth_logo_header.dart';
 import '../dashboard/super_admin_dashboard_screen.dart';
@@ -19,10 +12,15 @@ class SuperAdminLoginScreen extends StatefulWidget {
 }
 
 class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
-  final _emailController =
-      TextEditingController(text: 'admin.master@goticket.id');
-  final _passwordController =
-      TextEditingController(text: 'SuperSecret2025!');
+  final _emailController = TextEditingController(
+    text: 'admin.master@goticket.id',
+  );
+  final _passwordController = TextEditingController(text: 'SuperSecret2025!');
+
+  // Controllers & FocusNodes untuk 6-digit Kode Autentikasi Super Admin
+  final List<TextEditingController> _tokenControllers =
+      List.generate(6, (_) => TextEditingController());
+  final List<FocusNode> _tokenFocusNodes = List.generate(6, (_) => FocusNode());
 
   bool _obscurePassword = true;
   bool _rememberSession = true;
@@ -32,6 +30,12 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    for (final controller in _tokenControllers) {
+      controller.dispose();
+    }
+    for (final node in _tokenFocusNodes) {
+      node.dispose();
+    }
     super.dispose();
   }
 
@@ -57,7 +61,10 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
               backgroundColor: Colors.white,
               elevation: 0,
               leading: IconButton(
-                icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF1E293B)),
+                icon: const Icon(
+                  Icons.arrow_back_rounded,
+                  color: Color(0xFF1E293B),
+                ),
                 onPressed: () => Navigator.of(context).pop(),
               ),
               title: const Text(
@@ -67,62 +74,42 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
             )
           : null,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Banner Portal Sentral Super Admin Level 1
-              _buildTopLevelBanner(),
-              const SizedBox(height: 18),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight - 32),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Logo dengan cyan glow
+                      const AuthLogoHeader(),
+                      const SizedBox(height: 18),
 
-              // Logo dengan cyan glow
-              const AuthLogoHeader(),
-              const SizedBox(height: 18),
+                      // Judul & Subjudul
+                      const Text(
+                        'LOGIN ADMIN',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
 
-              // Judul & Subjudul
-              const Text(
-                'LOGIN ADMIN',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A),
-                  letterSpacing: 0.5,
+                      // Form Input Kredensial Admin
+                      _buildSuperAdminForm(),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 6),
-              const Text(
-                'Otorisasi panel kendali manajemen penginapan, kontrol\nstaf, pengguna, dan analitik finansial Go Ticket.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF64748B),
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Form Input Kredensial Admin
-              _buildSuperAdminForm(),
-              const SizedBox(height: 20),
-
-              // Kartu Audit Trail Keamanan
-              _buildAuditTrailCard(),
-              const SizedBox(height: 14),
-
-              // Tombol Bantuan Tim Teknis
-              _buildTechSupportButton(),
-              const SizedBox(height: 14),
-
-              // Info IP Otoritas
-              const Text(
-                'IP Otoritas: 180.252.164.20 (Jakarta Gateway Secured)',
-                style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -132,39 +119,12 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
   // WIDGETS
   // ---------------------------------------------------------------------------
 
-  Widget _buildTopLevelBanner() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEFF6FF),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFDBEAFE)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: const [
-          Icon(Icons.circle, size: 7, color: Color(0xFF2563EB)),
-          SizedBox(width: 6),
-          Text(
-            'PORTAL SENTRAL SUPER ADMIN • TINGKAT OTORISASI LEVEL 1',
-            style: TextStyle(
-              fontSize: 9.5,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF2563EB),
-              letterSpacing: 0.4,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSuperAdminForm() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Email / ID Super Admin
-        _buildInputLabel('Email / ID Super Admin'),
+        _buildInputLabel('Email '),
         _buildTextField(
           controller: _emailController,
           hintText: 'admin.master@goticket.id',
@@ -177,12 +137,12 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: const [
             Text(
-              'Master Security Key / Password',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
-            ),
-            Text(
-              'Kunci Vault Utama',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0284C7)),
+              'Password',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF334155),
+              ),
             ),
           ],
         ),
@@ -194,11 +154,14 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
           obscureText: _obscurePassword,
           suffixIcon: IconButton(
             icon: Icon(
-              _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+              _obscurePassword
+                  ? Icons.visibility_outlined
+                  : Icons.visibility_off_outlined,
               size: 18,
               color: const Color(0xFF94A3B8),
             ),
-            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+            onPressed: () =>
+                setState(() => _obscurePassword = !_obscurePassword),
           ),
         ),
         const SizedBox(height: 16),
@@ -212,25 +175,19 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                 Icon(Icons.shield_outlined, size: 14, color: Color(0xFF0284C7)),
                 SizedBox(width: 4),
                 Text(
-                  'Kode Autentikasi 2FA / Token',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
-                ),
-              ],
-            ),
-            Row(
-              children: const [
-                Icon(Icons.lock_outline_rounded, size: 13, color: Color(0xFF0284C7)),
-                SizedBox(width: 4),
-                Text(
-                  'Hardware Token / TOTP',
-                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                  'Kode Autentikasi',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF334155),
+                  ),
                 ),
               ],
             ),
           ],
         ),
         const SizedBox(height: 8),
-        _buildTokenBoxes(['8', '3', '9', '2', '–', '–']),
+        _buildTokenBoxes(),
         const SizedBox(height: 14),
 
         // Switch Sesi Resmi
@@ -241,14 +198,14 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: const [
                 Text(
-                  'Ingat Sesi di Perangkat Resmi',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  'Ingat Sesi',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                  ),
                 ),
                 SizedBox(height: 2),
-                Text(
-                  'Otorisasi terminal hotel terverifikasi (12 jam)',
-                  style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
-                ),
               ],
             ),
             Switch(
@@ -266,29 +223,62 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
     );
   }
 
-  Widget _buildTokenBoxes(List<String> values) {
+  Widget _buildTokenBoxes() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: values.map((val) {
+      children: List.generate(6, (index) {
         return Container(
           width: 44,
-          height: 44,
+          height: 48,
           decoration: BoxDecoration(
             color: const Color(0xFFF1F5F9),
             borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: _tokenControllers[index].text.isNotEmpty
+                  ? const Color(0xFF00C7F2)
+                  : Colors.transparent,
+              width: 1.5,
+            ),
           ),
           child: Center(
-            child: Text(
-              val,
+            child: TextField(
+              controller: _tokenControllers[index],
+              focusNode: _tokenFocusNodes[index],
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              maxLength: 1,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+              ],
               style: const TextStyle(
-                fontSize: 16,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF0F172A),
               ),
+              decoration: const InputDecoration(
+                counterText: '',
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+                isDense: true,
+              ),
+              onChanged: (value) {
+                setState(() {});
+                if (value.isNotEmpty) {
+                  if (index < 5) {
+                    _tokenFocusNodes[index + 1].requestFocus();
+                  } else {
+                    _tokenFocusNodes[index].unfocus();
+                  }
+                } else {
+                  if (index > 0) {
+                    _tokenFocusNodes[index - 1].requestFocus();
+                  }
+                }
+              },
             ),
           ),
         );
-      }).toList(),
+      }),
     );
   }
 
@@ -316,13 +306,18 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
         ),
         child: _isLoading
             ? const SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
               )
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -338,84 +333,13 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                     ),
                   ),
                   SizedBox(width: 6),
-                  Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 18),
+                  Icon(
+                    Icons.arrow_forward_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                 ],
               ),
-      ),
-    );
-  }
-
-  Widget _buildAuditTrailCard() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE0F2FE),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(Icons.shield_rounded, size: 18, color: Color(0xFF0369A1)),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  'AUDIT TRAIL KEAMANAN AKTIF',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A),
-                    letterSpacing: 0.3,
-                  ),
-                ),
-                SizedBox(height: 3),
-                Text(
-                  'Dilindungi Enkripsi AES–256 & Audit Trail Transaksi Realtime. Setiap aktivitas login dan modifikasi data admin dicatat secara permanen ke server log.',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Color(0xFF64748B),
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTechSupportButton() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
-          Icon(Icons.headset_mic_outlined, size: 16, color: Color(0xFF0F172A)),
-          SizedBox(width: 8),
-          Text(
-            'Hubungi Tim Teknis & Keamanan Server',
-            style: TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF0F172A),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -425,7 +349,11 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
       padding: const EdgeInsets.only(bottom: 6),
       child: Text(
         text,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF334155),
+        ),
       ),
     );
   }
@@ -449,10 +377,17 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
         decoration: InputDecoration(
           hintText: hintText,
           hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-          prefixIcon: Icon(prefixIcon, color: const Color(0xFF0284C7), size: 18),
+          prefixIcon: Icon(
+            prefixIcon,
+            color: const Color(0xFF0284C7),
+            size: 18,
+          ),
           suffixIcon: suffixIcon,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 14,
+          ),
         ),
       ),
     );

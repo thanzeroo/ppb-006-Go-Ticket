@@ -1,10 +1,3 @@
-// =============================================================================
-// FILE: lib/apps/user/screens/auth/customer_login_screen.dart
-// RESPONSIBILITY: Halaman Login & Register untuk Customer / User Go Ticket.
-// Tampilan presisi sesuai desain mockup: Tab Masuk & Daftar Akun, form input,
-// tombol login sosial (Google & Apple), dan info keamanan perbankan.
-// =============================================================================
-
 import 'package:flutter/material.dart';
 
 import '../../../../core/widgets/auth_logo_header.dart';
@@ -18,7 +11,6 @@ class CustomerLoginScreen extends StatefulWidget {
 }
 
 class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
-  // 0 = Masuk (Login), 1 = Daftar Akun (Register)
   int _tabIndex = 0;
 
   // Controllers untuk Login
@@ -72,7 +64,10 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
               backgroundColor: Colors.white,
               elevation: 0,
               leading: IconButton(
-                icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF1E293B)),
+                icon: const Icon(
+                  Icons.arrow_back_rounded,
+                  color: Color(0xFF1E293B),
+                ),
                 onPressed: () => Navigator.of(context).pop(),
               ),
               title: const Text(
@@ -82,68 +77,61 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
             )
           : null,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Logo dengan efek cyan glow
-              const AuthLogoHeader(),
-              const SizedBox(height: 18),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight - 40),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Logo dengan efek cyan glow
+                      const AuthLogoHeader(),
+                      const SizedBox(height: 18),
 
-              // Judul Utama: "Selamat Datang di Go Ticket"
-              RichText(
-                textAlign: TextAlign.center,
-                text: const TextSpan(
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Inter',
-                    letterSpacing: -0.3,
+                      // Judul Utama: "Selamat Datang di Go Ticket"
+                      RichText(
+                        textAlign: TextAlign.center,
+                        text: const TextSpan(
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Inter',
+                            letterSpacing: -0.3,
+                          ),
+                          children: [
+                            TextSpan(
+                              text: 'Selamat Datang di ',
+                              style: TextStyle(color: Color(0xFF0F172A)),
+                            ),
+                            TextSpan(
+                              text: 'Go Ticket',
+                              style: TextStyle(color: Color(0xFF0077B6)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+
+                      // Switcher Tab: [ Masuk ] [ Daftar Akun ]
+                      _buildTabSwitcher(),
+                      const SizedBox(height: 24),
+
+                      // Form sesuai tab yang dipilih
+                      _tabIndex == 0 ? _buildLoginForm() : _buildRegisterForm(),
+                      const SizedBox(height: 24),
+
+                      // Badge Keamanan Enkripsi
+                      _buildSecurityBadge(),
+                    ],
                   ),
-                  children: [
-                    TextSpan(
-                      text: 'Selamat Datang di ',
-                      style: TextStyle(color: Color(0xFF0F172A)),
-                    ),
-                    TextSpan(
-                      text: 'Go\nTicket',
-                      style: TextStyle(color: Color(0xFF0077B6)),
-                    ),
-                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-
-              // Subjudul
-              const Text(
-                'Akses kemudahan reservasi hotel & penginapan\nterbaik impianmu',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF64748B),
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 22),
-
-              // Switcher Tab: [ Masuk ] [ Daftar Akun ]
-              _buildTabSwitcher(),
-              const SizedBox(height: 24),
-
-              // Form sesuai tab yang dipilih
-              _tabIndex == 0 ? _buildLoginForm() : _buildRegisterForm(),
-              const SizedBox(height: 24),
-
-              // Badge Keamanan Enkripsi
-              _buildSecurityBadge(),
-              const SizedBox(height: 14),
-
-              // Kartu Keuntungan Member
-              _buildMemberBenefitCard(),
-              const SizedBox(height: 16),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -214,7 +202,9 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
             Icon(
               icon,
               size: 16,
-              color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+              color: isSelected
+                  ? const Color(0xFF0F172A)
+                  : const Color(0xFF64748B),
             ),
             const SizedBox(width: 6),
             Text(
@@ -222,7 +212,9 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+                color: isSelected
+                    ? const Color(0xFF0F172A)
+                    : const Color(0xFF64748B),
               ),
             ),
           ],
@@ -236,7 +228,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildInputLabel('Email atau No. WhatsApp'),
+        _buildInputLabel('Email / Nomor WhatsApp'),
         _buildTextField(
           controller: _emailLoginController,
           hintText: 'nama@email.com / 0812xxxx',
@@ -268,11 +260,14 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           obscureText: _obscurePassword,
           suffixIcon: IconButton(
             icon: Icon(
-              _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+              _obscurePassword
+                  ? Icons.visibility_outlined
+                  : Icons.visibility_off_outlined,
               size: 18,
               color: const Color(0xFF94A3B8),
             ),
-            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+            onPressed: () =>
+                setState(() => _obscurePassword = !_obscurePassword),
           ),
         ),
         const SizedBox(height: 12),
@@ -282,10 +277,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         const SizedBox(height: 18),
 
         // Tombol Masuk ke Akun
-        _buildPrimaryButton(
-          title: 'Masuk ke Akun',
-          onTap: _submit,
-        ),
+        _buildPrimaryButton(title: 'Masuk ke Akun', onTap: _submit),
         const SizedBox(height: 22),
 
         // Divider: ATAU LANJUTKAN DENGAN
@@ -298,8 +290,6 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
             Expanded(
               child: _buildSocialButton(
                 title: 'Google',
-                icon: Icons.g_mobiledata_rounded,
-                isGoogle: true,
                 onTap: _submit,
               ),
             ),
@@ -307,7 +297,6 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
             Expanded(
               child: _buildSocialButton(
                 title: 'Apple',
-                icon: Icons.apple_rounded,
                 onTap: _submit,
               ),
             ),
@@ -354,11 +343,14 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           obscureText: _obscurePassword,
           suffixIcon: IconButton(
             icon: Icon(
-              _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+              _obscurePassword
+                  ? Icons.visibility_outlined
+                  : Icons.visibility_off_outlined,
               size: 18,
               color: const Color(0xFF94A3B8),
             ),
-            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+            onPressed: () =>
+                setState(() => _obscurePassword = !_obscurePassword),
           ),
         ),
         const SizedBox(height: 14),
@@ -371,11 +363,15 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           obscureText: _obscureConfirmPassword,
           suffixIcon: IconButton(
             icon: Icon(
-              _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+              _obscureConfirmPassword
+                  ? Icons.visibility_outlined
+                  : Icons.visibility_off_outlined,
               size: 18,
               color: const Color(0xFF94A3B8),
             ),
-            onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+            onPressed: () => setState(
+              () => _obscureConfirmPassword = !_obscureConfirmPassword,
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -383,10 +379,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         _buildRememberMeCheckbox(),
         const SizedBox(height: 18),
 
-        _buildPrimaryButton(
-          title: 'Buat Akun',
-          onTap: _submit,
-        ),
+        _buildPrimaryButton(title: 'Buat Akun', onTap: _submit),
       ],
     );
   }
@@ -424,10 +417,17 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         decoration: InputDecoration(
           hintText: hintText,
           hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-          prefixIcon: Icon(prefixIcon, color: const Color(0xFF00A8E8), size: 18),
+          prefixIcon: Icon(
+            prefixIcon,
+            color: const Color(0xFF00A8E8),
+            size: 18,
+          ),
           suffixIcon: suffixIcon,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 14,
+          ),
         ),
       ),
     );
@@ -442,7 +442,9 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           child: Checkbox(
             value: _rememberMe,
             activeColor: const Color(0xFF00C7F2),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
             side: const BorderSide(color: Color(0xFF00C7F2), width: 1.5),
             onChanged: (val) => setState(() => _rememberMe = val ?? false),
           ),
@@ -469,13 +471,18 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           backgroundColor: const Color(0xFF00C7F2),
           elevation: 0,
           shadowColor: const Color(0xFF00C7F2).withValues(alpha: 0.4),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
         ),
         child: _isLoading
             ? const SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
               )
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -489,7 +496,11 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 18),
+                  const Icon(
+                    Icons.arrow_forward_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                 ],
               ),
       ),
@@ -519,8 +530,6 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
 
   Widget _buildSocialButton({
     required String title,
-    required IconData icon,
-    bool isGoogle = false,
     required VoidCallback onTap,
   }) {
     return InkWell(
@@ -532,29 +541,15 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           color: const Color(0xFFF1F5F9),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            isGoogle
-                ? const Text(
-                    'G',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFFEA4335),
-                    ),
-                  )
-                : Icon(icon, size: 20, color: const Color(0xFF0F172A)),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF334155),
-              ),
+        child: Center(
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF334155),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -576,54 +571,6 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildMemberBenefitCard() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE0F2FE).withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.stars_rounded,
-              color: Color(0xFF0284C7),
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  'Keuntungan Khusus Member',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A),
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Dapatkan poin cashback & konfirmasi instan',
-                  style: TextStyle(fontSize: 11, color: Color(0xFF0284C7)),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

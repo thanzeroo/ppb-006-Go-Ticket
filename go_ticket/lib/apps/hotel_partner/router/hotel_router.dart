@@ -10,7 +10,6 @@ import '../screens/admin_hotel/employee_management_screen.dart';
 import '../screens/admin_hotel/executive_dashboard_screen.dart';
 import '../screens/admin_hotel/financial_payout_screen.dart';
 import '../screens/admin_hotel/room_pricing_screen.dart';
-import '../screens/auth/admin_hotel_login_screen.dart';
 import '../screens/auth/staff_login_screen.dart';
 import '../screens/front_office/checkout_process_screen.dart';
 import '../screens/front_office/fo_dashboard_screen.dart';
@@ -61,7 +60,7 @@ class HotelRouter {
       case staffLogin:
         return _buildRoute(const StaffLoginScreen(), settings);
       case adminHotelLogin:
-        return _buildRoute(const AdminHotelLoginScreen(), settings);
+        return _buildRoute(const StaffLoginScreen(initialRole: 2), settings);
       case foDashboard:
         return _buildRoute(const FoDashboardScreen(), settings);
       case verifyBooking:
