@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-import '../../router/customer_router.dart';
+import 'tabs/beranda_tab.dart';
+import 'tabs/cari_tab.dart';
+import 'tabs/pesanan_tab.dart';
+import 'tabs/pengaturan_tab.dart';
 
-/// Halaman Dashboard Customer (User).
-/// Tampilan dikosongkan sesuai permintaan: hanya teks "ini dashboard"
-/// dengan BottomNavigationBar yang menghubungkan halaman-halaman utama.
+/// Halaman Dashboard Customer (User) — Full UI dengan 4 tab utama.
+/// Beranda | Cari | Pesanan | Pengaturan
 class CustomerDashboardScreen extends StatefulWidget {
   const CustomerDashboardScreen({super.key});
 
@@ -16,170 +19,114 @@ class CustomerDashboardScreen extends StatefulWidget {
 class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   int _currentIndex = 0;
 
+  static const List<Widget> _pages = [
+    BerandaTab(),
+    CariTab(),
+    PesananTab(),
+    PengaturanTab(),
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: Text(
-          _getTitleForIndex(_currentIndex),
-          style: const TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        actions: [
-          // Contoh tombol cepat untuk tes navigasi ke detail & booking hotel
-          IconButton(
-            icon: const Icon(Icons.hotel_rounded, color: Colors.black),
-            tooltip: 'Detail Hotel',
-            onPressed: () {
-              Navigator.pushNamed(context, CustomerRouter.hotelDetail);
-            },
-          ),
-        ],
+      extendBody: true,
+      backgroundColor: const Color(0xFFF5F7FA),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _pages,
       ),
-      body: _buildPageContent(_currentIndex),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: Colors.black,
-        unselectedItemColor: Colors.black38,
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Dashboard',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search_outlined),
-            activeIcon: Icon(Icons.search),
-            label: 'Cari',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.receipt_long_outlined),
-            activeIcon: Icon(Icons.receipt_long),
-            label: 'Pesanan',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Profil',
-          ),
-        ],
-      ),
+      bottomNavigationBar: _buildBottomNav(),
     );
   }
 
-  String _getTitleForIndex(int index) {
-    switch (index) {
-      case 0:
-        return 'Dashboard';
-      case 1:
-        return 'Pencarian';
-      case 2:
-        return 'Pesanan Saya';
-      case 3:
-        return 'Profil';
-      default:
-        return 'Dashboard';
-    }
-  }
+  Widget _buildBottomNav() {
+    const items = [
+      _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Beranda'),
+      _NavItem(icon: Icons.search_outlined, activeIcon: Icons.search, label: 'Cari'),
+      _NavItem(
+          icon: Icons.receipt_long_outlined,
+          activeIcon: Icons.receipt_long,
+          label: 'Pesanan'),
+      _NavItem(
+          icon: Icons.person_outline, activeIcon: Icons.person, label: 'Pengaturan'),
+    ];
 
-  Widget _buildPageContent(int index) {
-    switch (index) {
-      case 0:
-        return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text(
-                'ini dashboard',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 16,
+            offset: const Offset(0, -2),
+          ),
+        ],
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Row(
+            children: List.generate(items.length, (index) {
+              final item = items[index];
+              final isSelected = index == _currentIndex;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _currentIndex = index),
+                  behavior: HitTestBehavior.opaque,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? const Color(0xFF00B4D8).withOpacity(0.1)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isSelected ? item.activeIcon : item.icon,
+                          color: isSelected
+                              ? const Color(0xFF00B4D8)
+                              : const Color(0xFF9CA3AF),
+                          size: 22,
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          item.label,
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : FontWeight.w400,
+                            color: isSelected
+                                ? const Color(0xFF00B4D8)
+                                : const Color(0xFF9CA3AF),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.black,
-                  side: const BorderSide(color: Colors.black),
-                ),
-                onPressed: () {
-                  Navigator.pushNamed(context, CustomerRouter.hotelDetail);
-                },
-                icon: const Icon(Icons.arrow_forward),
-                label: const Text('Ke Halaman Hotel'),
-              ),
-            ],
+              );
+            }),
           ),
-        );
-      case 1:
-        return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text(
-                'Halaman Pencarian',
-                style: TextStyle(fontSize: 16, color: Colors.black54),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: () {
-                  Navigator.pushNamed(context, CustomerRouter.hotelDetail);
-                },
-                child: const Text('Buka Contoh Hotel'),
-              ),
-            ],
-          ),
-        );
-      case 2:
-        return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text(
-                'Halaman Riwayat Pesanan & Tiket',
-                style: TextStyle(fontSize: 16, color: Colors.black54),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: () {
-                  Navigator.pushNamed(context, CustomerRouter.eTicket);
-                },
-                child: const Text('Lihat E-Tiket'),
-              ),
-            ],
-          ),
-        );
-      case 3:
-        return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text(
-                'Halaman Profil User',
-                style: TextStyle(fontSize: 16, color: Colors.black54),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: () {
-                  Navigator.pushReplacementNamed(context, CustomerRouter.login);
-                },
-                child: const Text('Keluar / Ganti Akun'),
-              ),
-            ],
-          ),
-        );
-      default:
-        return const Center(child: Text('ini dashboard'));
-    }
+        ),
+      ),
+    );
   }
+}
+
+class _NavItem {
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+
+  const _NavItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+  });
 }
