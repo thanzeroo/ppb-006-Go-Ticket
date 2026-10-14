@@ -2,13 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../../core/utils/storage_helper.dart';
 import '../auth/customer_login_screen.dart';
-import '../dashboard/customer_dashboard_screen.dart';
 
-/// Halaman Loading / Splash Screen untuk User (Customer).
-/// Menampilkan latar belakang gelap dengan logo Go Ticket di tengah,
-/// lalu secara otomatis berpindah ke halaman Login atau Dashboard.
+/// Splash Screen untuk User/Customer.
 class CustomerLoadingScreen extends StatefulWidget {
   const CustomerLoadingScreen({super.key});
 
@@ -17,45 +13,20 @@ class CustomerLoadingScreen extends StatefulWidget {
 }
 
 class _CustomerLoadingScreenState extends State<CustomerLoadingScreen> {
-  Timer? _timer;
-
   @override
   void initState() {
     super.initState();
-    _startTimer();
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  /// Menunggu selama 2 detik lalu mengecek sesi login user
-  void _startTimer() {
-    _timer = Timer(const Duration(seconds: 2), () async {
+    Timer(const Duration(seconds: 2), () {
       if (!mounted) return;
-
-      // Cek apakah user sudah login
-      final isLoggedIn = await StorageHelper.isLoggedIn();
-
-      if (!mounted) return;
-
-      // Navigasi ke halaman tujuan
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-          builder: (_) => isLoggedIn
-              ? const CustomerDashboardScreen()
-              : const CustomerLoginScreen(),
-        ),
+        MaterialPageRoute(builder: (_) => const CustomerLoginScreen()),
       );
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // Mengatur warna ikon status bar (jam & baterai) agar terlihat putih
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -63,17 +34,30 @@ class _CustomerLoadingScreenState extends State<CustomerLoadingScreen> {
       ),
     );
 
-    return Scaffold(
-      // Warna background gelap kebiruan sesuai desain mockup
-      backgroundColor: const Color(0xFF13222B),
+    return const Scaffold(
+      backgroundColor: Color(0xFF13222B),
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 48),
-          child: Image.asset(
-            'assets/logo.png',
-            width: 220,
-            fit: BoxFit.contain,
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.confirmation_number_outlined,
+                size: 64, color: Color(0xFF00B4D8)),
+            SizedBox(height: 16),
+            Text(
+              'GoTicket',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.5,
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Temukan penginapan impian Anda',
+              style: TextStyle(color: Colors.white54, fontSize: 13),
+            ),
+          ],
         ),
       ),
     );

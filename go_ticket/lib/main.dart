@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'apps/hotel_partner/screens/splash/hotel_loading_screen.dart';
-import 'apps/superadmin_go-ticket/screens/splash/super_admin_loading_screen.dart';
+import 'apps/pihak_hotel/screens/splash/hotel_splash_screen.dart';
+import 'apps/pihak_go_ticket/screens/splash/admin_splash_screen.dart';
 import 'apps/user/screens/splash/customer_loading_screen.dart';
 
 void main() {
@@ -13,14 +13,15 @@ class GoTicketApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
+      title: 'Go Ticket',
       debugShowCheckedModeBanner: false,
-      home: PortalSelectionScreen(),
+      home: const PortalSelectionScreen(),
     );
   }
 }
 
-/// Layar pemilihan portal sederhana hitam putih (minimalis kaku)
+/// Layar pemilihan portal — pintu masuk ke 3 role utama.
 class PortalSelectionScreen extends StatelessWidget {
   const PortalSelectionScreen({super.key});
 
@@ -30,28 +31,58 @@ class PortalSelectionScreen extends StatelessWidget {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 32),
-              _buildSimpleButton(
+              // Logo
+              const Icon(Icons.confirmation_number_outlined,
+                  size: 48, color: Color(0xFF00B4D8)),
+              const SizedBox(height: 12),
+              const Text(
+                'Go Ticket',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Pilih portal untuk melanjutkan',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+              ),
+              const SizedBox(height: 40),
+
+              _buildPortalButton(
                 context: context,
-                label: '1. User (Tamu)',
+                label: 'User (Tamu)',
+                subtitle: 'Cari & booking hotel',
+                icon: Icons.person_outline,
+                color: const Color(0xFF00B4D8),
                 destination: const CustomerLoadingScreen(),
               ),
               const SizedBox(height: 12),
-              _buildSimpleButton(
+              _buildPortalButton(
                 context: context,
-                label: '2. Pihak Hotel',
-                destination: const HotelLoadingScreen(),
+                label: 'Pihak Hotel',
+                subtitle: 'Kelola hotel mitra',
+                icon: Icons.hotel_outlined,
+                color: const Color(0xFF0D3B55),
+                destination: const HotelSplashScreen(),
               ),
               const SizedBox(height: 12),
-              _buildSimpleButton(
+              _buildPortalButton(
                 context: context,
-                label: '3. Admin Go Ticket',
-                destination: const SuperAdminLoadingScreen(),
+                label: 'Pihak Go Ticket',
+                subtitle: 'Panel administrasi platform',
+                icon: Icons.admin_panel_settings_outlined,
+                color: const Color(0xFF7C3AED),
+                destination: const AdminSplashScreen(),
               ),
             ],
           ),
@@ -60,43 +91,66 @@ class PortalSelectionScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSimpleButton({
+  Widget _buildPortalButton({
     required BuildContext context,
     required String label,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
     required Widget destination,
   }) {
-    return SizedBox(
-      height: 52,
-      child: OutlinedButton(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.black,
-          backgroundColor: Colors.white,
-          side: const BorderSide(color: Colors.black, width: 1.5),
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.zero,
-          ),
-          alignment: Alignment.centerLeft,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+    return Material(
+      color: color.withOpacity(0.05),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => destination),
         ),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => destination),
-          );
-        },
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: color.withOpacity(0.25)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 22),
               ),
-            ),
-            const Icon(Icons.arrow_forward, color: Colors.black, size: 18),
-          ],
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: color.withOpacity(0.5)),
+            ],
+          ),
         ),
       ),
     );

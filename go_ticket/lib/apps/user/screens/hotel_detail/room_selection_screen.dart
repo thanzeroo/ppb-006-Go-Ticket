@@ -64,7 +64,9 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       color: AppColors.white,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: GestureDetector(
-        onTap: () => Navigator.pushNamed(context, CustomerRouter.calendar),
+        onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Pilih tanggal — coming soon')),
+        ),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
@@ -97,6 +99,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       ),
     );
   }
+
 
   Widget _buildRoomList() {
     // TODO: Ganti dengan data dari RoomRepository
