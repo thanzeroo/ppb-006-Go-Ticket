@@ -5,8 +5,8 @@ import 'package:go_ticket/apps/pihak_hotel/screens/auth/staff_login_screen.dart'
 import 'package:go_ticket/apps/pihak_hotel/screens/splash/hotel_splash_screen.dart';
 import 'package:go_ticket/apps/pihak_go_ticket/screens/auth/admin_login_screen.dart';
 import 'package:go_ticket/apps/pihak_go_ticket/screens/splash/admin_splash_screen.dart';
-import 'package:go_ticket/apps/user/screens/auth/customer_login_screen.dart';
-import 'package:go_ticket/apps/user/screens/splash/customer_loading_screen.dart';
+import 'package:go_ticket/apps/pihak_user/screens/auth/customer_login_screen.dart';
+import 'package:go_ticket/apps/pihak_user/screens/splash/customer_loading_screen.dart';
 import 'package:go_ticket/main.dart';
 
 void main() {
@@ -67,6 +67,23 @@ void main() {
     expect(find.text('Nama Lengkap'), findsOneWidget);
     expect(find.text('Nomor Telepon'), findsOneWidget);
     expect(find.text('Buat Akun'), findsOneWidget);
+
+    // Scroll ke tombol "Buat Akun" dan klik
+    await tester.ensureVisible(find.text('Buat Akun'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Buat Akun'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Syarat & Ketentuan'), findsOneWidget);
+    expect(find.text('Hotel Policies'), findsOneWidget);
+    expect(find.text('Kebijakan Berlaku Aktif'), findsOneWidget);
+    expect(find.text('Setuju & Lanjutkan'), findsOneWidget);
+
+    // Klik "Setuju & Lanjutkan" balik lagi ke login utama
+    await tester.tap(find.text('Setuju & Lanjutkan'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Masuk ke Akun'), findsOneWidget);
   });
 
   testWidgets('StaffLoginScreen should render role selector', (WidgetTester tester) async {

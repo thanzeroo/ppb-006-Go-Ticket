@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'apps/pihak_hotel/screens/splash/hotel_splash_screen.dart';
 import 'apps/pihak_go_ticket/screens/splash/admin_splash_screen.dart';
-import 'apps/user/screens/splash/customer_loading_screen.dart';
+import 'apps/pihak_user/screens/splash/customer_loading_screen.dart';
 
 void main() {
   runApp(const GoTicketApp());
