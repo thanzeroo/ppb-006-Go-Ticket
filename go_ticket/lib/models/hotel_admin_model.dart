@@ -1,5 +1,14 @@
 import 'package:flutter/material.dart';
 
+// =============================================================================
+// FILE: lib/models/hotel_admin_model.dart
+// RESPONSIBILITY: Data model untuk modul Administrator Pihak Hotel di Go Ticket.
+// Mencakup:
+// - RoomTypeData: data master kamar, okupansi, dan tarif weekday/weekend
+// - StaffData: data staf hotel, roster shift, kontak, dan hak otorisasi
+// - TransactionData: mutasi kas, reservasi kamar, dan metode pembayaran
+// =============================================================================
+
 class RoomTypeData {
   final String badge;
   final String? secondaryBadge;

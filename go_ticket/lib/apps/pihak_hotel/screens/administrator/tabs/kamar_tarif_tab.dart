@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../models/administrator_models.dart';
-import '../screens/add_room_type_screen.dart';
-import '../screens/edit_room_type_screen.dart';
-import '../widgets/administrator_theme.dart';
+import '../../../../../core/theme/hotel_admin_theme.dart';
+import '../../../../../models/hotel_admin_model.dart';
+import 'add_room_type_screen.dart';
+import 'edit_room_type_screen.dart';
 
 /// Tab 2: Master Kamar & Kelola Tarif Administrator
 class KamarTarifTab extends StatefulWidget {

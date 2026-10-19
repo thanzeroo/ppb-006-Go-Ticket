@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../models/administrator_models.dart';
-import '../screens/add_staff_screen.dart';
-import '../screens/edit_staff_screen.dart';
-import '../widgets/administrator_theme.dart';
+import '../../../../../core/theme/hotel_admin_theme.dart';
+import '../../../../../models/hotel_admin_model.dart';
+import 'add_staff_screen.dart';
+import 'edit_staff_screen.dart';
 
 /// Tab 3: Manajemen Staf & Hak Akses Administrator
 class StafTimTab extends StatefulWidget {

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import 'models/administrator_models.dart';
+import '../../../../core/theme/hotel_admin_theme.dart';
+import '../../../../models/hotel_admin_model.dart';
 import 'tabs/dashboard_tab.dart';
 import 'tabs/kamar_tarif_tab.dart';
 import 'tabs/keuangan_tab.dart';
 import 'tabs/staf_tim_tab.dart';
-import 'widgets/administrator_theme.dart';
 
 /// Main Dashboard Screen for Administrator Pihak Hotel
 /// Consists of 4 Tabs:

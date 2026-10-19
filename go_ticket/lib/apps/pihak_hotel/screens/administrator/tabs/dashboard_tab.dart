@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../widgets/administrator_theme.dart';
+
+import '../../../../../core/theme/hotel_admin_theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TAB 1 – DASHBOARD ADMINISTRATOR

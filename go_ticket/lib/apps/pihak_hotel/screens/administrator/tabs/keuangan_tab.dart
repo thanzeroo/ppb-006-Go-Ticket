@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../models/administrator_models.dart';
-import '../widgets/administrator_theme.dart';
+import '../../../../../core/theme/hotel_admin_theme.dart';
+import '../../../../../models/hotel_admin_model.dart';
 
 /// Tab 4: Buku Kas & Keuangan Administrator
 class KeuanganTab extends StatefulWidget {
