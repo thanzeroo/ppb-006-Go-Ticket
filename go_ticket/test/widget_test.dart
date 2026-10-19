@@ -91,10 +91,18 @@ void main() {
       home: StaffLoginScreen(),
     ));
 
-    expect(find.text('Login Staf Hotel'), findsOneWidget);
-    expect(find.text('Front Office'), findsOneWidget);
+    expect(find.text('Portal Operasional Staf'), findsOneWidget);
+    expect(find.text('Staf'), findsNWidgets(2)); // Tab utama dan Sub-role
     expect(find.text('Maintenance'), findsOneWidget);
-    expect(find.text('Admin Hotel'), findsOneWidget);
+    expect(find.text('Administrator'), findsOneWidget);
+    expect(find.text('Pilih Shift Tugas'), findsOneWidget);
+
+    // Beralih ke tab Administrator
+    await tester.tap(find.text('Administrator'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Portal Administrator Hotel'), findsOneWidget);
+    expect(find.text('PIN Otorisasi Keuangan 6-Digit'), findsOneWidget);
   });
 
   testWidgets('AdminLoginScreen should render', (WidgetTester tester) async {
@@ -102,7 +110,9 @@ void main() {
       home: AdminLoginScreen(),
     ));
 
-    expect(find.text('GoTicket Admin'), findsOneWidget);
-    expect(find.text('Panel Pihak Go Ticket'), findsOneWidget);
+    expect(find.text('LOGIN ADMIN'), findsOneWidget);
+    expect(find.text('Email / ID Super Admin'), findsOneWidget);
+    expect(find.text('Otorisasi & Buka Dashboard'), findsOneWidget);
+    expect(find.text('AUDIT TRAIL KEAMANAN AKTIF'), findsOneWidget);
   });
 }
