@@ -2,6 +2,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'add_room_type_screen.dart';
+import 'add_staff_screen.dart';
+import 'edit_room_type_screen.dart';
+import 'edit_staff_screen.dart';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DATA MODELS (local, presentational only)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -136,6 +141,14 @@ class _ExecutiveDashboardScreenState extends State<ExecutiveDashboardScreen> {
 
   final List<_StaffMember> _staff = const [
     _StaffMember(
+      name: 'Ni Made Anggreni, S.Tr.Par', id: '#STF-2024-004',
+      role: 'Front Office Lead / Senior',
+      statusLabel: 'Aktif Bertugas',
+      statusColor: Color(0xFF0D9B9B),
+      akses: ['Verifikasi Booking', 'RFID Smart Lock', 'Otorisasi Refund'],
+      wa: '+62 813-3982-1140',
+    ),
+    _StaffMember(
       name: 'Budi Santoso', id: '#HK-2011',
       role: 'Housekeeping Supervisor (S...',
       statusLabel: 'Aktif Bertugas',
@@ -227,6 +240,15 @@ class _ExecutiveDashboardScreenState extends State<ExecutiveDashboardScreen> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
               child: Row(
                 children: [
+                  if (Navigator.canPop(context)) ...[
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
+                      onPressed: () => Navigator.pop(context),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
                   Container(
                     width: 32, height: 32,
                     decoration: BoxDecoration(
@@ -538,8 +560,17 @@ class _KamarTarifTabViewState extends State<_KamarTarifTabView> {
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800,
               color: Color(0xFF1E293B))),
         const SizedBox(height: 14),
-        _PrimaryBtn(icon: Icons.add_circle_outline,
-            label: '+ Tambah Tipe Kamar Baru', color: widget.teal, onTap: () {}),
+        _PrimaryBtn(
+          icon: Icons.add_circle_outline,
+          label: '+ Tambah Tipe Kamar Baru',
+          color: widget.teal,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AddRoomTypeScreen()),
+            );
+          },
+        ),
         const SizedBox(height: 12),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
@@ -681,7 +712,17 @@ class _RoomCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 10)))),
               const SizedBox(width: 8),
               Expanded(child: ElevatedButton.icon(
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => EditRoomTypeScreen(
+                        roomName: room.name,
+                        category: room.badge,
+                      ),
+                    ),
+                  );
+                },
                 icon: const Icon(Icons.edit_outlined, size: 14),
                 label: const Text('Edit Kamar'),
                 style: ElevatedButton.styleFrom(
@@ -1054,8 +1095,17 @@ class _StafTimTabViewState extends State<_StafTimTabView> {
         const Text('Manajemen Staf & Hak Akses',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF1E293B))),
         const SizedBox(height: 14),
-        _PrimaryBtn(icon: Icons.person_add_outlined,
-            label: '+ Tambah Karyawan Baru', color: widget.teal, onTap: () {}),
+        _PrimaryBtn(
+          icon: Icons.person_add_outlined,
+          label: '+ Tambah Karyawan Baru',
+          color: widget.teal,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AddStaffScreen()),
+            );
+          },
+        ),
         const SizedBox(height: 10),
         OutlinedButton.icon(
           onPressed: () {},
@@ -1213,7 +1263,18 @@ class _StaffCard extends StatelessWidget {
           const SizedBox(height: 10),
           Row(children: [
             Expanded(child: OutlinedButton.icon(
-              onPressed: () {},
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EditStaffScreen(
+                      staffName: member.name,
+                      staffId: member.id,
+                      initialRole: member.role,
+                    ),
+                  ),
+                );
+              },
               icon: const Icon(Icons.calendar_today_outlined, size: 14),
               label: const Text('Atur Shift'),
               style: OutlinedButton.styleFrom(
@@ -1223,7 +1284,18 @@ class _StaffCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 9)))),
             const SizedBox(width: 8),
             Expanded(child: OutlinedButton.icon(
-              onPressed: () {},
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EditStaffScreen(
+                      staffName: member.name,
+                      staffId: member.id,
+                      initialRole: member.role,
+                    ),
+                  ),
+                );
+              },
               icon: const Icon(Icons.shield_outlined, size: 14),
               label: const Text('Kelola Akses'),
               style: OutlinedButton.styleFrom(
