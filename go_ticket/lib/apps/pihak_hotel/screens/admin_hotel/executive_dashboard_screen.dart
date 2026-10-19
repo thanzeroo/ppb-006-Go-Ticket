@@ -6,6 +6,58 @@ import 'edit_room_type_screen.dart';
 import 'edit_staff_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
+// DESIGN SYSTEM COLOR TOKENS
+// ─────────────────────────────────────────────────────────────────────────────
+const Color _cLight = Color(0xFFE6FAFF);
+const Color _cLightActive = Color(0xFFB0F1FF);
+const Color _cNormal = Color(0xFF00D1FF);
+const Color _cDark = Color(0xFF009DBF);
+const Color _cDarkActive = Color(0xFF005E73);
+const Color _cDarker = Color(0xFF004959);
+
+const Color _bg = Color(0xFFF8FAFC);
+const Color _cardBorder = Color(0xFFE2E8F0);
+
+Widget _buildNetworkImage(
+  String url, {
+  double? width,
+  double? height,
+  BoxFit fit = BoxFit.cover,
+  Widget? placeholder,
+}) {
+  return Image.network(
+    url,
+    width: width,
+    height: height,
+    fit: fit,
+    loadingBuilder: (context, child, loadingProgress) {
+      if (loadingProgress == null) return child;
+      return Container(
+        width: width,
+        height: height,
+        color: _cLight,
+        child: const Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2, color: _cNormal),
+          ),
+        ),
+      );
+    },
+    errorBuilder: (context, error, stackTrace) {
+      return placeholder ??
+          Container(
+            width: width,
+            height: height,
+            color: _cDarkActive,
+            child: const Icon(Icons.hotel, color: Colors.white70),
+          );
+    },
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // DATA MODELS
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -22,8 +74,7 @@ class _RoomTypeData {
   final String weekendNote;
   final List<String> amenities;
   final int photoCount;
-  final Color imageGradientStart;
-  final Color imageGradientEnd;
+  final String imageUrl;
 
   const _RoomTypeData({
     required this.badge,
@@ -38,8 +89,7 @@ class _RoomTypeData {
     required this.weekendNote,
     required this.amenities,
     required this.photoCount,
-    required this.imageGradientStart,
-    required this.imageGradientEnd,
+    required this.imageUrl,
   });
 }
 
@@ -53,6 +103,7 @@ class _StaffData {
   final Color onlineDotColor;
   final List<String> akses;
   final String wa;
+  final String avatarUrl;
 
   const _StaffData({
     required this.name,
@@ -64,6 +115,7 @@ class _StaffData {
     required this.onlineDotColor,
     required this.akses,
     required this.wa,
+    required this.avatarUrl,
   });
 }
 
@@ -101,10 +153,6 @@ class _ExecutiveDashboardScreenState extends State<ExecutiveDashboardScreen> {
   // Tab index: 0 = Dashboard, 1 = Kamar & Tarif, 2 = Staf & Tim, 3 = Keuangan
   int _selectedTab = 0;
 
-  static const Color _darkTeal = Color(0xFF005B60);
-  static const Color _cyanPrimary = Color(0xFF00C4D4);
-  static const Color _bg = Color(0xFFF8FAFC);
-
   final List<_RoomTypeData> _rooms = const [
     _RoomTypeData(
       badge: 'Suite Room',
@@ -118,8 +166,8 @@ class _ExecutiveDashboardScreenState extends State<ExecutiveDashboardScreen> {
       weekendNote: 'Standar Weekend',
       amenities: ['Garden View', 'Rain Shower', 'Air Conditioner'],
       photoCount: 6,
-      imageGradientStart: Color(0xFF334155),
-      imageGradientEnd: Color(0xFF1E293B),
+      imageUrl:
+          'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800&auto=format&fit=crop',
     ),
     _RoomTypeData(
       badge: 'Deluxe Series',
@@ -134,8 +182,8 @@ class _ExecutiveDashboardScreenState extends State<ExecutiveDashboardScreen> {
       weekendNote: 'Surge AI Aktif',
       amenities: ['Bathtub', 'Sea View', 'Smart TV', 'Wifi 100Mbps'],
       photoCount: 8,
-      imageGradientStart: Color(0xFF1E3A8A),
-      imageGradientEnd: Color(0xFF0F172A),
+      imageUrl:
+          'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop',
     ),
     _RoomTypeData(
       badge: 'Villa Signature',
@@ -150,8 +198,8 @@ class _ExecutiveDashboardScreenState extends State<ExecutiveDashboardScreen> {
       weekendNote: 'Tarif Dinamis',
       amenities: ['Private Pool', '24h Butler', 'Espresso Bar'],
       photoCount: 12,
-      imageGradientStart: Color(0xFF064E3B),
-      imageGradientEnd: Color(0xFF022C22),
+      imageUrl:
+          'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=800&auto=format&fit=crop',
     ),
   ];
 
@@ -161,33 +209,39 @@ class _ExecutiveDashboardScreenState extends State<ExecutiveDashboardScreen> {
       id: '#STF-2024-004',
       role: 'Front Office Lead / Senior',
       statusLabel: 'Aktif Bertugas',
-      statusBg: Color(0xFFE0F2FE),
-      statusFg: Color(0xFF0284C7),
+      statusBg: _cLight,
+      statusFg: _cDarkActive,
       onlineDotColor: Color(0xFF16A34A),
       akses: ['Verifikasi Booking', 'RFID Smart Lock', 'Otorisasi Refund'],
       wa: '+62 813-3982-1140',
+      avatarUrl:
+          'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop',
     ),
     _StaffData(
       name: 'Budi Santoso',
       id: '#HK-2011',
       role: 'Housekeeping Supervisor (S...)',
       statusLabel: 'Aktif Bertugas',
-      statusBg: Color(0xFFE0F2FE),
-      statusFg: Color(0xFF0284C7),
+      statusBg: _cLight,
+      statusFg: _cDarkActive,
       onlineDotColor: Color(0xFF16A34A),
       akses: ['Checklist Kebersihan', 'Logistik Gudang', 'Lapor Kerusakan'],
       wa: '+62 813-8822-9901',
+      avatarUrl:
+          'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop',
     ),
     _StaffData(
       name: 'Hendra Wijaya',
       id: '#TK-3004',
       role: 'Senior Maintenance Technic',
       statusLabel: 'On-Site (#204)',
-      statusBg: Color(0xFFE0F2FE),
-      statusFg: Color(0xFF0284C7),
-      onlineDotColor: Color(0xFF0284C7),
+      statusBg: _cLight,
+      statusFg: _cDarkActive,
+      onlineDotColor: _cNormal,
       akses: ['Tiket Kerusakan', 'Status Kamar OOO'],
       wa: '+62 812-3333-4444',
+      avatarUrl:
+          'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop',
     ),
     _StaffData(
       name: 'Siti Nurhaliza',
@@ -199,6 +253,8 @@ class _ExecutiveDashboardScreenState extends State<ExecutiveDashboardScreen> {
       onlineDotColor: Color(0xFF94A3B8),
       akses: ['Tutup Buku Kasir EOD', 'Check-in Malam'],
       wa: '+62 821-9999-0000',
+      avatarUrl:
+          'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&auto=format&fit=crop',
     ),
   ];
 
@@ -249,10 +305,10 @@ class _ExecutiveDashboardScreenState extends State<ExecutiveDashboardScreen> {
     ];
 
     final tabViews = [
-      _DashboardView(darkTeal: _darkTeal, cyan: _cyanPrimary),
-      _KamarTarifView(rooms: _rooms, darkTeal: _darkTeal, cyan: _cyanPrimary),
-      _StafTimView(staff: _staff, darkTeal: _darkTeal, cyan: _cyanPrimary),
-      _KeuanganView(transactions: _transactions, darkTeal: _darkTeal, cyan: _cyanPrimary),
+      const _DashboardView(),
+      _KamarTarifView(rooms: _rooms),
+      _StafTimView(staff: _staff),
+      _KeuanganView(transactions: _transactions),
     ];
 
     return Scaffold(
@@ -260,7 +316,7 @@ class _ExecutiveDashboardScreenState extends State<ExecutiveDashboardScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Top Bar
+            // Top Bar with official Logo
             _buildTopAppBar(),
 
             // Content
@@ -294,22 +350,24 @@ class _ExecutiveDashboardScreenState extends State<ExecutiveDashboardScreen> {
             ),
             const SizedBox(width: 8),
           ],
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-            decoration: BoxDecoration(
-              color: _darkTeal,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: const Text(
-              'GO',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
+          // Real Logo image from assets/logo.png
+          Image.asset(
+            'assets/logo.png',
+            height: 28,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                color: _cDarkActive,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text(
+                'GO',
+                style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900),
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           const Expanded(
             child: Text(
               'Go Ticket Administrator',
@@ -322,10 +380,10 @@ class _ExecutiveDashboardScreenState extends State<ExecutiveDashboardScreen> {
             ),
           ),
           Container(
-            width: 32,
-            height: 32,
+            width: 34,
+            height: 34,
             decoration: const BoxDecoration(
-              color: _darkTeal,
+              color: _cDarkActive,
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.person, color: Colors.white, size: 18),
@@ -361,7 +419,7 @@ class _ExecutiveDashboardScreenState extends State<ExecutiveDashboardScreen> {
                   children: [
                     Icon(
                       tabs[i].$1,
-                      color: sel ? _darkTeal : const Color(0xFF94A3B8),
+                      color: sel ? _cDarkActive : const Color(0xFF94A3B8),
                       size: 22,
                     ),
                     const SizedBox(height: 2),
@@ -370,7 +428,7 @@ class _ExecutiveDashboardScreenState extends State<ExecutiveDashboardScreen> {
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: sel ? FontWeight.w800 : FontWeight.w600,
-                        color: sel ? _darkTeal : const Color(0xFF94A3B8),
+                        color: sel ? _cDarkActive : const Color(0xFF94A3B8),
                       ),
                     ),
                   ],
@@ -389,10 +447,7 @@ class _ExecutiveDashboardScreenState extends State<ExecutiveDashboardScreen> {
 // ═══════════════════════════════════════════════════════════════
 
 class _DashboardView extends StatefulWidget {
-  final Color darkTeal;
-  final Color cyan;
-
-  const _DashboardView({required this.darkTeal, required this.cyan});
+  const _DashboardView();
 
   @override
   State<_DashboardView> createState() => _DashboardViewState();
@@ -422,7 +477,7 @@ class _DashboardViewState extends State<_DashboardView> {
           'Dashbord Administrator',
           style: TextStyle(
             fontSize: 20,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
             color: Color(0xFF0F172A),
             letterSpacing: -0.3,
           ),
@@ -441,17 +496,17 @@ class _DashboardViewState extends State<_DashboardView> {
                   margin: const EdgeInsets.only(right: 8),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                   decoration: BoxDecoration(
-                    color: sel ? const Color(0xFFBAE6FD) : Colors.white,
+                    color: sel ? _cLightActive : Colors.white,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: sel ? const Color(0xFF7DD3FC) : const Color(0xFFE2E8F0),
+                      color: sel ? _cNormal : _cardBorder,
                     ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (sel) ...[
-                        const Icon(Icons.circle, size: 6, color: Color(0xFF0369A1)),
+                        const Icon(Icons.circle, size: 6, color: _cDarkActive),
                         const SizedBox(width: 4),
                       ],
                       Text(
@@ -459,7 +514,7 @@ class _DashboardViewState extends State<_DashboardView> {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: sel ? FontWeight.w800 : FontWeight.w600,
-                          color: sel ? const Color(0xFF0369A1) : const Color(0xFF64748B),
+                          color: sel ? _cDarkActive : const Color(0xFF64748B),
                         ),
                       ),
                     ],
@@ -482,12 +537,12 @@ class _DashboardViewState extends State<_DashboardView> {
             ),
             const Spacer(),
             Row(
-              children: [
-                Icon(Icons.sync, size: 13, color: widget.darkTeal),
-                const SizedBox(width: 4),
+              children: const [
+                Icon(Icons.sync, size: 13, color: _cDarkActive),
+                SizedBox(width: 4),
                 Text(
                   'Sinkron OTA otomatis',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: widget.darkTeal),
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _cDarkActive),
                 ),
               ],
             ),
@@ -507,17 +562,17 @@ class _DashboardViewState extends State<_DashboardView> {
                   Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF0FDFE),
+                      color: _cLight,
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: Icon(Icons.account_balance_outlined, size: 16, color: widget.darkTeal),
+                    child: const Icon(Icons.account_balance_outlined, size: 16, color: _cDarkActive),
                   ),
                 ],
               ),
               const SizedBox(height: 4),
               const Text(
                 'Rp 124.850.000',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
               ),
               const SizedBox(height: 6),
               Row(
@@ -555,7 +610,7 @@ class _DashboardViewState extends State<_DashboardView> {
                   children: const [
                     Text('Rata-Rata Okupansi', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
                     SizedBox(height: 2),
-                    Text('84%', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                    Text('84%', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
                     SizedBox(height: 2),
                     Text('RevPAR: Rp 920.000', style: TextStyle(fontSize: 11, color: Color(0xFF475569))),
                     Text('ADR: Rp 1.150.000', style: TextStyle(fontSize: 11, color: Color(0xFF475569))),
@@ -565,18 +620,18 @@ class _DashboardViewState extends State<_DashboardView> {
               // Gauge
               Stack(
                 alignment: Alignment.center,
-                children: [
+                children: const [
                   SizedBox(
                     width: 65,
                     height: 65,
                     child: CircularProgressIndicator(
                       value: 0.84,
                       strokeWidth: 6,
-                      backgroundColor: const Color(0xFFE2E8F0),
-                      color: widget.darkTeal,
+                      backgroundColor: Color(0xFFE2E8F0),
+                      color: _cDarkActive,
                     ),
                   ),
-                  Icon(Icons.hotel, color: widget.darkTeal, size: 20),
+                  Icon(Icons.hotel, color: _cDarkActive, size: 20),
                 ],
               ),
             ],
@@ -598,13 +653,13 @@ class _DashboardViewState extends State<_DashboardView> {
                         const Text('Kamar Terjual', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(color: const Color(0xFFF0FDFE), borderRadius: BorderRadius.circular(4)),
-                          child: Icon(Icons.key, size: 12, color: widget.darkTeal),
+                          decoration: BoxDecoration(color: _cLight, borderRadius: BorderRadius.circular(4)),
+                          child: const Icon(Icons.key, size: 12, color: _cDarkActive),
                         ),
                       ],
                     ),
                     const SizedBox(height: 4),
-                    const Text('142', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                    const Text('142', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
                     const Text('Nights', style: TextStyle(fontSize: 9, color: Color(0xFF64748B))),
                     const SizedBox(height: 2),
                     const Text('Dari 45 total inventaris unit', style: TextStyle(fontSize: 8, color: Color(0xFF94A3B8))),
@@ -630,7 +685,7 @@ class _DashboardViewState extends State<_DashboardView> {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    const Text('4.9', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                    const Text('4.9', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
                     const Text('/ 5.0', style: TextStyle(fontSize: 9, color: Color(0xFF64748B))),
                     const SizedBox(height: 2),
                     const Text('1.280 ulasan terverifikasi', style: TextStyle(fontSize: 8, color: Color(0xFF94A3B8))),
@@ -674,9 +729,9 @@ class _DashboardViewState extends State<_DashboardView> {
                     final isBold = b['bold'] == true;
                     final val = b['val'] as double;
                     final barColor = isTeal
-                        ? widget.darkTeal
+                        ? _cDarkActive
                         : isCyan
-                            ? widget.cyan
+                            ? _cNormal
                             : const Color(0xFFBFDBFE);
 
                     return Expanded(
@@ -698,7 +753,7 @@ class _DashboardViewState extends State<_DashboardView> {
                             b['day'] as String,
                             style: TextStyle(
                               fontSize: 9,
-                              fontWeight: isBold ? FontWeight.w900 : FontWeight.w600,
+                              fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
                               color: isBold ? const Color(0xFF0F172A) : const Color(0xFF64748B),
                             ),
                           ),
@@ -714,9 +769,9 @@ class _DashboardViewState extends State<_DashboardView> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: const [
-                  _LegendDot(color: Color(0xFF005B60), label: 'Kamar (75%)'),
+                  _LegendDot(color: _cDarkActive, label: 'Kamar (75%)'),
                   SizedBox(width: 12),
-                  _LegendDot(color: Color(0xFF00C4D4), label: 'F&B & Bar (15%)'),
+                  _LegendDot(color: _cNormal, label: 'F&B & Bar (15%)'),
                   SizedBox(width: 12),
                   _LegendDot(color: Color(0xFFE2E8F0), label: 'Ekstra (10%)'),
                 ],
@@ -730,9 +785,9 @@ class _DashboardViewState extends State<_DashboardView> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFFF0FDFE),
+            color: _cLight,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFBAE6FD)),
+            border: Border.all(color: _cLightActive),
           ),
           child: Row(
             children: [
@@ -740,7 +795,7 @@ class _DashboardViewState extends State<_DashboardView> {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: widget.darkTeal,
+                  color: _cDarkActive,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(Icons.description_outlined, color: Colors.white, size: 18),
@@ -778,9 +833,9 @@ class _DashboardViewState extends State<_DashboardView> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.white,
-                  border: Border.all(color: const Color(0xFFBAE6FD)),
+                  border: Border.all(color: _cLightActive),
                 ),
-                child: const Icon(Icons.chevron_right, size: 14, color: Color(0xFF0284C7)),
+                child: const Icon(Icons.chevron_right, size: 14, color: _cDarkActive),
               ),
             ],
           ),
@@ -797,7 +852,7 @@ class _DashboardViewState extends State<_DashboardView> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: _cardBorder),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
@@ -835,14 +890,8 @@ class _LegendDot extends StatelessWidget {
 
 class _KamarTarifView extends StatefulWidget {
   final List<_RoomTypeData> rooms;
-  final Color darkTeal;
-  final Color cyan;
 
-  const _KamarTarifView({
-    required this.rooms,
-    required this.darkTeal,
-    required this.cyan,
-  });
+  const _KamarTarifView({required this.rooms});
 
   @override
   State<_KamarTarifView> createState() => _KamarTarifViewState();
@@ -862,7 +911,7 @@ class _KamarTarifViewState extends State<_KamarTarifView> {
           'Kelola Master Kamar & Tarif',
           style: TextStyle(
             fontSize: 20,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
             color: Color(0xFF0F172A),
             letterSpacing: -0.3,
           ),
@@ -883,8 +932,8 @@ class _KamarTarifViewState extends State<_KamarTarifView> {
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
           ),
           style: ElevatedButton.styleFrom(
-            backgroundColor: widget.cyan,
-            foregroundColor: Colors.white,
+            backgroundColor: _cNormal,
+            foregroundColor: const Color(0xFF00383D),
             minimumSize: const Size.fromHeight(46),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
             elevation: 0,
@@ -904,7 +953,7 @@ class _KamarTarifViewState extends State<_KamarTarifView> {
                   margin: const EdgeInsets.only(right: 8),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                   decoration: BoxDecoration(
-                    color: sel ? widget.darkTeal : const Color(0xFFF1F5F9),
+                    color: sel ? _cDarkActive : const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -922,7 +971,7 @@ class _KamarTarifViewState extends State<_KamarTarifView> {
         ),
 
         const SizedBox(height: 16),
-        // Room Cards
+        // Room Cards with REAL DUMMY PHOTOS
         ...widget.rooms.map((r) => _buildRoomCard(r)),
 
         const SizedBox(height: 20),
@@ -936,7 +985,7 @@ class _KamarTarifViewState extends State<_KamarTarifView> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: _cardBorder),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -949,64 +998,78 @@ class _KamarTarifViewState extends State<_KamarTarifView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Room Image Header
-          Container(
-            height: 130,
+          // Room Image Header with REAL DUMMY PHOTO
+          SizedBox(
+            height: 140,
             width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [room.imageGradientStart, room.imageGradientEnd],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        room.badge,
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: widget.darkTeal),
-                      ),
+                _buildNetworkImage(room.imageUrl),
+                // Gradient overlay
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.black.withValues(alpha: 0.15),
+                        Colors.black.withValues(alpha: 0.75),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
                     ),
-                    if (room.secondaryBadge != null) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: widget.darkTeal,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          room.secondaryBadge!,
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white),
-                        ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              room.badge,
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: _cDarker),
+                            ),
+                          ),
+                          if (room.secondaryBadge != null) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: _cNormal,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                room.secondaryBadge!,
+                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF00383D)),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            room.name,
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            room.sub,
+                            style: const TextStyle(fontSize: 10, color: Colors.white70, fontWeight: FontWeight.w500),
+                          ),
+                        ],
                       ),
                     ],
-                  ],
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      room.name,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      room.sub,
-                      style: const TextStyle(fontSize: 10, color: Colors.white70),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
@@ -1030,18 +1093,18 @@ class _KamarTarifViewState extends State<_KamarTarifView> {
                     ),
                     Text(
                       '${room.terjual} Terjual (${room.occupancy}% Okupansi)',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: widget.darkTeal),
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: _cDarkActive),
                     ),
                   ],
                 ),
                 const SizedBox(height: 6),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: room.occupancy / 100.0,
+                  child: const LinearProgressIndicator(
+                    value: 0.80,
                     minHeight: 5,
-                    backgroundColor: const Color(0xFFE2E8F0),
-                    valueColor: AlwaysStoppedAnimation(widget.darkTeal),
+                    backgroundColor: Color(0xFFE2E8F0),
+                    valueColor: AlwaysStoppedAnimation(_cDarkActive),
                   ),
                 ),
 
@@ -1061,7 +1124,7 @@ class _KamarTarifViewState extends State<_KamarTarifView> {
                           children: [
                             const Text('Weekday (Sen – Kam)', style: TextStyle(fontSize: 9, color: Color(0xFF64748B))),
                             const SizedBox(height: 2),
-                            Text(room.weekdayPrice, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                            Text(room.weekdayPrice, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
                             const Text('per malam', style: TextStyle(fontSize: 8, color: Color(0xFF94A3B8))),
                           ],
                         ),
@@ -1074,7 +1137,7 @@ class _KamarTarifViewState extends State<_KamarTarifView> {
                           children: [
                             const Text('Weekend (Jum – Min)', style: TextStyle(fontSize: 9, color: Color(0xFF64748B))),
                             const SizedBox(height: 2),
-                            Text(room.weekendPrice, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: widget.darkTeal)),
+                            Text(room.weekendPrice, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _cDarkActive)),
                             Text(room.weekendNote, style: const TextStyle(fontSize: 8, color: Color(0xFF94A3B8))),
                           ],
                         ),
@@ -1110,9 +1173,9 @@ class _KamarTarifViewState extends State<_KamarTarifView> {
                         icon: const Icon(Icons.photo_library_outlined, size: 14),
                         label: Text('Galeri Foto (${room.photoCount})'),
                         style: OutlinedButton.styleFrom(
-                          backgroundColor: const Color(0xFFF0FDFE),
-                          foregroundColor: const Color(0xFF0369A1),
-                          side: const BorderSide(color: Color(0xFFBAE6FD)),
+                          backgroundColor: _cLight,
+                          foregroundColor: _cDarkActive,
+                          side: const BorderSide(color: _cLightActive),
                           textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
                           padding: const EdgeInsets.symmetric(vertical: 9),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -1136,7 +1199,7 @@ class _KamarTarifViewState extends State<_KamarTarifView> {
                         icon: const Icon(Icons.edit_outlined, size: 14),
                         label: const Text('Edit Kamar'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: widget.darkTeal,
+                          backgroundColor: _cDarkActive,
                           foregroundColor: Colors.white,
                           textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
                           padding: const EdgeInsets.symmetric(vertical: 9),
@@ -1162,14 +1225,8 @@ class _KamarTarifViewState extends State<_KamarTarifView> {
 
 class _StafTimView extends StatefulWidget {
   final List<_StaffData> staff;
-  final Color darkTeal;
-  final Color cyan;
 
-  const _StafTimView({
-    required this.staff,
-    required this.darkTeal,
-    required this.cyan,
-  });
+  const _StafTimView({required this.staff});
 
   @override
   State<_StafTimView> createState() => _StafTimViewState();
@@ -1189,7 +1246,7 @@ class _StafTimViewState extends State<_StafTimView> {
           'Manajemen Staf & Hak Akses',
           style: TextStyle(
             fontSize: 20,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
             color: Color(0xFF0F172A),
             letterSpacing: -0.3,
           ),
@@ -1210,8 +1267,8 @@ class _StafTimViewState extends State<_StafTimView> {
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
           ),
           style: ElevatedButton.styleFrom(
-            backgroundColor: widget.cyan,
-            foregroundColor: Colors.white,
+            backgroundColor: _cNormal,
+            foregroundColor: const Color(0xFF00383D),
             minimumSize: const Size.fromHeight(46),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
             elevation: 0,
@@ -1248,8 +1305,8 @@ class _StafTimViewState extends State<_StafTimView> {
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(color: const Color(0xFFE0F2FE), borderRadius: BorderRadius.circular(10)),
-              child: const Text('Live Sync', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF0284C7))),
+              decoration: BoxDecoration(color: _cLight, borderRadius: BorderRadius.circular(10)),
+              child: const Text('Live Sync', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: _cDarkActive)),
             ),
           ],
         ),
@@ -1264,7 +1321,7 @@ class _StafTimViewState extends State<_StafTimView> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(color: _cardBorder),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1273,12 +1330,12 @@ class _StafTimViewState extends State<_StafTimView> {
                       children: const [
                         Text('07:00 – 15:00', style: TextStyle(fontSize: 9, color: Color(0xFF64748B))),
                         Spacer(),
-                        Icon(Icons.circle, size: 6, color: Color(0xFF00C4D4)),
+                        Icon(Icons.circle, size: 6, color: _cNormal),
                       ],
                     ),
                     const SizedBox(height: 2),
-                    const Text('6 Karyawan', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
-                    const Text('Shift Pagi (Active Now)', style: TextStyle(fontSize: 9, color: Color(0xFF0284C7), fontWeight: FontWeight.w600)),
+                    const Text('6 Karyawan', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                    const Text('Shift Pagi (Active Now)', style: TextStyle(fontSize: 9, color: _cDarkActive, fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
@@ -1290,7 +1347,7 @@ class _StafTimViewState extends State<_StafTimView> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(color: _cardBorder),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1303,7 +1360,7 @@ class _StafTimViewState extends State<_StafTimView> {
                       ],
                     ),
                     const SizedBox(height: 2),
-                    const Text('5 Karyawan', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                    const Text('5 Karyawan', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
                     const Text('Shift Siang (Terjadwal)', style: TextStyle(fontSize: 9, color: Color(0xFF64748B))),
                   ],
                 ),
@@ -1325,9 +1382,9 @@ class _StafTimViewState extends State<_StafTimView> {
                   margin: const EdgeInsets.only(right: 8),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                   decoration: BoxDecoration(
-                    color: sel ? widget.darkTeal : Colors.white,
+                    color: sel ? _cDarkActive : Colors.white,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: sel ? widget.darkTeal : const Color(0xFFE2E8F0)),
+                    border: Border.all(color: sel ? _cDarkActive : _cardBorder),
                   ),
                   child: Text(
                     _depts[i],
@@ -1344,7 +1401,7 @@ class _StafTimViewState extends State<_StafTimView> {
         ),
 
         const SizedBox(height: 14),
-        // Staff List
+        // Staff List with REAL DUMMY PHOTOS
         ...widget.staff.map((s) => _buildStaffCard(s)),
 
         const SizedBox(height: 20),
@@ -1359,21 +1416,29 @@ class _StafTimViewState extends State<_StafTimView> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: _cardBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
+              // REAL DUMMY AVATAR PHOTO
               Stack(
                 children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: const Color(0xFFCCFBF1),
-                    child: Text(
-                      s.name[0],
-                      style: TextStyle(fontWeight: FontWeight.w900, color: widget.darkTeal, fontSize: 16),
+                  ClipOval(
+                    child: _buildNetworkImage(
+                      s.avatarUrl,
+                      width: 44,
+                      height: 44,
+                      placeholder: CircleAvatar(
+                        radius: 22,
+                        backgroundColor: _cLight,
+                        child: Text(
+                          s.name[0],
+                          style: const TextStyle(fontWeight: FontWeight.w800, color: _cDarkActive),
+                        ),
+                      ),
                     ),
                   ),
                   Positioned(
@@ -1446,7 +1511,7 @@ class _StafTimViewState extends State<_StafTimView> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        border: Border.all(color: _cardBorder),
                       ),
                       child: Text('✔ $a', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
                     );
@@ -1513,9 +1578,9 @@ class _StafTimViewState extends State<_StafTimView> {
                   icon: const Icon(Icons.shield_outlined, size: 12),
                   label: const Text('Kelola Akses'),
                   style: OutlinedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF0FDFE),
-                    foregroundColor: const Color(0xFF0369A1),
-                    side: const BorderSide(color: Color(0xFFBAE6FD)),
+                    backgroundColor: _cLight,
+                    foregroundColor: _cDarkActive,
+                    side: const BorderSide(color: _cLightActive),
                     textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -1536,14 +1601,8 @@ class _StafTimViewState extends State<_StafTimView> {
 
 class _KeuanganView extends StatefulWidget {
   final List<_TransactionData> transactions;
-  final Color darkTeal;
-  final Color cyan;
 
-  const _KeuanganView({
-    required this.transactions,
-    required this.darkTeal,
-    required this.cyan,
-  });
+  const _KeuanganView({required this.transactions});
 
   @override
   State<_KeuanganView> createState() => _KeuanganViewState();
@@ -1566,19 +1625,19 @@ class _KeuanganViewState extends State<_KeuanganView> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFFF0F9FF),
+            color: _cLight,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFBAE6FD)),
+            border: Border.all(color: _cLightActive),
           ),
           child: Row(
             children: [
-              const Icon(Icons.sync_alt, size: 16, color: Color(0xFF0284C7)),
+              const Icon(Icons.sync_alt, size: 16, color: _cDarkActive),
               const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
-                    Text('EXECUTIVE LEDGER • Real-Time Sync', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF0284C7))),
+                    Text('EXECUTIVE LEDGER • Real-Time Sync', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: _cDarkActive)),
                     Text('GM & Owner Dashboard • Read-Only', style: TextStyle(fontSize: 9, color: Color(0xFF64748B))),
                   ],
                 ),
@@ -1610,7 +1669,7 @@ class _KeuanganViewState extends State<_KeuanganView> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: _periodMode == 0 ? widget.darkTeal : Colors.transparent,
+                        color: _periodMode == 0 ? _cDarkActive : Colors.transparent,
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text('Per Bulan', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _periodMode == 0 ? Colors.white : const Color(0xFF475569))),
@@ -1621,7 +1680,7 @@ class _KeuanganViewState extends State<_KeuanganView> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: _periodMode == 1 ? widget.darkTeal : Colors.transparent,
+                        color: _periodMode == 1 ? _cDarkActive : Colors.transparent,
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text('Per Tahun', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _periodMode == 1 ? Colors.white : const Color(0xFF475569))),
@@ -1635,7 +1694,7 @@ class _KeuanganViewState extends State<_KeuanganView> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                border: Border.all(color: _cardBorder),
               ),
               child: Row(
                 children: const [
@@ -1662,16 +1721,16 @@ class _KeuanganViewState extends State<_KeuanganView> {
                   margin: const EdgeInsets.only(right: 6),
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                   decoration: BoxDecoration(
-                    color: sel ? const Color(0xFFBAE6FD) : Colors.white,
+                    color: sel ? _cLightActive : Colors.white,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: sel ? const Color(0xFF7DD3FC) : const Color(0xFFE2E8F0)),
+                    border: Border.all(color: sel ? _cNormal : _cardBorder),
                   ),
                   child: Text(
                     _monthPills[i],
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
-                      color: sel ? const Color(0xFF0369A1) : const Color(0xFF64748B),
+                      color: sel ? _cDarkActive : const Color(0xFF64748B),
                     ),
                   ),
                 ),
@@ -1681,19 +1740,19 @@ class _KeuanganViewState extends State<_KeuanganView> {
         ),
 
         const SizedBox(height: 14),
-        // Card 1: TOTAL PENDAPATAN MASUK (GROSS INFLOW) -> GORGEOUS DEEP TEAL GRADIENT CARD
+        // Card 1: TOTAL PENDAPATAN MASUK (GROSS INFLOW) -> DEEP TEAL GRADIENT CARD
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFF004D54), Color(0xFF00666E), Color(0xFF007A87)],
+              colors: [_cDarker, _cDarkActive, _cDark],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF004D54).withValues(alpha: 0.3),
+                color: _cDarker.withValues(alpha: 0.35),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -1718,7 +1777,7 @@ class _KeuanganViewState extends State<_KeuanganView> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: widget.cyan,
+                      color: _cNormal,
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Text(
@@ -1731,7 +1790,7 @@ class _KeuanganViewState extends State<_KeuanganView> {
               const SizedBox(height: 8),
               const Text(
                 'Rp 1.485.200.000',
-                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.5),
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: -0.5),
               ),
               const SizedBox(height: 2),
               const Text(
@@ -1749,7 +1808,7 @@ class _KeuanganViewState extends State<_KeuanganView> {
                       children: [
                         Text('Nett Settlement Hotel', style: TextStyle(fontSize: 9, color: Colors.white70)),
                         SizedBox(height: 2),
-                        Text('Rp 1.336.680.000', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Colors.white)),
+                        Text('Rp 1.336.680.000', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white)),
                       ],
                     ),
                   ),
@@ -1759,7 +1818,7 @@ class _KeuanganViewState extends State<_KeuanganView> {
                       children: [
                         Text('Potongan Komisi OTA', style: TextStyle(fontSize: 9, color: Colors.white70)),
                         SizedBox(height: 2),
-                        Text('Rp 148.520.000', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFFBAE6FD))),
+                        Text('Rp 148.520.000', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _cLightActive)),
                       ],
                     ),
                   ),
@@ -1779,7 +1838,7 @@ class _KeuanganViewState extends State<_KeuanganView> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(color: _cardBorder),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1788,21 +1847,21 @@ class _KeuanganViewState extends State<_KeuanganView> {
                       children: [
                         Container(
                           padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(color: const Color(0xFFF0FDFE), borderRadius: BorderRadius.circular(4)),
-                          child: const Icon(Icons.calendar_month, size: 12, color: Color(0xFF0284C7)),
+                          decoration: BoxDecoration(color: _cLight, borderRadius: BorderRadius.circular(4)),
+                          child: const Icon(Icons.calendar_month, size: 12, color: _cDarkActive),
                         ),
                         const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                          decoration: BoxDecoration(color: const Color(0xFFE0F2FE), borderRadius: BorderRadius.circular(4)),
-                          child: const Text('10 Bulan', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF0284C7))),
+                          decoration: BoxDecoration(color: _cLightActive, borderRadius: BorderRadius.circular(4)),
+                          child: const Text('10 Bulan', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: _cDarkActive)),
                         ),
                       ],
                     ),
                     const SizedBox(height: 6),
                     const Text('Rata-rata Pendapatan', style: TextStyle(fontSize: 9, color: Color(0xFF64748B))),
                     const SizedBox(height: 1),
-                    const Text('Rp 148,5 Jt', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                    const Text('Rp 148,5 Jt', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
                     const Text('/ bulan berjalan', style: TextStyle(fontSize: 8, color: Color(0xFF94A3B8))),
                   ],
                 ),
@@ -1815,7 +1874,7 @@ class _KeuanganViewState extends State<_KeuanganView> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(color: _cardBorder),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1824,21 +1883,21 @@ class _KeuanganViewState extends State<_KeuanganView> {
                       children: [
                         Container(
                           padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(color: const Color(0xFFF0FDFE), borderRadius: BorderRadius.circular(4)),
-                          child: const Icon(Icons.hotel, size: 12, color: Color(0xFF0284C7)),
+                          decoration: BoxDecoration(color: _cLight, borderRadius: BorderRadius.circular(4)),
+                          child: const Icon(Icons.hotel, size: 12, color: _cDarkActive),
                         ),
                         const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                          decoration: BoxDecoration(color: const Color(0xFFE0F2FE), borderRadius: BorderRadius.circular(4)),
-                          child: const Text('48 Kamar', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF0284C7))),
+                          decoration: BoxDecoration(color: _cLightActive, borderRadius: BorderRadius.circular(4)),
+                          child: const Text('48 Kamar', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: _cDarkActive)),
                         ),
                       ],
                     ),
                     const SizedBox(height: 6),
                     const Text('RevPAR Rata-rata', style: TextStyle(fontSize: 9, color: Color(0xFF64748B))),
                     const SizedBox(height: 1),
-                    const Text('Rp 820.000', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                    const Text('Rp 820.000', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
                     const Text('Revenue Per Avail. Room', style: TextStyle(fontSize: 8, color: Color(0xFF94A3B8))),
                   ],
                 ),
@@ -1854,7 +1913,7 @@ class _KeuanganViewState extends State<_KeuanganView> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: _cardBorder),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1871,8 +1930,8 @@ class _KeuanganViewState extends State<_KeuanganView> {
                   ),
                   Container(
                     padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(color: const Color(0xFFF0FDFE), borderRadius: BorderRadius.circular(6)),
-                    child: const Icon(Icons.trending_up, size: 14, color: Color(0xFF0284C7)),
+                    decoration: BoxDecoration(color: _cLight, borderRadius: BorderRadius.circular(6)),
+                    child: const Icon(Icons.trending_up, size: 14, color: _cDarkActive),
                   ),
                 ],
               ),
@@ -1880,11 +1939,11 @@ class _KeuanganViewState extends State<_KeuanganView> {
               // Legend
               Row(
                 children: const [
-                  _LegendDot(color: Color(0xFF005B60), label: 'Bruto (Gross)'),
+                  _LegendDot(color: _cDarkActive, label: 'Bruto (Gross)'),
                   SizedBox(width: 10),
-                  _LegendDot(color: Color(0xFF00C4D4), label: 'Bersih (Nett)'),
+                  _LegendDot(color: _cNormal, label: 'Bersih (Nett)'),
                   SizedBox(width: 10),
-                  _LegendDot(color: Color(0xFFBAE6FD), label: 'OTA Fee'),
+                  _LegendDot(color: _cLightActive, label: 'OTA Fee'),
                 ],
               ),
               const SizedBox(height: 12),
@@ -1895,8 +1954,8 @@ class _KeuanganViewState extends State<_KeuanganView> {
                 width: double.infinity,
                 child: CustomPaint(
                   painter: _RevenueChartPainter(
-                    tealColor: widget.darkTeal,
-                    cyanColor: widget.cyan,
+                    tealColor: _cDarkActive,
+                    cyanColor: _cNormal,
                   ),
                 ),
               ),
@@ -1909,7 +1968,7 @@ class _KeuanganViewState extends State<_KeuanganView> {
                   Text('Mei', style: TextStyle(fontSize: 8, color: Color(0xFF94A3B8))),
                   Text('Jul', style: TextStyle(fontSize: 8, color: Color(0xFF94A3B8))),
                   Text('Sep', style: TextStyle(fontSize: 8, color: Color(0xFF94A3B8))),
-                  Text('Okt (Kini)', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: Color(0xFF005B60))),
+                  Text('Okt (Kini)', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: _cDarkActive)),
                 ],
               ),
 
@@ -1924,8 +1983,8 @@ class _KeuanganViewState extends State<_KeuanganView> {
                   const Spacer(),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(color: const Color(0xFFE0F2FE), borderRadius: BorderRadius.circular(4)),
-                    child: const Text('YTD 2025 →', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF0284C7))),
+                    decoration: BoxDecoration(color: _cLightActive, borderRadius: BorderRadius.circular(4)),
+                    child: const Text('YTD 2025 →', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: _cDarkActive)),
                   ),
                 ],
               ),
@@ -1942,7 +2001,7 @@ class _KeuanganViewState extends State<_KeuanganView> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: _cardBorder),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1971,9 +2030,9 @@ class _KeuanganViewState extends State<_KeuanganView> {
                         margin: const EdgeInsets.only(right: 6),
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: sel ? widget.darkTeal : Colors.white,
+                          color: sel ? _cDarkActive : Colors.white,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: sel ? widget.darkTeal : const Color(0xFFE2E8F0)),
+                          border: Border.all(color: sel ? _cDarkActive : _cardBorder),
                         ),
                         child: Text(
                           _kasFilters[i],
@@ -1998,7 +2057,7 @@ class _KeuanganViewState extends State<_KeuanganView> {
                   decoration: BoxDecoration(
                     color: const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    border: Border.all(color: _cardBorder),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2011,7 +2070,7 @@ class _KeuanganViewState extends State<_KeuanganView> {
                             decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(4)),
                             child: const Text('Uang Masuk (+)', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w800, color: Color(0xFF16A34A))),
                           ),
-                          Text(tx.amount, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF16A34A))),
+                          Text(tx.amount, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF16A34A))),
                         ],
                       ),
                       const SizedBox(height: 4),
@@ -2019,7 +2078,7 @@ class _KeuanganViewState extends State<_KeuanganView> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(tx.name, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
-                          Text(tx.code, style: const TextStyle(fontSize: 9, color: Color(0xFF0284C7), fontWeight: FontWeight.w700)),
+                          Text(tx.code, style: const TextStyle(fontSize: 9, color: _cDarkActive, fontWeight: FontWeight.w700)),
                         ],
                       ),
                       const SizedBox(height: 2),
@@ -2047,7 +2106,7 @@ class _KeuanganViewState extends State<_KeuanganView> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: _cardBorder),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2056,7 +2115,7 @@ class _KeuanganViewState extends State<_KeuanganView> {
                 children: [
                   Container(
                     padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(color: widget.darkTeal, shape: BoxShape.circle),
+                    decoration: const BoxDecoration(color: _cDarkActive, shape: BoxShape.circle),
                     child: const Icon(Icons.download, size: 14, color: Colors.white),
                   ),
                   const SizedBox(width: 8),
@@ -2077,8 +2136,8 @@ class _KeuanganViewState extends State<_KeuanganView> {
                       icon: const Icon(Icons.picture_as_pdf_outlined, size: 12),
                       label: const Text('Unduh PDF Resmi'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: widget.darkTeal,
-                        side: BorderSide(color: widget.darkTeal),
+                        foregroundColor: _cDarkActive,
+                        side: const BorderSide(color: _cDarkActive),
                         textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -2092,7 +2151,7 @@ class _KeuanganViewState extends State<_KeuanganView> {
                       icon: const Icon(Icons.table_chart_outlined, size: 12),
                       label: const Text('Unduh CSV / Excel'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: widget.darkTeal,
+                        backgroundColor: _cDarkActive,
                         foregroundColor: Colors.white,
                         textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
                         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -2149,7 +2208,7 @@ class _RevenueChartPainter extends CustomPainter {
     final w = size.width;
     final h = size.height;
 
-    // Data points normalized (0 to 1)
+    // Data points normalized
     final points = [
       Offset(0, h * 0.75),
       Offset(w * 0.20, h * 0.65),

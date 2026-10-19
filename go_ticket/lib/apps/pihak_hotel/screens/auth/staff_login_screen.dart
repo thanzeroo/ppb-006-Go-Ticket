@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../admin_hotel/hotel_dashboard_screen.dart';
+import '../admin_hotel/executive_dashboard_screen.dart';
 import '../front_office/fo_dashboard_screen.dart';
 import '../maintenance/maintenance_dashboard_screen.dart';
 
@@ -85,10 +85,10 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
         );
       }
     } else {
-      // Role Administrator -> Masuk ke Hotel Admin Dashboard
+      // Role Administrator -> Langsung masuk ke Executive Dashboard Admin Hotel
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const HotelDashboardScreen()),
+        MaterialPageRoute(builder: (_) => const ExecutiveDashboardScreen()),
       );
     }
   }

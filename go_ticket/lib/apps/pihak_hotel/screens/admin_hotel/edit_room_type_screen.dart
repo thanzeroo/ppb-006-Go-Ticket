@@ -15,7 +15,7 @@ class EditRoomTypeScreen extends StatefulWidget {
 }
 
 class _EditRoomTypeScreenState extends State<EditRoomTypeScreen> {
-  static const Color _teal = Color(0xFF007A87);
+  static const Color _teal = Color(0xFF005E73);
   static const Color _bg = Color(0xFFF6F8FB);
   static const Color _cardBorder = Color(0xFFE5E9F0);
 
@@ -103,14 +103,25 @@ class _EditRoomTypeScreenState extends State<EditRoomTypeScreen> {
           icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Edit Tipe Kamar',
-          style: TextStyle(
-            color: Color(0xFF0F172A),
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.3,
-          ),
+        title: Row(
+          children: [
+            Image.asset(
+              'assets/logo.png',
+              height: 24,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => const SizedBox(),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'Edit Tipe Kamar',
+              style: TextStyle(
+                color: Color(0xFF0F172A),
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.3,
+              ),
+            ),
+          ],
         ),
         actions: [
           IconButton(
@@ -1053,11 +1064,29 @@ class _EditRoomTypeScreenState extends State<EditRoomTypeScreen> {
         children: [
           Row(
             children: [
-              Expanded(child: _buildPhotoThumb('Cover Utama', Icons.bed)),
+              Expanded(
+                child: _buildPhotoThumb(
+                  'Cover Utama',
+                  Icons.bed,
+                  'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800&auto=format&fit=crop',
+                ),
+              ),
               const SizedBox(width: 8),
-              Expanded(child: _buildPhotoThumb('Kamar Mandi', Icons.bathtub)),
+              Expanded(
+                child: _buildPhotoThumb(
+                  'Kamar Mandi',
+                  Icons.bathtub,
+                  'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&auto=format&fit=crop',
+                ),
+              ),
               const SizedBox(width: 8),
-              Expanded(child: _buildPhotoThumb('Balkon', Icons.deck)),
+              Expanded(
+                child: _buildPhotoThumb(
+                  'Balkon',
+                  Icons.deck,
+                  'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=400&auto=format&fit=crop',
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -1065,13 +1094,13 @@ class _EditRoomTypeScreenState extends State<EditRoomTypeScreen> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 20),
             decoration: BoxDecoration(
-              color: const Color(0xFFF0FDFE),
+              color: const Color(0xFFE6FAFF),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFBAE6FD), style: BorderStyle.solid),
+              border: Border.all(color: const Color(0xFF00D1FF).withValues(alpha: 0.4), style: BorderStyle.solid),
             ),
             child: Column(
               children: const [
-                Icon(Icons.cloud_upload_outlined, size: 32, color: Color(0xFF007A87)),
+                Icon(Icons.cloud_upload_outlined, size: 32, color: Color(0xFF005E73)),
                 SizedBox(height: 6),
                 Text('Tarik & Lepaskan foto baru di sini', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
                 SizedBox(height: 2),
@@ -1084,50 +1113,82 @@ class _EditRoomTypeScreenState extends State<EditRoomTypeScreen> {
     );
   }
 
-  Widget _buildPhotoThumb(String label, IconData icon) {
+  Widget _buildPhotoThumb(String label, IconData icon, String imageUrl) {
     return Container(
       height: 75,
       decoration: BoxDecoration(
         color: const Color(0xFF334155),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Stack(
-        children: [
-          Center(
-            child: Icon(icon, color: Colors.white.withValues(alpha: 0.4), size: 32),
-          ),
-          Positioned(
-            bottom: 4,
-            left: 4,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(4),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.network(
+              imageUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Center(
+                child: Icon(icon, color: Colors.white.withValues(alpha: 0.4), size: 32),
               ),
-              child: Text(label, style: const TextStyle(fontSize: 8, color: Colors.white, fontWeight: FontWeight.w600)),
+              loadingBuilder: (context, child, progress) {
+                if (progress == null) return child;
+                return Center(
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    value: progress.expectedTotalBytes != null
+                        ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                        : null,
+                  ),
+                );
+              },
             ),
-          ),
-          Positioned(
-            top: 4,
-            right: 4,
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), shape: BoxShape.circle),
-                  child: const Icon(Icons.edit, size: 10, color: Colors.white),
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.3),
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.65),
+                  ],
                 ),
-                const SizedBox(width: 3),
-                Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), shape: BoxShape.circle),
-                  child: const Icon(Icons.close, size: 10, color: Colors.white),
-                ),
-              ],
+              ),
             ),
-          ),
-        ],
+            Positioned(
+              bottom: 4,
+              left: 4,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(label, style: const TextStyle(fontSize: 8, color: Colors.white, fontWeight: FontWeight.w600)),
+              ),
+            ),
+            Positioned(
+              top: 4,
+              right: 4,
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), shape: BoxShape.circle),
+                    child: const Icon(Icons.edit, size: 10, color: Colors.white),
+                  ),
+                  const SizedBox(width: 3),
+                  Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), shape: BoxShape.circle),
+                    child: const Icon(Icons.close, size: 10, color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

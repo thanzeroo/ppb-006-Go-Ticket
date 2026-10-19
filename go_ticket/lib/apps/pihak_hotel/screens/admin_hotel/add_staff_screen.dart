@@ -8,9 +8,10 @@ class AddStaffScreen extends StatefulWidget {
 }
 
 class _AddStaffScreenState extends State<AddStaffScreen> {
-  static const Color _teal = Color(0xFF007A87);
+  static const Color _teal = Color(0xFF005E73);
   static const Color _bg = Color(0xFFF6F8FB);
   static const Color _cardBorder = Color(0xFFE5E9F0);
+  static const Color _cNormal = Color(0xFF00D1FF);
 
   late TextEditingController _nameController;
   late TextEditingController _nikController;
@@ -70,16 +71,11 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
         ),
         title: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              decoration: BoxDecoration(
-                color: const Color(0xFF007A87),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: const Text(
-                'GO',
-                style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900),
-              ),
+            Image.asset(
+              'assets/logo.png',
+              height: 26,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => const SizedBox(),
             ),
             const SizedBox(width: 8),
             const Text(
@@ -98,12 +94,13 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
             icon: const Icon(Icons.help_outline, color: Color(0xFF64748B), size: 20),
             onPressed: () {},
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
+          const Padding(
+            padding: EdgeInsets.only(right: 12),
             child: CircleAvatar(
               radius: 14,
-              backgroundColor: const Color(0xFF007A87).withValues(alpha: 0.15),
-              child: const Icon(Icons.person, size: 16, color: Color(0xFF007A87)),
+              backgroundImage: NetworkImage(
+                'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop',
+              ),
             ),
           ),
         ],
@@ -225,11 +222,16 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                       height: 50,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: const Color(0xFFCCFBF1),
-                        border: Border.all(color: const Color(0xFF007A87), width: 2),
+                        border: Border.all(color: _cNormal, width: 2),
                       ),
-                      child: const Center(
-                        child: Icon(Icons.person, size: 30, color: Color(0xFF007A87)),
+                      child: ClipOval(
+                        child: Image.network(
+                          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop',
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => const Center(
+                            child: Icon(Icons.person, size: 30, color: Color(0xFF005E73)),
+                          ),
+                        ),
                       ),
                     ),
                     Positioned(
@@ -238,7 +240,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(2),
                         decoration: const BoxDecoration(
-                          color: Color(0xFF007A87),
+                          color: _teal,
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.camera_alt, size: 10, color: Colors.white),

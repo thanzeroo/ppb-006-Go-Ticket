@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'apps/pihak_go_ticket/screens/splash/admin_splash_screen.dart';
 import 'apps/pihak_hotel/screens/splash/hotel_splash_screen.dart';
@@ -17,8 +18,9 @@ class GoTicketApp extends StatelessWidget {
       title: 'Go Ticket',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        fontFamily: 'Inter',
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00C2FF)),
+        fontFamily: GoogleFonts.poppins().fontFamily,
+        textTheme: GoogleFonts.poppinsTextTheme(),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00D1FF)),
         useMaterial3: true,
       ),
       home: const PortalSelectionScreen(),
