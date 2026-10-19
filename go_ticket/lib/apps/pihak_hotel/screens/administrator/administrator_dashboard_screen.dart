@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/hotel_admin_theme.dart';
-import '../../../../models/hotel_admin_model.dart';
+import '../../../../core/models/hotel_admin_model.dart';
 import 'tabs/dashboard_tab.dart';
 import 'tabs/kamar_tarif_tab.dart';
 import 'tabs/keuangan_tab.dart';
