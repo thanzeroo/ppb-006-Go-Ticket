@@ -18,12 +18,13 @@ class PihakGoTicketApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF00B4D8),
-          brightness: Brightness.dark,
+          brightness: Brightness.light,
         ),
+        scaffoldBackgroundColor: const Color(0xFFF8FAFD),
         fontFamily: 'Inter',
         useMaterial3: true,
       ),
-      themeMode: ThemeMode.dark,
+      themeMode: ThemeMode.light,
       home: const AdminSplashScreen(),
     );
   }
