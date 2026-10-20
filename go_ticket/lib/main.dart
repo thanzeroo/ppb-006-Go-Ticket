@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'apps/pihak_go_ticket/screens/splash/admin_splash_screen.dart';
 import 'apps/pihak_hotel/screens/splash/hotel_splash_screen.dart';
+import 'apps/pihak_user/router/customer_router.dart';
 import 'apps/pihak_user/screens/splash/customer_loading_screen.dart';
 
 void main() {
@@ -23,6 +24,7 @@ class GoTicketApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00D1FF)),
         useMaterial3: true,
       ),
+      onGenerateRoute: CustomerRouter.onGenerateRoute,
       home: const PortalSelectionScreen(),
     );
   }

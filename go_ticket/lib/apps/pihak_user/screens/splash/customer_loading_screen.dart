@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 
 import '../../router/customer_router.dart';
 
+import '../auth/customer_login_screen.dart';
+
 /// Splash/Loading Screen untuk User/Customer dengan logo Go Ticket.
 class CustomerLoadingScreen extends StatefulWidget {
   const CustomerLoadingScreen({super.key});
@@ -41,7 +43,18 @@ class _CustomerLoadingScreenState extends State<CustomerLoadingScreen>
 
     _timer = Timer(const Duration(milliseconds: 1800), () {
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, CustomerRouter.login);
+      Navigator.pushReplacement(
+        context,
+        PageRouteBuilder(
+          settings: const RouteSettings(name: CustomerRouter.login),
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              const CustomerLoginScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          transitionDuration: const Duration(milliseconds: 300),
+        ),
+      );
     });
   }
 
