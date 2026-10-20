@@ -1,0 +1,353 @@
+{
+  "project": "GoTicket - Sistem Pembukuan Penginapan Terintegrasi",
+  "zones": [
+    {
+      "zone_name": "Zona User (Mobile App)",
+      "entities": [
+        {
+          "name": "User",
+          "primary_key": ["id_user"],
+          "attributes": [
+            "nama_lengkap",
+            "email",
+            "no_telepon",
+            "password",
+            "tanggal_lahir",
+            "jenis_kelamin",
+            "alamat_domisili",
+            "saldo_poin",
+            "tier_membership",
+            "status_akun"
+          ]
+        },
+        {
+          "name": "Saved_Guests",
+          "primary_key": ["id_saved_guest"],
+          "foreign_keys": ["id_user"],
+          "attributes": [
+            "nama_tamu",
+            "no_ktp_nik",
+            "no_handphone",
+            "email",
+            "tanggal_lahir",
+            "kategori_usia",
+            "tipe_relasi"
+          ]
+        },
+        {
+          "name": "Saved_Hotels",
+          "primary_key": ["id_saved_hotel"],
+          "foreign_keys": ["id_user", "id_penginapan"],
+          "attributes": [
+            "nama_folder",
+            "tgl_disimpan"
+          ]
+        },
+        {
+          "name": "Booking",
+          "primary_key": ["id_booking"],
+          "foreign_keys": ["id_user", "id_penginapan", "id_tipe_kamar", "id_promo"],
+          "attributes": [
+            "kode_booking",
+            "tgl_booking",
+            "tgl_checkin",
+            "tgl_checkout",
+            "jml_malam",
+            "jml_dewasa",
+            "jml_anak",
+            "total_harga",
+            "potongan_diskon",
+            "status_booking",
+            "permintaan_khusus"
+          ]
+        },
+        {
+          "name": "Pembayaran",
+          "primary_key": ["id_pembayaran"],
+          "foreign_keys": ["id_booking"],
+          "attributes": [
+            "no_referensi_trx",
+            "metode_pembayaran",
+            "nominal_bayar",
+            "tgl_bayar",
+            "status_pembayaran"
+          ]
+        },
+        {
+          "name": "ETicket",
+          "primary_key": ["id_tiket"],
+          "foreign_keys": ["id_booking"],
+          "attributes": [
+            "nomor_tiket",
+            "qr_code_token",
+            "tgl_terbit",
+            "status_tiket"
+          ]
+        },
+        {
+          "name": "Ulasan",
+          "primary_key": ["id_ulasan"],
+          "foreign_keys": ["id_booking", "id_user", "id_penginapan"],
+          "attributes": [
+            "rating_bintang",
+            "rating_kebersihan",
+            "rating_pelayanan",
+            "komentar",
+            "foto_ulasan",
+            "tgl_ulasan",
+            "tanggapan_hotel",
+            "helpful_count"
+          ]
+        },
+        {
+          "name": "Notifikasi",
+          "primary_key": ["id_notifikasi"],
+          "foreign_keys": ["id_user"],
+          "attributes": [
+            "judul",
+            "pesan",
+            "tipe_notifikasi",
+            "status_baca",
+            "tgl_kirim"
+          ]
+        }
+      ]
+    },
+    {
+      "zone_name": "Zona Pihak Hotel (Operasional)",
+      "entities": [
+        {
+          "name": "Mitra_Penginapan",
+          "primary_key": ["id_penginapan"],
+          "attributes": [
+            "nama_properti",
+            "alamat_lengkap",
+            "kota",
+            "no_telepon",
+            "whatsapp",
+            "waktu_checkin",
+            "waktu_checkout",
+            "deposit_nominal",
+            "kebijakan_batal",
+            "status_operasional",
+            "rating_rata_rata",
+            "deskripsi"
+          ]
+        },
+        {
+          "name": "Tipe_Kamar",
+          "primary_key": ["id_tipe_kamar"],
+          "foreign_keys": ["id_penginapan"],
+          "attributes": [
+            "nama_tipe",
+            "kapasitas_tamu",
+            "tipe_bed",
+            "luas_m2",
+            "harga_dasar",
+            "harga_weekend",
+            "total_unit"
+          ]
+        },
+        {
+          "name": "Kamar",
+          "primary_key": ["id_kamar"],
+          "foreign_keys": ["id_tipe_kamar", "id_penginapan"],
+          "attributes": [
+            "nomor_kamar",
+            "lantai",
+            "status_kamar"
+          ]
+        },
+        {
+          "name": "Harga_Khusus_Kamar",
+          "primary_key": ["id_harga"],
+          "foreign_keys": ["id_tipe_kamar"],
+          "attributes": [
+            "tanggal",
+            "harga_khusus",
+            "diskon"
+          ]
+        },
+        {
+          "name": "Ketersediaan_Kamar",
+          "primary_key": ["id_ketersediaan"],
+          "foreign_keys": ["id_tipe_kamar"],
+          "attributes": [
+            "tanggal",
+            "stok_tersedia",
+            "stok_terjual",
+            "status"
+          ]
+        },
+        {
+          "name": "Fasilitas_Properti",
+          "primary_key": ["id_fasilitas"],
+          "foreign_keys": ["id_penginapan"],
+          "attributes": [
+            "nama_fasilitas",
+            "kategori_fasilitas"
+          ]
+        },
+        {
+          "name": "Staf_Hotel",
+          "primary_key": ["id_staf"],
+          "foreign_keys": ["id_penginapan"],
+          "attributes": [
+            "nik_staf",
+            "nama_staf",
+            "email",
+            "password",
+            "no_telepon",
+            "role_jabatan",
+            "shift_tugas",
+            "status_duty",
+            "status_karyawan"
+          ]
+        },
+        {
+          "name": "Verifikasi_Booking",
+          "primary_key": ["id_verifikasi"],
+          "foreign_keys": ["id_booking", "id_staf"],
+          "attributes": [
+            "tgl_verifikasi",
+            "status_verifikasi",
+            "catatan_verifikasi"
+          ]
+        },
+        {
+          "name": "Check_In",
+          "primary_key": ["id_checkin"],
+          "foreign_keys": ["id_booking", "id_kamar", "id_staf"],
+          "attributes": [
+            "waktu_checkin_aktual",
+            "kartu_kunci_rfid",
+            "status_checkin",
+            "catatan"
+          ]
+        },
+        {
+          "name": "Check_Out",
+          "primary_key": ["id_checkout"],
+          "foreign_keys": ["id_booking", "id_kamar", "id_staf"],
+          "attributes": [
+            "waktu_checkout_aktual",
+            "kartu_kunci_kembali",
+            "pengembalian_deposit",
+            "kondisi_kamar_awal",
+            "status_checkout",
+            "catatan_turnover"
+          ]
+        },
+        {
+          "name": "Laporan_Kebersihan",
+          "primary_key": ["id_tugas_kebersihan"],
+          "foreign_keys": ["id_kamar", "id_staf_petugas", "id_admin_validator"],
+          "attributes": [
+            "tgl_tugas",
+            "waktu_mulai",
+            "waktu_selesai",
+            "checklist_linen",
+            "checklist_sanitasi",
+            "checklist_kamar_mandi",
+            "checklist_minibar",
+            "checklist_elektronik",
+            "foto_bukti",
+            "status_kebersihan",
+            "status_validasi_admin"
+          ]
+        },
+        {
+          "name": "Laporan_Kerusakan",
+          "primary_key": ["id_tiket_kerusakan"],
+          "foreign_keys": ["id_kamar", "dilaporkan_oleh", "ditugaskan_ke", "divalidasi_oleh"],
+          "attributes": [
+            "judul_masalah",
+            "deskripsi_kerusakan",
+            "tingkat_prioritas",
+            "foto_kerusakan",
+            "status_perbaikan",
+            "tgl_lapor",
+            "tgl_selesai",
+            "tindakan_perbaikan",
+            "status_validasi_admin",
+            "tgl_validasi",
+            "catatan_admin"
+          ]
+        }
+      ]
+    },
+    {
+      "zone_name": "Zona Go Ticket (Developer HQ / Super Admin)",
+      "entities": [
+        {
+          "name": "Super_Admin",
+          "primary_key": ["id_admin"],
+          "attributes": [
+            "nama_admin",
+            "email_admin",
+            "password_hash",
+            "secret_2fa",
+            "role_level",
+            "last_login",
+            "ip_address",
+            "status_aktif"
+          ]
+        },
+        {
+          "name": "Kampanye_Promo",
+          "primary_key": ["id_promo"],
+          "foreign_keys": ["dibuat_oleh"],
+          "attributes": [
+            "kode_promo",
+            "nama_kampanye",
+            "kategori_musim",
+            "tipe_diskon",
+            "besaran_diskon",
+            "maks_plafon_diskon",
+            "min_transaksi",
+            "total_kuota",
+            "tgl_mulai",
+            "tgl_berakhir",
+            "status_promo"
+          ]
+        },
+        {
+          "name": "Promo_Kamar",
+          "primary_key": ["id_promo_kamar"],
+          "foreign_keys": ["id_promo", "tipe_kamar_id"],
+          "attributes": [
+            "status_aktif",
+            "tgl_diterapkan"
+          ]
+        },
+        {
+          "name": "Antrean_payout_mitra",
+          "primary_key": ["id_payout"],
+          "foreign_keys": ["penginapan_id", "diverifikasi_oleh"],
+          "attributes": [
+            "no_referensi_payout",
+            "nominal_gross",
+            "komisi_platform",
+            "nominal_bersih",
+            "tgl_pengajuan",
+            "tgl_jatuh_tempo",
+            "status_payout",
+            "metode_pencairan",
+            "catatan_verifikasi"
+          ]
+        },
+        {
+          "name": "Audit_Log_Sistem",
+          "primary_key": ["id_log"],
+          "foreign_keys": ["id_admin"],
+          "attributes": [
+            "aktivitas",
+            "modul",
+            "ip_address",
+            "tgl_aktivitas"
+          ]
+        }
+      ]
+    }
+  ]
+}
