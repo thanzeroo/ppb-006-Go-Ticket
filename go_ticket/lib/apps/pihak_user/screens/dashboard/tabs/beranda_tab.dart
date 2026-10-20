@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../data/booking_args.dart';
 import '../../../router/customer_router.dart';
 import '../customer_dashboard_screen.dart';
 
@@ -15,6 +16,29 @@ class BerandaTab extends StatefulWidget {
 class _BerandaTabState extends State<BerandaTab> {
   final TextEditingController _destinasiController =
       TextEditingController(text: 'Bali, Indonesia');
+
+  String _dateLabel = '24 - 26 Okt';
+  DateTime? _checkIn;
+  DateTime? _checkOut;
+
+  Future<void> _pickDate() async {
+    final result = await Navigator.pushNamed(
+      context,
+      CustomerRouter.calendar,
+    );
+    if (result is Map && mounted) {
+      final ci = result['checkIn'] as DateTime?;
+      final co = result['checkOut'] as DateTime?;
+      if (ci != null && co != null) {
+        setState(() {
+          _checkIn = ci;
+          _checkOut = co;
+          _dateLabel =
+              '${ci.day} - ${co.day} ${BookingArgs.monthShort(co.month)}';
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -185,27 +209,34 @@ class _BerandaTabState extends State<BerandaTab> {
               Row(
                 children: [
                   Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5F7FA),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.calendar_today_outlined,
-                              color: Color(0xFF00B4D8), size: 18),
-                          const SizedBox(width: 8),
-                          Text(
-                            '24 - 26 Okt',
-                            style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: const Color(0xFF111827)),
-                          ),
-                        ],
+                    child: InkWell(
+                      onTap: _pickDate,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF5F7FA),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFE5E7EB)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.calendar_today_outlined,
+                                color: Color(0xFF00B4D8), size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _dateLabel,
+                                style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: const Color(0xFF111827)),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -579,8 +610,20 @@ class _BerandaTabState extends State<BerandaTab> {
   }
 
   Widget _buildHotelCard(Map<String, dynamic> hotel) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+    return GestureDetector(
+      onTap: () {
+        final args = BookingArgs.fromHotel(hotel).copyWith(
+          checkIn: _checkIn,
+          checkOut: _checkOut,
+        );
+        Navigator.pushNamed(
+          context,
+          CustomerRouter.hotelDetail,
+          arguments: args,
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -752,11 +795,17 @@ class _BerandaTabState extends State<BerandaTab> {
                       ],
                     ),
                     ElevatedButton(
-                      onPressed: () => Navigator.pushNamed(
-                        context,
-                        CustomerRouter.roomSelection,
-                        arguments: hotel,
-                      ),
+                      onPressed: () {
+                        final args = BookingArgs.fromHotel(hotel).copyWith(
+                          checkIn: _checkIn,
+                          checkOut: _checkOut,
+                        );
+                        Navigator.pushNamed(
+                          context,
+                          CustomerRouter.roomSelection,
+                          arguments: args,
+                        );
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF00B4D8),
                         foregroundColor: Colors.white,
@@ -781,7 +830,8 @@ class _BerandaTabState extends State<BerandaTab> {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildWhyGoTicket() {

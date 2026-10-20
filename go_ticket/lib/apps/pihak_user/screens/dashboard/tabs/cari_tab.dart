@@ -304,25 +304,28 @@ class _CariTabState extends State<CariTab> {
             ),
           ),
           const Divider(height: 1, color: Color(0xFFE5E7EB)),
-          Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                const Icon(Icons.location_on,
-                    color: Color(0xFF00B4D8), size: 16),
-                const SizedBox(width: 4),
-                Text(
-                  'Seminyak, Bali  •  24 - 26 Okt  •  2 Tamu, 1 Kamar',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: const Color(0xFF374151),
-                    fontWeight: FontWeight.w500,
+          InkWell(
+            onTap: () => Navigator.pushNamed(context, CustomerRouter.calendar),
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.location_on,
+                      color: Color(0xFF00B4D8), size: 16),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Seminyak, Bali  •  24 - 26 Okt  •  2 Tamu, 1 Kamar',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: const Color(0xFF374151),
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-                const Spacer(),
-                const Icon(Icons.tune, color: Color(0xFF00B4D8), size: 18),
-              ],
+                  const Spacer(),
+                  const Icon(Icons.tune, color: Color(0xFF00B4D8), size: 18),
+                ],
+              ),
             ),
           ),
         ],

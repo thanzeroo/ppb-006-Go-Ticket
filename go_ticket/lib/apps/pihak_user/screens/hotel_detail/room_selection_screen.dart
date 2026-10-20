@@ -88,13 +88,15 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
   @override
   void initState() {
     super.initState();
-    _in = _args.checkIn;
-    _out = _args.checkOut;
-    // pastikan pilihan awal valid
-    if (!_rangeIsFree(_in!, _out!)) {
-      _in = null;
-      _out = null;
+    final today = _today;
+    DateTime checkIn = _args.checkIn;
+    DateTime checkOut = _args.checkOut;
+    if (checkIn.isBefore(today)) {
+      checkIn = today.add(const Duration(days: 1));
+      checkOut = checkIn.add(const Duration(days: 2));
     }
+    _in = checkIn;
+    _out = checkOut;
   }
 
   DateTime get _today {
@@ -104,8 +106,8 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
 
   /// Status dummy per tanggal (sampai ada data dari API).
   _DayStatus _status(DateTime d) {
-    if (d.day % 9 == 0) return _DayStatus.full;
-    if (d.day % 11 == 0) return _DayStatus.maintenance;
+    if (d.day % 29 == 0) return _DayStatus.full;
+    if (d.day % 31 == 0) return _DayStatus.maintenance;
     return _DayStatus.available;
   }
 
@@ -140,7 +142,20 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       : 0;
 
   void _next() {
+    if (_in == null || _out == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Silakan tentukan tanggal check-in dan check-out')),
+      );
+      return;
+    }
     final room = _rooms[_room];
+    if (room.soldOut) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Tipe kamar ini sudah habis. Silakan pilih tipe kamar lain.')),
+      );
+      return;
+    }
     Navigator.pushNamed(
       context,
       CustomerRouter.guestDetail,
@@ -246,7 +261,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
           GTButton(
             label: 'Lanjut Pemesanan',
             trailing: Icons.arrow_forward_rounded,
-            onTap: ready ? _next : null,
+            onTap: _next,
           ),
         ]),
       ),
