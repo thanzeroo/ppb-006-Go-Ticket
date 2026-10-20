@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../widgets/gt_ui.dart';
+import 'package:go_ticket/core/widgets/gt_ui.dart';
 
 class _Guest {
   String name;

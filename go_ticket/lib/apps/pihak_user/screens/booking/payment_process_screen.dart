@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../data/booking_args.dart';
+import 'package:go_ticket/core/models/booking_args.dart';
 import '../../router/customer_router.dart';
-import '../../widgets/gt_ui.dart';
+import 'package:go_ticket/core/widgets/gt_ui.dart';
 
 /// Pembayaran (Figma: "USER Page Payment").
 class PaymentProcessScreen extends StatefulWidget {

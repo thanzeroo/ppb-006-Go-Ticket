@@ -609,7 +609,7 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
                         ElevatedButton(
                           onPressed: () => Navigator.pushNamed(
                             context,
-                            CustomerRouter.roomSelection,
+                            CustomerRouter.hotelDetail,
                             arguments: hotel,
                           ),
                           style: ElevatedButton.styleFrom(

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../data/booking_args.dart';
+import 'package:go_ticket/core/models/booking_args.dart';
 import '../../../router/customer_router.dart';
 import '../customer_dashboard_screen.dart';
 
@@ -802,7 +802,7 @@ class _BerandaTabState extends State<BerandaTab> {
                         );
                         Navigator.pushNamed(
                           context,
-                          CustomerRouter.roomSelection,
+                          CustomerRouter.hotelDetail,
                           arguments: args,
                         );
                       },

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../data/booking_args.dart';
+import 'package:go_ticket/core/models/booking_args.dart';
 import '../../router/customer_router.dart';
-import '../../widgets/gt_ui.dart';
+import 'package:go_ticket/core/widgets/gt_ui.dart';
 
 /// Pembayaran berhasil + E-Tiket (Figma: "USER Page Payment Valid").
 class PaymentSuccessScreen extends StatelessWidget {

@@ -659,7 +659,7 @@ class _PesananTabState extends State<PesananTab>
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () => Navigator.pushNamed(
-                        context, CustomerRouter.roomSelection),
+                        context, CustomerRouter.hotelDetail),
                     icon: const Icon(Icons.refresh,
                         color: Color(0xFF00B4D8), size: 14),
                     label: Text(

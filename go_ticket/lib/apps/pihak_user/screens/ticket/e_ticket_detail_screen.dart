@@ -11,6 +11,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/models/booking_args.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../core/widgets/custom_button.dart';
 
@@ -19,6 +20,9 @@ class ETicketDetailScreen extends StatelessWidget {
   final dynamic arguments;
 
   const ETicketDetailScreen({super.key, this.arguments});
+
+  BookingArgs? get booking =>
+      arguments is BookingArgs ? (arguments as BookingArgs) : null;
 
   @override
   Widget build(BuildContext context) {
@@ -118,12 +122,19 @@ class ETicketDetailScreen extends StatelessWidget {
                 const Icon(Icons.hotel_rounded,
                     color: AppColors.white, size: 32),
                 const SizedBox(height: 8),
-                Text('Grand Hotel Example',
-                    style: AppTextStyles.headlineSmall
-                        .copyWith(color: AppColors.white)),
-                Text('Jakarta Pusat, DKI Jakarta',
-                    style: AppTextStyles.bodySmall
-                        .copyWith(color: AppColors.white.withValues(alpha: 0.8))),
+                Text(
+                  booking?.hotelName ?? 'Grand Hotel Example',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.headlineSmall
+                      .copyWith(color: AppColors.white),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  booking?.location ?? 'Jakarta Pusat, DKI Jakarta',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.bodySmall
+                      .copyWith(color: AppColors.white.withValues(alpha: 0.8)),
+                ),
               ],
             ),
           ),
@@ -141,8 +152,13 @@ class ETicketDetailScreen extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: List.generate(
                         (constraints.constrainWidth() / 8).floor(),
-                        (_) => const SizedBox(width: 4, height: 1,
-                            child: DecoratedBox(decoration: BoxDecoration(color: AppColors.grey300))),
+                        (_) => const SizedBox(
+                          width: 4,
+                          height: 1,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(color: AppColors.grey300),
+                          ),
+                        ),
                       ),
                     );
                   }),
@@ -157,12 +173,28 @@ class ETicketDetailScreen extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
             child: Column(
               children: [
-                _buildTicketRow('Nama Tamu', 'John Doe'),
-                _buildTicketRow('Kode Booking', 'GT-20261005-001'),
-                _buildTicketRow('Tipe Kamar', 'Standard Room'),
-                _buildTicketRow('Check-in', '05 Oktober 2026, 14.00'),
-                _buildTicketRow('Check-out', '08 Oktober 2026, 12.00'),
-                _buildTicketRow('Jumlah Tamu', '2 Tamu'),
+                _buildTicketRow(
+                  'Nama Tamu',
+                  (booking?.guestName.isNotEmpty ?? false)
+                      ? booking!.guestName
+                      : 'Budi Santoso',
+                ),
+                _buildTicketRow(
+                  'Kode Booking',
+                  'GT-${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}-001',
+                ),
+                _buildTicketRow(
+                  'Tipe Kamar',
+                  booking?.roomName ?? 'Standard Room',
+                ),
+                _buildTicketRow(
+                  'Jadwal Menginap',
+                  booking?.dateRange ?? '05 Okt - 08 Okt 2026',
+                ),
+                _buildTicketRow(
+                  'Jumlah Tamu',
+                  '${booking?.adults ?? 2} Dewasa${(booking?.children ?? 0) > 0 ? ', ${booking!.children} Anak' : ''}',
+                ),
               ],
             ),
           ),

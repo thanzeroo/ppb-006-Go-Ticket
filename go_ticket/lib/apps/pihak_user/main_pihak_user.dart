@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'screens/splash/customer_loading_screen.dart';
+import 'router/customer_router.dart';
 
 /// Aplikasi root untuk Pihak User / Customer Go Ticket.
 void main() {
@@ -25,7 +25,8 @@ class PihakUserApp extends StatelessWidget {
         useMaterial3: true,
       ),
       themeMode: ThemeMode.light,
-      home: const CustomerLoadingScreen(),
+      onGenerateRoute: CustomerRouter.onGenerateRoute,
+      initialRoute: CustomerRouter.initial,
     );
   }
 }

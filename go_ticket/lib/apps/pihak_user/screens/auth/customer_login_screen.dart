@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/widgets/auth_logo_header.dart';
-import '../dashboard/customer_dashboard_screen.dart';
+import '../../router/customer_router.dart';
 import 'terms_screen.dart';
 
 class CustomerLoginScreen extends StatefulWidget {
@@ -63,8 +63,8 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     if (!mounted) return;
     setState(() => _isLoading = false);
 
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const CustomerDashboardScreen()),
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      CustomerRouter.dashboard,
       (_) => false,
     );
   }

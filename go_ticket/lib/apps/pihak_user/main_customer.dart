@@ -1,6 +1,3 @@
+/// Barrel file untuk backward-compatibility.
+/// Gunakan [PihakUserApp] dari main_pihak_user.dart.
 export 'main_pihak_user.dart';
-
-import 'main_pihak_user.dart';
-
-/// Alias untuk kompatibilitas ke belakang
-typedef UserApp = PihakUserApp;

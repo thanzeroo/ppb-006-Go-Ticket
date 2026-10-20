@@ -668,7 +668,7 @@ class _CariTabState extends State<CariTab> {
                     ElevatedButton(
                       onPressed: () => Navigator.pushNamed(
                         context,
-                        CustomerRouter.roomSelection,
+                        CustomerRouter.hotelDetail,
                         arguments: hotel,
                       ),
                       style: ElevatedButton.styleFrom(

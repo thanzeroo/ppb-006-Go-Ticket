@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../data/booking_args.dart';
-import '../../widgets/gt_ui.dart';
+import 'package:go_ticket/core/models/booking_args.dart';
+import 'package:go_ticket/core/widgets/gt_ui.dart';
 
 /// Ulasan hotel (Figma: "USER Page Ulasan Hotel").
 class HotelReviewsScreen extends StatelessWidget {
