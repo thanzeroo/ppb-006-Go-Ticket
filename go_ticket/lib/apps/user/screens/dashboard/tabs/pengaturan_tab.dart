@@ -1,5 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../../core/utils/storage_helper.dart';
+import '../../auth/customer_login_screen.dart';
+import '../../auth/terms_screen.dart';
+import '../../settings/profile_screen.dart';
+import '../../settings/saved_guests_screen.dart';
+import '../../settings/security_screen.dart';
+import '../../settings/voucher_screen.dart';
+import 'pesanan_tab.dart';
 import 'saved_hotel_screen.dart';
 
 /// Tab Pengaturan / Profil User
@@ -12,6 +20,105 @@ class PengaturanTab extends StatefulWidget {
 
 class _PengaturanTabState extends State<PengaturanTab> {
   bool _notifEnabled = true;
+  String _language = 'Bahasa Indonesia';
+
+  void _go(Widget page) =>
+      Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+
+  void _snack(String m) => ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(m)));
+
+  Future<void> _pickLanguage() async {
+    final v = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text('Pilihan Bahasa',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          ),
+          for (final l in const ['Bahasa Indonesia', 'English'])
+            ListTile(
+              title: Text(l),
+              trailing: l == _language
+                  ? const Icon(Icons.check, color: Color(0xFF00B4D8))
+                  : null,
+              onTap: () => Navigator.pop(ctx, l),
+            ),
+        ]),
+      ),
+    );
+    if (v != null) setState(() => _language = v);
+  }
+
+  void _openHelp() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text('Pusat Bantuan & CS 24/7',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          ),
+          ListTile(
+            leading: const Icon(Icons.chat_outlined),
+            title: const Text('WhatsApp Resmi Go Ticket'),
+            subtitle: const Text('Respon cepat 24 jam'),
+            onTap: () {
+              Navigator.pop(ctx);
+              _snack('Membuka WhatsApp Go Ticket…');
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.mail_outline),
+            title: const Text('Email Bantuan'),
+            subtitle: const Text('cs@goticket.id'),
+            onTap: () {
+              Navigator.pop(ctx);
+              _snack('Membuka email bantuan…');
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.help_outline),
+            title: const Text('Pertanyaan Umum (FAQ)'),
+            onTap: () {
+              Navigator.pop(ctx);
+              _snack('FAQ segera hadir');
+            },
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Future<void> _logout() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Keluar dari Akun?'),
+        content: const Text('Kamu perlu masuk lagi untuk memesan hotel.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Batal')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Keluar',
+                  style: TextStyle(color: Color(0xFFEF4444)))),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await StorageHelper.clearAccessToken();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const CustomerLoginScreen()),
+      (_) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +138,7 @@ class _PengaturanTabState extends State<PengaturanTab> {
                 icon: Icons.person_outline,
                 title: 'Edit Profil Saya',
                 subtitle: 'Ubah nama, nomor HP & tanggal lahir',
-                onTap: () {},
+                onTap: () => _go(const ProfileScreen()),
               ),
               const Divider(height: 1, indent: 56, color: Color(0xFFE5E7EB)),
               _buildMenuItem(
@@ -40,14 +147,14 @@ class _PengaturanTabState extends State<PengaturanTab> {
                 subtitle: 'Isi cepat data penumpang & tamu hotel',
                 badge: '3 Tamu',
                 badgeColor: const Color(0xFF00B4D8),
-                onTap: () {},
+                onTap: () => _go(const SavedGuestsScreen()),
               ),
               const Divider(height: 1, indent: 56, color: Color(0xFFE5E7EB)),
               _buildMenuItem(
                 icon: Icons.lock_outline,
                 title: 'Keamanan Akun & Kata Sandi',
                 subtitle: 'Ganti password & otentikasi 2 langkah',
-                onTap: () {},
+                onTap: () => _go(const SecurityScreen()),
               ),
             ]),
             const SizedBox(height: 20),
@@ -57,7 +164,7 @@ class _PengaturanTabState extends State<PengaturanTab> {
                 icon: Icons.receipt_long_outlined,
                 title: 'Riwayat Pesanan & E-Tiket Saya',
                 subtitle: 'Akses tiket aktif, voucher hotel & invoice',
-                onTap: () {},
+                onTap: () => _go(const PesananTab()),
               ),
               const Divider(height: 1, indent: 56, color: Color(0xFFE5E7EB)),
               _buildMenuItem(
@@ -82,7 +189,7 @@ class _PengaturanTabState extends State<PengaturanTab> {
                 subtitle: 'Diskon eksklusif member Platinum',
                 badge: '2 Baru',
                 badgeColor: const Color(0xFFF59E0B),
-                onTap: () {},
+                onTap: () => _go(const VoucherScreen()),
               ),
             ]),
             const SizedBox(height: 20),
@@ -100,8 +207,8 @@ class _PengaturanTabState extends State<PengaturanTab> {
                 icon: Icons.translate,
                 title: 'Pilihan Bahasa',
                 subtitle: 'Bahasa tampilan sistem',
-                value: 'Bahasa Indonesia',
-                onTap: () {},
+                value: _language,
+                onTap: _pickLanguage,
               ),
             ]),
             const SizedBox(height: 20),
@@ -111,14 +218,14 @@ class _PengaturanTabState extends State<PengaturanTab> {
                 icon: Icons.headset_mic_outlined,
                 title: 'Pusat Bantuan & CS 24/7',
                 subtitle: 'Respon cepat via WhatsApp resmi',
-                onTap: () {},
+                onTap: _openHelp,
               ),
               const Divider(height: 1, indent: 56, color: Color(0xFFE5E7EB)),
               _buildMenuItem(
                 icon: Icons.policy_outlined,
                 title: 'Kebijakan Privasi & Ketentuan',
                 subtitle: 'Syarat penggunaan Go Ticket',
-                onTap: () {},
+                onTap: () => _go(const TermsScreen()),
               ),
             ]),
             const SizedBox(height: 24),
@@ -290,7 +397,7 @@ class _PengaturanTabState extends State<PengaturanTab> {
                 ),
               ),
               ElevatedButton(
-                onPressed: () {},
+                onPressed: () => _go(const VoucherScreen()),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF00B4D8),
                   foregroundColor: Colors.white,
@@ -619,7 +726,7 @@ class _PengaturanTabState extends State<PengaturanTab> {
           border: Border.all(color: const Color(0xFFFECACA)),
         ),
         child: InkWell(
-          onTap: () {},
+          onTap: _logout,
           borderRadius: BorderRadius.circular(14),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),

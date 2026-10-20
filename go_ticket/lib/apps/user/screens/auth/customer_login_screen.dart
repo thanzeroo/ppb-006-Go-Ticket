@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/widgets/auth_logo_header.dart';
 import '../dashboard/customer_dashboard_screen.dart';
+import 'terms_screen.dart';
 
 class CustomerLoginScreen extends StatefulWidget {
   const CustomerLoginScreen({super.key});
@@ -14,7 +15,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
   int _tabIndex = 0;
 
   // Controllers untuk Login
-  final _emailLoginController = TextEditingController(text: 'nama@email.com');
+  final _emailLoginController = TextEditingController();
   final _passwordLoginController = TextEditingController();
 
   // Controllers untuk Register
@@ -26,9 +27,14 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
 
   // Status checkbox & visibility password
   bool _rememberMe = true;
-  bool _obscurePassword = true;
+  bool _agreeTerms = false;
+  bool _obscureLoginPassword = true;
+  bool _obscureRegisterPassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
+
+  final _loginFormKey = GlobalKey<FormState>();
+  final _registerFormKey = GlobalKey<FormState>();
 
   @override
   void dispose() {
@@ -44,6 +50,14 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
 
   /// Simulasi proses login / register dan masuk ke Dashboard
   Future<void> _submit() async {
+    final formKey = _tabIndex == 0 ? _loginFormKey : _registerFormKey;
+    if (!(formKey.currentState?.validate() ?? false)) return;
+
+    if (_tabIndex == 1 && !_agreeTerms) {
+      _showSnack('Anda harus menyetujui Syarat & Ketentuan terlebih dahulu');
+      return;
+    }
+
     setState(() => _isLoading = true);
     await Future.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
@@ -53,6 +67,111 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
       MaterialPageRoute(builder: (_) => const CustomerDashboardScreen()),
       (_) => false,
     );
+  }
+
+  void _showSnack(String msg) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<void> _openTerms() async {
+    final agreed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const TermsScreen()),
+    );
+    if (agreed == true && mounted) setState(() => _agreeTerms = true);
+  }
+
+  void _showForgotPassword() {
+    final ctrl = TextEditingController(text: _emailLoginController.text);
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Lupa Kata Sandi', style: TextStyle(fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Masukkan email atau nomor WhatsApp terdaftar. Kami akan '
+              'mengirim tautan untuk mengatur ulang kata sandi.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              decoration: const InputDecoration(
+                hintText: 'nama@email.com / 0812xxxx',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () {
+              final v = ctrl.text.trim();
+              Navigator.pop(ctx);
+              if (v.isEmpty) {
+                _showSnack('Email / nomor WhatsApp tidak boleh kosong');
+              } else {
+                _showSnack('Tautan reset kata sandi dikirim ke $v');
+              }
+            },
+            child: const Text('Kirim'),
+          ),
+        ],
+      ),
+    ).then((_) => ctrl.dispose());
+  }
+
+  // ---------------------------------------------------------------------------
+  // VALIDATOR
+  // ---------------------------------------------------------------------------
+
+  static final _emailRe = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+  static final _phoneRe = RegExp(r'^(\+62|62|0)8[0-9]{8,12}$');
+
+  String? _vRequired(String? v, String label) =>
+      (v == null || v.trim().isEmpty) ? '$label tidak boleh kosong' : null;
+
+  String? _vEmailOrPhone(String? v) {
+    final t = (v ?? '').trim();
+    if (t.isEmpty) return 'Email / nomor WhatsApp tidak boleh kosong';
+    if (!_emailRe.hasMatch(t) && !_phoneRe.hasMatch(t)) {
+      return 'Format email atau nomor WhatsApp tidak valid';
+    }
+    return null;
+  }
+
+  String? _vEmail(String? v) {
+    final t = (v ?? '').trim();
+    if (t.isEmpty) return 'Email tidak boleh kosong';
+    if (!_emailRe.hasMatch(t)) return 'Format email tidak valid';
+    return null;
+  }
+
+  String? _vPhone(String? v) {
+    final t = (v ?? '').trim();
+    if (t.isEmpty) return 'Nomor telepon tidak boleh kosong';
+    if (!_phoneRe.hasMatch(t)) return 'Nomor telepon tidak valid (contoh 0812xxxx)';
+    return null;
+  }
+
+  String? _vPassword(String? v) {
+    final t = v ?? '';
+    if (t.isEmpty) return 'Kata sandi tidak boleh kosong';
+    if (t.length < 8) return 'Kata sandi minimal 8 karakter';
+    return null;
+  }
+
+  String? _vConfirm(String? v) {
+    if ((v ?? '').isEmpty) return 'Konfirmasi kata sandi tidak boleh kosong';
+    if (v != _passwordRegisterController.text) return 'Kata sandi tidak sama';
+    return null;
   }
 
   @override
@@ -225,7 +344,9 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
 
   /// Form untuk Tab MASUK
   Widget _buildLoginForm() {
-    return Column(
+    return Form(
+      key: _loginFormKey,
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildInputLabel('Email / Nomor WhatsApp'),
@@ -233,6 +354,8 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           controller: _emailLoginController,
           hintText: 'nama@email.com / 0812xxxx',
           prefixIcon: Icons.alternate_email_rounded,
+          keyboardType: TextInputType.emailAddress,
+          validator: _vEmailOrPhone,
         ),
         const SizedBox(height: 16),
 
@@ -241,7 +364,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           children: [
             _buildInputLabel('Kata Sandi'),
             GestureDetector(
-              onTap: () {},
+              onTap: _showForgotPassword,
               child: const Text(
                 'Lupa Kata Sandi?',
                 style: TextStyle(
@@ -257,17 +380,18 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           controller: _passwordLoginController,
           hintText: 'Masukkan kata sandi',
           prefixIcon: Icons.lock_outline_rounded,
-          obscureText: _obscurePassword,
+          obscureText: _obscureLoginPassword,
+          validator: (v) => _vRequired(v, 'Kata sandi'),
           suffixIcon: IconButton(
             icon: Icon(
-              _obscurePassword
+              _obscureLoginPassword
                   ? Icons.visibility_outlined
                   : Icons.visibility_off_outlined,
               size: 18,
               color: const Color(0xFF94A3B8),
             ),
             onPressed: () =>
-                setState(() => _obscurePassword = !_obscurePassword),
+                setState(() => _obscureLoginPassword = !_obscureLoginPassword),
           ),
         ),
         const SizedBox(height: 12),
@@ -290,25 +414,28 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
             Expanded(
               child: _buildSocialButton(
                 title: 'Google',
-                onTap: _submit,
+                onTap: () => _showSnack('Masuk dengan Google segera hadir'),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _buildSocialButton(
                 title: 'Apple',
-                onTap: _submit,
+                onTap: () => _showSnack('Masuk dengan Apple segera hadir'),
               ),
             ),
           ],
         ),
       ],
+      ),
     );
   }
 
   /// Form untuk Tab DAFTAR AKUN
   Widget _buildRegisterForm() {
-    return Column(
+    return Form(
+      key: _registerFormKey,
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildInputLabel('Nama Lengkap'),
@@ -316,41 +443,47 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           controller: _nameController,
           hintText: 'Masukkan nama lengkap anda',
           prefixIcon: Icons.person_outline_rounded,
+          validator: (v) => _vRequired(v, 'Nama lengkap'),
         ),
         const SizedBox(height: 14),
 
         _buildInputLabel('Email'),
         _buildTextField(
           controller: _emailRegisterController,
-          hintText: 'nama@email.com / 0812xxxx',
+          hintText: 'nama@email.com',
           prefixIcon: Icons.alternate_email_rounded,
+          keyboardType: TextInputType.emailAddress,
+          validator: _vEmail,
         ),
         const SizedBox(height: 14),
 
         _buildInputLabel('Nomor Telepon'),
         _buildTextField(
           controller: _phoneController,
-          hintText: 'Masukkan nomor valid',
-          prefixIcon: Icons.chat_bubble_outline_rounded,
+          hintText: 'Contoh: 08123456789',
+          prefixIcon: Icons.phone_outlined,
+          keyboardType: TextInputType.phone,
+          validator: _vPhone,
         ),
         const SizedBox(height: 14),
 
         _buildInputLabel('Kata Sandi'),
         _buildTextField(
           controller: _passwordRegisterController,
-          hintText: 'Buat kata sandi',
+          hintText: 'Minimal 8 karakter',
           prefixIcon: Icons.lock_outline_rounded,
-          obscureText: _obscurePassword,
+          obscureText: _obscureRegisterPassword,
+          validator: _vPassword,
           suffixIcon: IconButton(
             icon: Icon(
-              _obscurePassword
+              _obscureRegisterPassword
                   ? Icons.visibility_outlined
                   : Icons.visibility_off_outlined,
               size: 18,
               color: const Color(0xFF94A3B8),
             ),
-            onPressed: () =>
-                setState(() => _obscurePassword = !_obscurePassword),
+            onPressed: () => setState(
+                () => _obscureRegisterPassword = !_obscureRegisterPassword),
           ),
         ),
         const SizedBox(height: 14),
@@ -358,9 +491,10 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         _buildInputLabel('Konfirmasi Kata Sandi'),
         _buildTextField(
           controller: _confirmPasswordController,
-          hintText: 'Masukkan kata sandi',
+          hintText: 'Ulangi kata sandi',
           prefixIcon: Icons.lock_outline_rounded,
           obscureText: _obscureConfirmPassword,
+          validator: _vConfirm,
           suffixIcon: IconButton(
             icon: Icon(
               _obscureConfirmPassword
@@ -374,12 +508,60 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
 
-        _buildRememberMeCheckbox(),
+        _buildTermsCheckbox(),
         const SizedBox(height: 18),
 
         _buildPrimaryButton(title: 'Buat Akun', onTap: _submit),
+      ],
+      ),
+    );
+  }
+
+  /// Checkbox persetujuan Syarat & Ketentuan (wajib saat daftar)
+  Widget _buildTermsCheckbox() {
+    const base = TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.4);
+    const link = TextStyle(
+      fontSize: 12,
+      fontWeight: FontWeight.w700,
+      color: Color(0xFF00A8E8),
+      height: 1.4,
+    );
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 22,
+          height: 22,
+          child: Checkbox(
+            value: _agreeTerms,
+            activeColor: const Color(0xFF00C7F2),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
+            side: const BorderSide(color: Color(0xFF00C7F2), width: 1.5),
+            onChanged: (val) => setState(() => _agreeTerms = val ?? false),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: GestureDetector(
+            onTap: _openTerms,
+            child: RichText(
+              text: const TextSpan(
+                style: base,
+                children: [
+                  TextSpan(text: 'Saya menyetujui '),
+                  TextSpan(text: 'Syarat & Ketentuan', style: link),
+                  TextSpan(text: ' serta '),
+                  TextSpan(text: 'Kebijakan Privasi', style: link),
+                  TextSpan(text: ' Go Ticket'),
+                ],
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -404,15 +586,20 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     required IconData prefixIcon,
     bool obscureText = false,
     Widget? suffixIcon,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
   }) {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFF1F5F9),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: TextField(
+      child: TextFormField(
         controller: controller,
         obscureText: obscureText,
+        keyboardType: keyboardType,
+        validator: validator,
+        autovalidateMode: AutovalidateMode.onUserInteraction,
         style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
         decoration: InputDecoration(
           hintText: hintText,
@@ -424,6 +611,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           ),
           suffixIcon: suffixIcon,
           border: InputBorder.none,
+          errorStyle: const TextStyle(fontSize: 11),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 14,
             vertical: 14,
@@ -562,7 +750,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         Icon(Icons.verified_user_rounded, color: Color(0xFF0284C7), size: 14),
         SizedBox(width: 6),
         Text(
-          'TERPROTEKSI ENKRIPSI 256–BIT KELAS PERBANKAN',
+          'TERPROTEKSI ENKRIPSI 256-BIT KELAS PERBANKAN',
           style: TextStyle(
             fontSize: 9,
             fontWeight: FontWeight.bold,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../router/customer_router.dart';
+
 /// Tab Saved Hotel (dari halaman Pesanan → tab Saved Hotel)
 /// Digunakan sebagai layar terpisah
 class SavedHotelScreen extends StatefulWidget {
@@ -605,7 +607,11 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
                           ),
                         const SizedBox(width: 8),
                         ElevatedButton(
-                          onPressed: () {},
+                          onPressed: () => Navigator.pushNamed(
+                            context,
+                            CustomerRouter.roomSelection,
+                            arguments: hotel,
+                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF00B4D8),
                             foregroundColor: Colors.white,

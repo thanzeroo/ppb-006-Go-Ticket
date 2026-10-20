@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../router/customer_router.dart';
+
 /// Tab Cari: Halaman hasil pencarian hotel seperti screenshot
 class CariTab extends StatefulWidget {
   const CariTab({super.key});
@@ -12,7 +14,7 @@ class CariTab extends StatefulWidget {
 class _CariTabState extends State<CariTab> {
   String _sortBy = 'Harga Terbaik';
 
-  final List<Map<String, dynamic>> _hotels = [
+  static final List<Map<String, dynamic>> _baseHotels = [
     {
       'name': 'The Grand Amora Resort & Spa',
       'location': 'Petittenget, Seminyak',
@@ -73,6 +75,85 @@ class _CariTabState extends State<CariTab> {
       'badgeText': 'Bintang 4',
     },
   ];
+
+  /// Data hotel diduplikasi 4x supaya daftar hasil terlihat banyak
+  /// (sementara, sebelum terhubung ke API). Salinan tidak ditandai favorit.
+  final List<Map<String, dynamic>> _hotels = [
+    for (var i = 0; i < 4; i++)
+      for (final h in _baseHotels)
+        {...h, if (i > 0) 'isFavorite': false},
+  ];
+
+  String _sort = 'Terpopuler';
+
+  void _snack(String m) => ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(m)));
+
+  Future<void> _showSort() async {
+    final v = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text('Urutkan',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          ),
+          for (final o in const [
+            'Terpopuler',
+            'Harga Terendah',
+            'Harga Tertinggi',
+            'Rating Tertinggi'
+          ])
+            ListTile(
+              title: Text(o),
+              trailing: o == _sort
+                  ? const Icon(Icons.check, color: Color(0xFF00B4D8))
+                  : null,
+              onTap: () => Navigator.pop(ctx, o),
+            ),
+        ]),
+      ),
+    );
+    if (v != null) {
+      setState(() => _sort = v);
+      _snack('Diurutkan: $v');
+    }
+  }
+
+  void _showFilter() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Filter',
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 8),
+                const Text('Filter aktif: Promo Kilat • Rating 4.5+ • Kolam Renang',
+                    style: TextStyle(fontSize: 12)),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _snack('Filter diterapkan');
+                    },
+                    child: const Text('Terapkan'),
+                  ),
+                ),
+              ]),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -202,7 +283,7 @@ class _CariTabState extends State<CariTab> {
                 return Container(
                   margin: const EdgeInsets.only(right: 8),
                   child: OutlinedButton(
-                    onPressed: () {},
+                    onPressed: () => _snack('Filter diterapkan'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF111827),
                       side: const BorderSide(color: Color(0xFFE5E7EB)),
@@ -296,6 +377,17 @@ class _CariTabState extends State<CariTab> {
   }
 
   Widget _buildHotelCard(Map<String, dynamic> hotel) {
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(
+        context,
+        CustomerRouter.hotelDetail,
+        arguments: hotel,
+      ),
+      child: _buildHotelCardBody(hotel),
+    );
+  }
+
+  Widget _buildHotelCardBody(Map<String, dynamic> hotel) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -571,7 +663,11 @@ class _CariTabState extends State<CariTab> {
                       ],
                     ),
                     ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () => Navigator.pushNamed(
+                        context,
+                        CustomerRouter.roomSelection,
+                        arguments: hotel,
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF00B4D8),
                         foregroundColor: Colors.white,
@@ -610,7 +706,7 @@ class _CariTabState extends State<CariTab> {
         children: [
           Expanded(
             child: OutlinedButton.icon(
-              onPressed: () {},
+              onPressed: _showSort,
               icon: const Icon(Icons.local_fire_department,
                   color: Color(0xFF00B4D8), size: 16),
               label: Text(
@@ -629,7 +725,7 @@ class _CariTabState extends State<CariTab> {
           const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton.icon(
-              onPressed: () {},
+              onPressed: _showFilter,
               icon: const Icon(Icons.filter_list, size: 16),
               label: Text(
                 'Filter (3)',

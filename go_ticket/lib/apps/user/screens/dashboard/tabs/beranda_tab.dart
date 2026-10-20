@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../core/constants/app_colors.dart';
+import '../../../router/customer_router.dart';
+import '../customer_dashboard_screen.dart';
 
 class BerandaTab extends StatefulWidget {
   const BerandaTab({super.key});
@@ -239,7 +242,7 @@ class _BerandaTabState extends State<BerandaTab> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () {},
+                  onPressed: () => CustomerDashboardScreen.tabNotifier.value = 1,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF00B4D8),
                     foregroundColor: Colors.white,
@@ -387,7 +390,14 @@ class _BerandaTabState extends State<BerandaTab> {
                       ),
                       const SizedBox(height: 8),
                       ElevatedButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          Clipboard.setData(
+                              const ClipboardData(text: 'STAYHEMAT'));
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(const SnackBar(
+                                content: Text('Kode STAYHEMAT disalin')));
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
                           foregroundColor: const Color(0xFF0096C7),
@@ -442,7 +452,7 @@ class _BerandaTabState extends State<BerandaTab> {
                 ),
               ),
               TextButton(
-                onPressed: () {},
+                onPressed: () => CustomerDashboardScreen.tabNotifier.value = 1,
                 child: Text(
                   'Lihat Semua',
                   style: GoogleFonts.inter(
@@ -467,7 +477,7 @@ class _BerandaTabState extends State<BerandaTab> {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   child: InkWell(
-                    onTap: () {},
+                    onTap: () => CustomerDashboardScreen.tabNotifier.value = 1,
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -545,7 +555,7 @@ class _BerandaTabState extends State<BerandaTab> {
                 ),
               ),
               TextButton(
-                onPressed: () {},
+                onPressed: () => CustomerDashboardScreen.tabNotifier.value = 1,
                 child: Text(
                   'Semua (42)',
                   style: GoogleFonts.inter(
@@ -743,7 +753,11 @@ class _BerandaTabState extends State<BerandaTab> {
                       ],
                     ),
                     ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () => Navigator.pushNamed(
+                        context,
+                        CustomerRouter.roomSelection,
+                        arguments: hotel,
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF00B4D8),
                         foregroundColor: Colors.white,

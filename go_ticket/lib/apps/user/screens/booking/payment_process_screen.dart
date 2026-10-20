@@ -1,24 +1,14 @@
-// =============================================================================
-// FILE: lib/apps/customer/screens/booking/payment_process_screen.dart
-// RESPONSIBILITY: Halaman proses pembayaran booking hotel. Menampilkan:
-// - Ringkasan pesanan dan total yang harus dibayar
-// - Pilihan metode pembayaran (Transfer Bank, VA, E-Wallet, QRIS)
-// - Countdown timer batas waktu pembayaran
-// - Instruksi pembayaran setelah metode dipilih
-// - Status polling setelah pembayaran (menunggu konfirmasi)
-// =============================================================================
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/app_colors.dart';
-import '../../../../core/theme/text_styles.dart';
-import '../../../../core/widgets/custom_button.dart';
-import '../ticket/e_ticket_detail_screen.dart';
+import '../../data/booking_args.dart';
+import '../../router/customer_router.dart';
+import '../../widgets/gt_ui.dart';
 
-/// Halaman proses pembayaran Go Ticket.
+/// Pembayaran (Figma: "USER Page Payment").
 class PaymentProcessScreen extends StatefulWidget {
   final dynamic arguments;
-
   const PaymentProcessScreen({super.key, this.arguments});
 
   @override
@@ -26,292 +16,396 @@ class PaymentProcessScreen extends StatefulWidget {
 }
 
 class _PaymentProcessScreenState extends State<PaymentProcessScreen> {
-  // ---------------------------------------------------------------------------
-  // STATE
-  // ---------------------------------------------------------------------------
+  late BookingArgs _args = BookingArgs.fromHotel(widget.arguments);
 
-  /// Metode pembayaran yang dipilih
-  String? _selectedMethod;
+  Timer? _timer;
+  int _secs = 14 * 60 + 59;
 
-  /// Apakah sedang memproses pembayaran
-  bool _isProcessing = false;
+  int _method = 0;
+  int? _open = 0;
 
-  /// Apakah instruksi pembayaran sudah ditampilkan
-  bool _showInstructions = false;
-
-  final List<_PaymentMethod> _paymentMethods = const [
-    _PaymentMethod(
-        id: 'bca_va',
-        name: 'BCA Virtual Account',
-        category: 'Transfer Bank / VA',
-        icon: Icons.account_balance_outlined),
-    _PaymentMethod(
-        id: 'mandiri_va',
-        name: 'Mandiri Virtual Account',
-        category: 'Transfer Bank / VA',
-        icon: Icons.account_balance_outlined),
-    _PaymentMethod(
-        id: 'gopay',
-        name: 'GoPay',
-        category: 'E-Wallet',
-        icon: Icons.account_balance_wallet_outlined),
-    _PaymentMethod(
-        id: 'ovo',
-        name: 'OVO',
-        category: 'E-Wallet',
-        icon: Icons.account_balance_wallet_outlined),
-    _PaymentMethod(
-        id: 'dana',
-        name: 'DANA',
-        category: 'E-Wallet',
-        icon: Icons.account_balance_wallet_outlined),
-    _PaymentMethod(
-        id: 'qris',
-        name: 'QRIS',
-        category: 'QRIS',
-        icon: Icons.qr_code_rounded),
+  static const _methods = [
+    ['E-Wallet & QRIS Instan', 'Konfirmasi otomatis tanpa upload bukti',
+      'QRIS / GoPay Instan'],
+    ['Virtual Account Bank', 'BCA, Mandiri, BNI, BRI & Permata',
+      'Virtual Account Bank'],
+    ['Kartu Kredit / Debit', 'Visa, Mastercard, JCB & AMEX',
+      'Kartu Kredit / Debit'],
+    ['PayLater & Cicilan', 'Liburan sekarang, bayar bulan depan',
+      'PayLater & Cicilan'],
   ];
 
-  void _selectMethod(String methodId) {
-    setState(() {
-      _selectedMethod = methodId;
-      _showInstructions = false;
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return;
+      if (_secs <= 1) {
+        t.cancel();
+        _expired();
+        return;
+      }
+      setState(() => _secs--);
     });
   }
 
-  Future<void> _processPayment() async {
-    if (_selectedMethod == null) return;
-
-    setState(() => _isProcessing = true);
-
-    // TODO: Integrasikan dengan BookingRepository.initiatePayment()
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (!mounted) return;
-    setState(() {
-      _isProcessing = false;
-      _showInstructions = true;
-    });
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
-  void _navigateToTicket() {
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const ETicketDetailScreen()),
-      (route) => route.isFirst,
+  void _expired() {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Waktu Pembayaran Habis'),
+        content: const Text(
+            'Batas waktu pembayaran telah berakhir. Silakan ulangi pemesanan.'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.of(context).popUntil((r) => r.isFirst);
+            },
+            child: const Text('Kembali'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String get _clock {
+    final m = (_secs ~/ 60).toString().padLeft(2, '0');
+    final s = (_secs % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  void _pay() {
+    _timer?.cancel();
+    Navigator.pushReplacementNamed(
+      context,
+      CustomerRouter.paymentSuccess,
+      arguments: _args.copyWith(paymentMethod: _methods[_method][2]),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
-      appBar: AppBar(
-        title: const Text('Pembayaran'),
-        automaticallyImplyLeading: !_showInstructions,
-      ),
-      body: _showInstructions ? _buildPaymentInstructions() : _buildMethodSelector(),
-      bottomNavigationBar: _showInstructions
-          ? null
-          : _buildPayButton(),
-    );
-  }
-
-  Widget _buildMethodSelector() {
-    final grouped = <String, List<_PaymentMethod>>{};
-    for (final m in _paymentMethods) {
-      grouped.putIfAbsent(m.category, () => []).add(m);
-    }
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        // Ringkasan harga
-        _buildOrderSummary(),
-        const SizedBox(height: 16),
-
-        // Pilih metode bayar
-        Text('Pilih Metode Pembayaran', style: AppTextStyles.titleMedium),
-        const SizedBox(height: 12),
-
-        ...grouped.entries.map((entry) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8, top: 4),
-                child: Text(entry.key,
-                    style: AppTextStyles.labelSmall
-                        .copyWith(color: AppColors.textSecondaryLight)),
+      backgroundColor: GT.bg,
+      appBar: const GTAppBar(title: 'Checkout Flow'),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+                color: GT.soft, borderRadius: BorderRadius.circular(20)),
+            child: Row(children: [
+              const CircleAvatar(
+                  radius: 20,
+                  backgroundColor: GT.sky,
+                  child: Icon(Icons.timer_outlined, color: GT.teal)),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('BATAS WAKTU SELESAI',
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: GT.muted)),
+                    Text('Selesaikan pembayaran dalam',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: GT.ink)),
+                  ],
+                ),
               ),
               Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
-                  color: AppColors.cardLight,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.grey200),
-                ),
-                child: Column(
-                  children: entry.value.map((method) {
-                    final isSelected = _selectedMethod == method.id;
-                    return ListTile(
-                      onTap: () => _selectMethod(method.id),
-                      leading: Icon(method.icon,
-                          color: isSelected ? AppColors.primary : AppColors.grey500),
-                      title: Text(method.name, style: AppTextStyles.labelMedium),
-                      trailing: isSelected
-                          ? const Icon(Icons.check_circle_rounded,
-                              color: AppColors.primary)
-                          : const Icon(Icons.radio_button_unchecked,
-                              color: AppColors.grey300),
-                      tileColor: isSelected
-                          ? AppColors.primary.withValues(alpha: 0.05)
-                          : null,
-                    );
-                  }).toList(),
-                ),
+                    color: GT.primary,
+                    borderRadius: BorderRadius.circular(20)),
+                child: Text(_clock,
+                    style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: GT.ink)),
               ),
-              const SizedBox(height: 12),
-            ],
-          );
-        }),
-      ],
-    );
-  }
-
-  Widget _buildOrderSummary() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: AppColors.primaryGradient,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Total Pembayaran',
-              style: AppTextStyles.bodySmall
-                  .copyWith(color: AppColors.white.withValues(alpha: 0.8))),
-          Text('Rp 950.000',
-              style: AppTextStyles.displaySmall.copyWith(color: AppColors.white)),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Grand Hotel Example — Standard',
-                  style: AppTextStyles.bodySmall
-                      .copyWith(color: AppColors.white.withValues(alpha: 0.8))),
-              Text('3 Malam',
-                  style: AppTextStyles.labelSmall
-                      .copyWith(color: AppColors.white)),
-            ],
+            ]),
           ),
+          const SizedBox(height: 14),
+          _summaryCard(),
+          const SizedBox(height: 4),
+          Row(children: const [
+            Icon(Icons.payments_outlined, color: GT.teal),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text('Metode Pembayaran',
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: GT.ink)),
+            ),
+            Text('Semua Transaksi Instan',
+                style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: GT.ink)),
+          ]),
+          const SizedBox(height: 12),
+          _methodTile(0, badge: 'Terpopuler', chips: const [
+            'QRIS', 'GoPay', 'OVO', 'DANA'
+          ]),
+          _promoRow(),
+          _methodTile(1),
+          _methodTile(2, lock: true),
+          _methodTile(3, badge: 'Bunga 0%'),
         ],
       ),
-    );
-  }
-
-  Widget _buildPayButton() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-      color: AppColors.white,
-      child: GoTicketButton(
-        label: _selectedMethod != null ? 'Bayar Sekarang' : 'Pilih Metode Dulu',
-        onPressed: _selectedMethod != null ? _processPayment : null,
-        isLoading: _isProcessing,
+      bottomNavigationBar: GTBottomBar(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Row(children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('TOTAL PEMBAYARAN',
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: GT.muted)),
+                  Text(rp(_args.total),
+                      style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: GT.teal)),
+                ],
+              ),
+            ),
+            const Icon(Icons.hotel_outlined, size: 14, color: GT.teal),
+            const SizedBox(width: 4),
+            Text('1 Kamar / ${_args.nights} Malam',
+                style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: GT.teal)),
+          ]),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: GTButton(
+              label: 'Bayar Sekarang ${rp(_args.total)}',
+              leading: Icons.shield_rounded,
+              onTap: _pay,
+            ),
+          ),
+        ]),
       ),
     );
   }
 
-  Widget _buildPaymentInstructions() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          // Status ikon sukses
-          const Icon(Icons.access_time_rounded,
-              size: 64, color: AppColors.warning),
-          const SizedBox(height: 16),
-          Text('Menunggu Pembayaran', style: AppTextStyles.headlineSmall),
-          const SizedBox(height: 8),
-          Text(
-            'Selesaikan pembayaran sebelum batas waktu habis',
-            style: AppTextStyles.bodySmall,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-
-          // Countdown
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: AppColors.warning.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              children: [
-                Text('Batas Waktu Pembayaran', style: AppTextStyles.labelSmall),
-                const SizedBox(height: 8),
-                Text('14:59', style: AppTextStyles.displaySmall.copyWith(
-                  color: AppColors.warning,
-                )),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Nomor VA
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.cardLight,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.grey200),
-            ),
+  Widget _summaryCard() {
+    return GTCard(
+      child: Column(children: [
+        Row(children: [
+          GTImage(_args.roomImage, height: 64, width: 64, radius: 12),
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Nomor Virtual Account', style: AppTextStyles.labelSmall),
-                const SizedBox(height: 6),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('1234 5678 9012 3456',
-                        style: AppTextStyles.headlineMedium),
-                    IconButton(
-                      onPressed: () {},
-                      icon: const Icon(Icons.copy_rounded,
-                          color: AppColors.primary, size: 20),
-                    ),
-                  ],
-                ),
+                const GTChip('Hotel • 1 Kamar',
+                    icon: Icons.hotel, bg: GT.soft),
+                const SizedBox(height: 4),
+                Text(_args.roomName,
+                    style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: GT.ink)),
+                Text('${_args.nights} Malam • ${_args.adults} Dewasa',
+                    style: const TextStyle(
+                        fontSize: 12, color: GT.muted)),
               ],
             ),
           ),
-          const Spacer(),
-
-          // Tombol cek status / sudah bayar
-          GoTicketButton(
-            label: 'Saya Sudah Membayar',
-            onPressed: _navigateToTicket,
-            icon: Icons.check_circle_outline_rounded,
+        ]),
+        const SizedBox(height: 14),
+        _line('${_args.nights} Malam x ${rp(_args.roomPrice)}',
+            Text(rp(_args.subtotal),
+                style: const TextStyle(
+                    fontWeight: FontWeight.w800, color: GT.ink))),
+        const SizedBox(height: 8),
+        _line('Layanan & Kebersihan',
+            const GTChip('GRATIS',
+                bg: Color(0xFFDCFCE7), fg: GT.green)),
+        const SizedBox(height: 8),
+        _line('Pajak Pemerintah & Daerah (10%)',
+            const Text('Termasuk',
+                style: TextStyle(fontSize: 12, color: GT.muted))),
+        if (_args.promoApplied) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+                color: const Color(0xFFE6F6F0),
+                borderRadius: BorderRadius.circular(14)),
+            child: Row(children: [
+              const CircleAvatar(
+                  radius: 16,
+                  backgroundColor: GT.sky,
+                  child:
+                      Icon(Icons.sell_outlined, size: 16, color: GT.teal)),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('STAYHEMAT ✓',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: GT.teal)),
+                    Text('Kupon potongan berhasil terpasang',
+                        style: TextStyle(fontSize: 11, color: GT.body)),
+                  ],
+                ),
+              ),
+              Text('- ${rp(_args.discount)}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800, color: GT.teal)),
+            ]),
           ),
         ],
-      ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+              color: GT.soft, borderRadius: BorderRadius.circular(14)),
+          child: Row(children: [
+            const Expanded(
+              child: Text('Total Tagihan',
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: GT.ink)),
+            ),
+            Text(rp(_args.total),
+                style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: GT.teal)),
+          ]),
+        ),
+      ]),
     );
   }
-}
 
-/// Data class untuk metode pembayaran
-class _PaymentMethod {
-  final String id;
-  final String name;
-  final String category;
-  final IconData icon;
+  Widget _line(String l, Widget r) => Row(children: [
+        Expanded(
+            child: Text(l,
+                style: const TextStyle(fontSize: 13, color: GT.body))),
+        r,
+      ]);
 
-  const _PaymentMethod({
-    required this.id,
-    required this.name,
-    required this.category,
-    required this.icon,
-  });
+  Widget _promoRow() {
+    return GTCard(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(children: [
+        const Icon(Icons.confirmation_number_outlined, color: GT.teal),
+        const SizedBox(width: 10),
+        const Expanded(
+          child: Text('Pilih Kode Promo',
+              style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: GT.ink)),
+        ),
+        GTButton(
+          label: _args.promoApplied ? 'Lepas' : 'Terapkan',
+          height: 44,
+          onTap: () => setState(
+              () => _args = _args.copyWith(promoApplied: !_args.promoApplied)),
+        ),
+      ]),
+    );
+  }
+
+  Widget _methodTile(int i,
+      {String? badge, List<String>? chips, bool lock = false}) {
+    final m = _methods[i];
+    final selected = _method == i;
+    final open = _open == i;
+    return GTCard(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.zero,
+      child: Column(children: [
+        InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => setState(() {
+            _method = i;
+            _open = open ? null : i;
+          }),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(children: [
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                    color: selected ? GT.primary : GT.soft,
+                    shape: BoxShape.circle),
+                child: selected
+                    ? const Icon(Icons.check, size: 16, color: GT.teal)
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 6,
+                      children: [
+                        Text(m[0],
+                            style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: GT.ink)),
+                        if (lock)
+                          const Icon(Icons.lock_rounded,
+                              size: 14, color: GT.green),
+                        if (badge != null)
+                          GTChip(badge, bg: GT.sky),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(m[1],
+                        style: const TextStyle(
+                            fontSize: 12, color: GT.muted)),
+                  ],
+                ),
+              ),
+              Icon(open ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                  color: GT.teal),
+            ]),
+          ),
+        ),
+        if (open && chips != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            child: Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final c in chips) GTChip(c, bg: GT.soft, fg: GT.ink),
+            ]),
+          ),
+      ]),
+    );
+  }
 }

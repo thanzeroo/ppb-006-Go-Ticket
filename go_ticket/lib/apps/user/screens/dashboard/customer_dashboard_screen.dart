@@ -11,6 +11,10 @@ import 'tabs/pengaturan_tab.dart';
 class CustomerDashboardScreen extends StatefulWidget {
   const CustomerDashboardScreen({super.key});
 
+  /// Dipakai tab lain untuk pindah tab: `CustomerDashboardScreen.tabNotifier.value = 1;`
+  /// (0 Beranda, 1 Cari, 2 Pesanan, 3 Pengaturan)
+  static final ValueNotifier<int> tabNotifier = ValueNotifier<int>(0);
+
   @override
   State<CustomerDashboardScreen> createState() =>
       _CustomerDashboardScreenState();
@@ -18,6 +22,25 @@ class CustomerDashboardScreen extends StatefulWidget {
 
 class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   int _currentIndex = 0;
+
+  void _onTabChanged() {
+    if (mounted) {
+      setState(() => _currentIndex = CustomerDashboardScreen.tabNotifier.value);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    CustomerDashboardScreen.tabNotifier.value = 0;
+    CustomerDashboardScreen.tabNotifier.addListener(_onTabChanged);
+  }
+
+  @override
+  void dispose() {
+    CustomerDashboardScreen.tabNotifier.removeListener(_onTabChanged);
+    super.dispose();
+  }
 
   static const List<Widget> _pages = [
     BerandaTab(),
@@ -72,7 +95,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
               final isSelected = index == _currentIndex;
               return Expanded(
                 child: GestureDetector(
-                  onTap: () => setState(() => _currentIndex = index),
+                  onTap: () => CustomerDashboardScreen.tabNotifier.value = index,
                   behavior: HitTestBehavior.opaque,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),

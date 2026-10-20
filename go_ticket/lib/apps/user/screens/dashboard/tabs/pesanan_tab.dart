@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../router/customer_router.dart';
 
 /// Tab Pesanan: Riwayat Tiket & Pesanan
 class PesananTab extends StatefulWidget {
@@ -483,7 +484,8 @@ class _PesananTabState extends State<PesananTab>
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () {},
+                    onPressed: () =>
+                        Navigator.pushNamed(context, CustomerRouter.eTicket),
                     icon: const Icon(Icons.qr_code, size: 16),
                     label: Text(
                       'Lihat E-Tiket & QR',
@@ -505,7 +507,8 @@ class _PesananTabState extends State<PesananTab>
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: () {},
+                    onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Petunjuk arah & kontak resepsionis dikirim ke WhatsApp'))),
                     icon: const Icon(Icons.support_agent,
                         color: Color(0xFF00B4D8), size: 16),
                     label: Text(
@@ -634,7 +637,8 @@ class _PesananTabState extends State<PesananTab>
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () {},
+                    onPressed: () => Navigator.pushNamed(
+                        context, CustomerRouter.postCheckoutReview),
                     icon: const Icon(Icons.star_border,
                         color: Color(0xFFF59E0B), size: 14),
                     label: Text(
@@ -654,7 +658,8 @@ class _PesananTabState extends State<PesananTab>
                 const SizedBox(width: 8),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () {},
+                    onPressed: () => Navigator.pushNamed(
+                        context, CustomerRouter.roomSelection),
                     icon: const Icon(Icons.refresh,
                         color: Color(0xFF00B4D8), size: 14),
                     label: Text(
@@ -676,7 +681,8 @@ class _PesananTabState extends State<PesananTab>
             const SizedBox(height: 6),
             Center(
               child: TextButton.icon(
-                onPressed: () {},
+                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Invoice PDF sedang disiapkan'))),
                 icon: const Icon(Icons.download_outlined,
                     size: 13, color: Color(0xFF6B7280)),
                 label: Text(
@@ -808,7 +814,8 @@ class _PesananTabState extends State<PesananTab>
             const SizedBox(height: 8),
             Center(
               child: TextButton.icon(
-                onPressed: () {},
+                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Refund 100% telah dikembalikan ke saldo GoPay'))),
                 icon: const Icon(Icons.info_outline,
                     size: 14, color: Color(0xFF6B7280)),
                 label: Text(
@@ -875,7 +882,8 @@ class _PesananTabState extends State<PesananTab>
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () {},
+                    onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Membuka WhatsApp resmi Go Ticket…'))),
                     icon: const Icon(Icons.chat, size: 14),
                     label: Text(
                       'WhatsApp 24 Jam',
@@ -896,7 +904,8 @@ class _PesananTabState extends State<PesananTab>
                 const SizedBox(width: 8),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () {},
+                    onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Pusat Bantuan segera hadir'))),
                     icon: const Icon(Icons.support,
                         color: Color(0xFF00B4D8), size: 14),
                     label: Text(

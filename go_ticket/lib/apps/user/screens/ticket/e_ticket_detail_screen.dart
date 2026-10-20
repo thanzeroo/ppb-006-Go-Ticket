@@ -28,11 +28,13 @@ class ETicketDetailScreen extends StatelessWidget {
         title: const Text('E-Tiket'),
         actions: [
           IconButton(
-            onPressed: () {},
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Tautan E-Tiket disalin'))),
             icon: const Icon(Icons.share_outlined),
           ),
           IconButton(
-            onPressed: () {},
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('E-Tiket sedang diunduh'))),
             icon: const Icon(Icons.download_outlined),
           ),
         ],
@@ -300,7 +302,8 @@ class ETicketDetailScreen extends StatelessWidget {
       children: [
         GoTicketOutlinedButton(
           label: 'Unduh E-Tiket (PDF)',
-          onPressed: () {},
+          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('E-Tiket PDF sedang diunduh'))),
           icon: Icons.picture_as_pdf_outlined,
         ),
         const SizedBox(height: 12),

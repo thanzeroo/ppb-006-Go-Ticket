@@ -12,8 +12,10 @@ import '../screens/splash/customer_loading_screen.dart';
 import '../screens/booking/guest_detail_form_screen.dart';
 import '../screens/booking/interactive_calendar_screen.dart';
 import '../screens/booking/payment_process_screen.dart';
+import '../screens/booking/payment_success_screen.dart';
 import '../screens/dashboard/customer_dashboard_screen.dart';
 import '../screens/hotel_detail/hotel_detail_screen.dart';
+import '../screens/hotel_detail/hotel_reviews_screen.dart';
 import '../screens/hotel_detail/room_selection_screen.dart';
 import '../screens/ticket/e_ticket_detail_screen.dart';
 import '../screens/ticket/post_checkout_review_screen.dart';
@@ -57,6 +59,12 @@ class CustomerRouter {
 
   /// Proses pembayaran
   static const String payment = '/booking/payment';
+
+  /// Pembayaran berhasil + E-Tiket ringkas
+  static const String paymentSuccess = '/booking/payment-success';
+
+  /// Ulasan hotel
+  static const String hotelReviews = '/hotel-reviews';
 
   /// Detail E-Tiket (QR Code)
   static const String eTicket = '/ticket/detail';
@@ -110,6 +118,18 @@ class CustomerRouter {
       case payment:
         return _buildRoute(
           PaymentProcessScreen(arguments: settings.arguments),
+          settings,
+        );
+
+      case paymentSuccess:
+        return _buildRoute(
+          PaymentSuccessScreen(arguments: settings.arguments),
+          settings,
+        );
+
+      case hotelReviews:
+        return _buildRoute(
+          HotelReviewsScreen(arguments: settings.arguments),
           settings,
         );
 
