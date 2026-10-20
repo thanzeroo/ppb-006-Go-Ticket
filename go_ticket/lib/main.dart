@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-import 'apps/hotel_partner/screens/splash/hotel_loading_screen.dart';
-import 'apps/superadmin_go-ticket/screens/splash/super_admin_loading_screen.dart';
-import 'apps/user/screens/splash/customer_loading_screen.dart';
+import 'apps/pihak_go_ticket/screens/splash/admin_splash_screen.dart';
+import 'apps/pihak_hotel/screens/splash/hotel_splash_screen.dart';
+import 'apps/pihak_user/screens/splash/customer_loading_screen.dart';
 
 void main() {
   runApp(const GoTicketApp());
@@ -13,90 +14,218 @@ class GoTicketApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
+      title: 'Go Ticket',
       debugShowCheckedModeBanner: false,
-      home: PortalSelectionScreen(),
+      theme: ThemeData(
+        fontFamily: GoogleFonts.poppins().fontFamily,
+        textTheme: GoogleFonts.poppinsTextTheme(),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00D1FF)),
+        useMaterial3: true,
+      ),
+      home: const PortalSelectionScreen(),
     );
   }
 }
 
-/// Layar pemilihan portal sederhana hitam putih (minimalis kaku)
+/// Layar pemilihan portal — bersih, terpusat di tengah layar, dan minimalis.
 class PortalSelectionScreen extends StatelessWidget {
   const PortalSelectionScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8FAFD),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 32),
-              _buildSimpleButton(
-                context: context,
-                label: '1. User (Tamu)',
-                destination: const CustomerLoadingScreen(),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Logo Go Ticket dengan Box & Cyan Glow
+                  Center(child: _buildLogoHeader()),
+                  const SizedBox(height: 18),
+
+                  // Judul Sederhana & Bersih
+                  const Text(
+                    'Go Ticket',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Pilih portal untuk melanjutkan',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // 1. Portal User (Tamu)
+                  _buildPortalButton(
+                    context: context,
+                    label: 'User (Tamu)',
+                    subtitle: 'Cari & booking hotel',
+                    icon: Icons.person_outline_rounded,
+                    color: const Color(0xFF00B4D8),
+                    destination: const CustomerLoadingScreen(),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // 2. Portal Pihak Hotel
+                  _buildPortalButton(
+                    context: context,
+                    label: 'Pihak Hotel',
+                    subtitle: 'Kelola hotel mitra',
+                    icon: Icons.hotel_outlined,
+                    color: const Color(0xFF0D3B55),
+                    destination: const HotelSplashScreen(),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // 3. Portal Pihak Go Ticket
+                  _buildPortalButton(
+                    context: context,
+                    label: 'Pihak Go Ticket',
+                    subtitle: 'Panel administrasi platform',
+                    icon: Icons.admin_panel_settings_outlined,
+                    color: const Color(0xFF7C3AED),
+                    destination: const AdminSplashScreen(),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              _buildSimpleButton(
-                context: context,
-                label: '2. Pihak Hotel',
-                destination: const HotelLoadingScreen(),
-              ),
-              const SizedBox(height: 12),
-              _buildSimpleButton(
-                context: context,
-                label: '3. Admin Go Ticket',
-                destination: const SuperAdminLoadingScreen(),
-              ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildSimpleButton({
+  /// Logo Header dengan rounded card & glowing cyan shadow
+  Widget _buildLogoHeader() {
+    return Container(
+      width: 82,
+      height: 82,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF00C7F2).withValues(alpha: 0.35),
+            blurRadius: 28,
+            spreadRadius: 4,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Image.asset(
+        'assets/logo.png',
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) => const Icon(
+          Icons.confirmation_number_outlined,
+          size: 48,
+          color: Color(0xFF00C2FF),
+        ),
+      ),
+    );
+  }
+
+  /// Tombol Portal yang bersih, rapi, dan responsif
+  Widget _buildPortalButton({
     required BuildContext context,
     required String label,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
     required Widget destination,
   }) {
-    return SizedBox(
-      height: 52,
-      child: OutlinedButton(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.black,
-          backgroundColor: Colors.white,
-          side: const BorderSide(color: Colors.black, width: 1.5),
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.zero,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
-          alignment: Alignment.centerLeft,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-        ),
-        onPressed: () {
-          Navigator.push(
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => destination),
-          );
-        },
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-              ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                // Icon Box
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: color,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+
+                // Label & Subtitle
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Arrow Icon
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: color.withValues(alpha: 0.6),
+                  size: 22,
+                ),
+              ],
             ),
-            const Icon(Icons.arrow_forward, color: Colors.black, size: 18),
-          ],
+          ),
         ),
       ),
     );

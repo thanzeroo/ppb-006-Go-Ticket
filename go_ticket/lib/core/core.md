@@ -75,3 +75,34 @@ Folder ini berisi komponen antarmuka (UI) generik yang sering digunakan kembali 
 
 * **`empty_state_widget.dart`**
   Tampilan khusus ketika data dari backend kosong atau terjadi kegagalan saat memuat data.
+
+---
+
+## 6. `models/`
+
+Folder ini berisi cetak biru data (*Data Models*) yang digunakan secara global di seluruh aplikasi Go Ticket untuk parsing JSON dari API, transfer state, dan konsistensi tipe data:
+
+* **`user_model.dart`**
+  Model identitas pengguna, tipe akun/role (`customer`, `admin_hotel`, `staff_front_office`, `staff_maintenance`, `super_admin`), profil, dan data autentikasi.
+
+* **`hotel_model.dart`**
+  Model data hotel mitra, lokasi, rating bintang, fasilitas umum, koordinat, dan galeri foto.
+
+* **`room_model.dart`**
+  Model data kamar hotel, status ketersediaan (`available`, `occupied`, `dirty`, `cleaning`, `maintenance`), harga weekday/weekend, dan fasilitas kamar.
+
+* **`booking_model.dart`**
+  Model transaksi reservasi kamar tamu, kode e-tiket, tanggal check-in/check-out, rincian biaya, dan status pembayaran.
+
+* **`maintenance_ticket_model.dart`**
+  Model tiket laporan kerusakan fasilitas hotel, prioritas pengerjaan (*Urgent*, *Medium*, *Low*), status pengerjaan, dan catatan teknisi.
+
+* **`payout_model.dart`**
+  Model data pencairan dana/saldo hotel mitra, riwayat mutasi kas, rekening bank tujuan, dan status audit transfer.
+
+* **`review_model.dart`**
+  Model ulasan dan rating tamu hotel, komentar kepuasan, tanggal ulasan, dan balasan pihak manajemen.
+
+* **`hotel_admin_model.dart`**
+  Model pendukung operasional administrator hotel: `RoomTypeData` (kuota & tarif dinamis), `StaffData` (roster shift & otorisasi hak akses), dan `TransactionData` (mutasi kas real-time).
+

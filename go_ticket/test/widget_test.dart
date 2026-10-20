@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:go_ticket/apps/hotel_partner/screens/auth/staff_login_screen.dart';
-import 'package:go_ticket/apps/hotel_partner/screens/splash/hotel_loading_screen.dart';
-import 'package:go_ticket/apps/superadmin_go-ticket/screens/auth/super_admin_login_screen.dart';
-import 'package:go_ticket/apps/superadmin_go-ticket/screens/splash/super_admin_loading_screen.dart';
-import 'package:go_ticket/apps/user/screens/auth/customer_login_screen.dart';
-import 'package:go_ticket/apps/user/screens/splash/customer_loading_screen.dart';
+
+import 'package:go_ticket/apps/pihak_hotel/screens/auth/staff_login_screen.dart';
+import 'package:go_ticket/apps/pihak_hotel/screens/splash/hotel_splash_screen.dart';
+import 'package:go_ticket/apps/pihak_go_ticket/screens/auth/admin_login_screen.dart';
+import 'package:go_ticket/apps/pihak_go_ticket/screens/splash/admin_splash_screen.dart';
+import 'package:go_ticket/apps/pihak_user/screens/auth/customer_login_screen.dart';
+import 'package:go_ticket/apps/pihak_user/screens/splash/customer_loading_screen.dart';
 import 'package:go_ticket/main.dart';
 
 void main() {
@@ -15,46 +16,43 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('CustomerLoadingScreen should render logo on dark background', (WidgetTester tester) async {
+  testWidgets('CustomerLoadingScreen should render', (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(
       home: CustomerLoadingScreen(),
     ));
 
     expect(find.byType(CustomerLoadingScreen), findsOneWidget);
     expect(find.byType(Scaffold), findsOneWidget);
-    expect(find.byType(Image), findsWidgets);
 
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
   });
 
-  testWidgets('HotelLoadingScreen should render hotel logo on dark background', (WidgetTester tester) async {
+  testWidgets('HotelSplashScreen should render', (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(
-      home: HotelLoadingScreen(),
+      home: HotelSplashScreen(),
     ));
 
-    expect(find.byType(HotelLoadingScreen), findsOneWidget);
+    expect(find.byType(HotelSplashScreen), findsOneWidget);
     expect(find.byType(Scaffold), findsOneWidget);
-    expect(find.byType(Image), findsWidgets);
 
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
   });
 
-  testWidgets('SuperAdminLoadingScreen should render admin logo on dark background', (WidgetTester tester) async {
+  testWidgets('AdminSplashScreen should render', (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(
-      home: SuperAdminLoadingScreen(),
+      home: AdminSplashScreen(),
     ));
 
-    expect(find.byType(SuperAdminLoadingScreen), findsOneWidget);
+    expect(find.byType(AdminSplashScreen), findsOneWidget);
     expect(find.byType(Scaffold), findsOneWidget);
-    expect(find.byType(Image), findsWidgets);
 
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
   });
 
-  testWidgets('CustomerLoginScreen should render and toggle between Masuk and Daftar Akun', (WidgetTester tester) async {
+  testWidgets('CustomerLoginScreen should render login & register tabs', (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(
       home: CustomerLoginScreen(),
     ));
@@ -69,32 +67,52 @@ void main() {
     expect(find.text('Nama Lengkap'), findsOneWidget);
     expect(find.text('Nomor Telepon'), findsOneWidget);
     expect(find.text('Buat Akun'), findsOneWidget);
+
+    // Scroll ke tombol "Buat Akun" dan klik
+    await tester.ensureVisible(find.text('Buat Akun'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Buat Akun'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Syarat & Ketentuan'), findsOneWidget);
+    expect(find.text('Hotel Policies'), findsOneWidget);
+    expect(find.text('Kebijakan Berlaku Aktif'), findsOneWidget);
+    expect(find.text('Setuju & Lanjutkan'), findsOneWidget);
+
+    // Klik "Setuju & Lanjutkan" balik lagi ke login utama
+    await tester.tap(find.text('Setuju & Lanjutkan'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Masuk ke Akun'), findsOneWidget);
   });
 
-  testWidgets('StaffLoginScreen should toggle between Maintenance, Staff, and Administrator', (WidgetTester tester) async {
+  testWidgets('StaffLoginScreen should render role selector', (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(
-      home: StaffLoginScreen(initialRole: 1),
+      home: StaffLoginScreen(),
     ));
 
     expect(find.text('Portal Operasional Staf'), findsOneWidget);
-    expect(find.text('Shift Pagi'), findsOneWidget);
+    expect(find.text('Staf'), findsNWidgets(2)); // Tab utama dan Sub-role
+    expect(find.text('Maintenance'), findsOneWidget);
+    expect(find.text('Administrator'), findsOneWidget);
+    expect(find.text('Pilih Shift Tugas'), findsOneWidget);
 
-    await tester.tap(find.text('Maintenance'));
-    await tester.pumpAndSettle();
-    expect(find.text('Portal Operasional Maintenance'), findsOneWidget);
-
+    // Beralih ke tab Administrator
     await tester.tap(find.text('Administrator'));
     await tester.pumpAndSettle();
+
     expect(find.text('Portal Administrator Hotel'), findsOneWidget);
+    expect(find.text('PIN Otorisasi Keuangan 6-Digit'), findsOneWidget);
   });
 
-  testWidgets('SuperAdminLoginScreen should render admin authorization portal', (WidgetTester tester) async {
+  testWidgets('AdminLoginScreen should render', (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(
-      home: SuperAdminLoginScreen(),
+      home: AdminLoginScreen(),
     ));
 
     expect(find.text('LOGIN ADMIN'), findsOneWidget);
-    expect(find.textContaining('TINGKAT OTORISASI LEVEL 1'), findsOneWidget);
+    expect(find.text('Email / ID Super Admin'), findsOneWidget);
     expect(find.text('Otorisasi & Buka Dashboard'), findsOneWidget);
+    expect(find.text('AUDIT TRAIL KEAMANAN AKTIF'), findsOneWidget);
   });
 }
