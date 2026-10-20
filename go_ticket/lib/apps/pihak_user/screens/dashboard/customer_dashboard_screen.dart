@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'tabs/beranda_tab.dart';
 import 'tabs/cari_tab.dart';
 import 'tabs/pesanan_tab.dart';
 import 'tabs/pengaturan_tab.dart';
 
-/// Dashboard utama User/Customer dengan 4 tab navigasi.
+/// Halaman Dashboard Customer (User) — Full UI dengan 4 tab utama.
+/// Beranda | Cari | Pesanan | Pengaturan
 class CustomerDashboardScreen extends StatefulWidget {
   const CustomerDashboardScreen({super.key});
 
@@ -21,7 +23,6 @@ class CustomerDashboardScreen extends StatefulWidget {
 class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   int _currentIndex = 0;
 
-<<<<<<< HEAD:go_ticket/lib/apps/user/screens/dashboard/customer_dashboard_screen.dart
   void _onTabChanged() {
     if (mounted) {
       setState(() => _currentIndex = CustomerDashboardScreen.tabNotifier.value);
@@ -42,32 +43,37 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   }
 
   static const List<Widget> _pages = [
-=======
-  static const List<Widget> _tabs = [
->>>>>>> b22167a638fe5031603dbdfed85d081a7ce2eb77:go_ticket/lib/apps/pihak_user/screens/dashboard/customer_dashboard_screen.dart
     BerandaTab(),
     CariTab(),
     PesananTab(),
     PengaturanTab(),
   ];
 
-  static const List<_NavItem> _navItems = [
-    _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Beranda'),
-    _NavItem(icon: Icons.search_outlined, activeIcon: Icons.search, label: 'Cari'),
-    _NavItem(icon: Icons.receipt_long_outlined, activeIcon: Icons.receipt_long, label: 'Pesanan'),
-    _NavItem(icon: Icons.person_outline, activeIcon: Icons.person, label: 'Profil'),
-  ];
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBody: true,
       backgroundColor: const Color(0xFFF5F7FA),
-      body: IndexedStack(index: _currentIndex, children: _tabs),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _pages,
+      ),
       bottomNavigationBar: _buildBottomNav(),
     );
   }
 
   Widget _buildBottomNav() {
+    const items = [
+      _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Beranda'),
+      _NavItem(icon: Icons.search_outlined, activeIcon: Icons.search, label: 'Cari'),
+      _NavItem(
+          icon: Icons.receipt_long_outlined,
+          activeIcon: Icons.receipt_long,
+          label: 'Pesanan'),
+      _NavItem(
+          icon: Icons.person_outline, activeIcon: Icons.person, label: 'Pengaturan'),
+    ];
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -84,22 +90,18 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           child: Row(
-            children: List.generate(_navItems.length, (i) {
-              final item = _navItems[i];
-              final selected = i == _currentIndex;
+            children: List.generate(items.length, (index) {
+              final item = items[index];
+              final isSelected = index == _currentIndex;
               return Expanded(
                 child: GestureDetector(
-<<<<<<< HEAD:go_ticket/lib/apps/user/screens/dashboard/customer_dashboard_screen.dart
                   onTap: () => CustomerDashboardScreen.tabNotifier.value = index,
-=======
-                  onTap: () => setState(() => _currentIndex = i),
->>>>>>> b22167a638fe5031603dbdfed85d081a7ce2eb77:go_ticket/lib/apps/pihak_user/screens/dashboard/customer_dashboard_screen.dart
                   behavior: HitTestBehavior.opaque,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     decoration: BoxDecoration(
-                      color: selected
+                      color: isSelected
                           ? const Color(0xFF00B4D8).withOpacity(0.1)
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(12),
@@ -108,8 +110,8 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          selected ? item.activeIcon : item.icon,
-                          color: selected
+                          isSelected ? item.activeIcon : item.icon,
+                          color: isSelected
                               ? const Color(0xFF00B4D8)
                               : const Color(0xFF9CA3AF),
                           size: 22,
@@ -117,12 +119,12 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                         const SizedBox(height: 3),
                         Text(
                           item.label,
-                          style: TextStyle(
+                          style: GoogleFonts.inter(
                             fontSize: 11,
-                            fontWeight: selected
+                            fontWeight: isSelected
                                 ? FontWeight.w700
                                 : FontWeight.w400,
-                            color: selected
+                            color: isSelected
                                 ? const Color(0xFF00B4D8)
                                 : const Color(0xFF9CA3AF),
                           ),

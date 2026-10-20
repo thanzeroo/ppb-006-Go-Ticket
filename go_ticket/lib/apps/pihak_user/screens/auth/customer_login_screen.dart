@@ -2,11 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/widgets/auth_logo_header.dart';
 import '../dashboard/customer_dashboard_screen.dart';
-<<<<<<< HEAD:go_ticket/lib/apps/user/screens/auth/customer_login_screen.dart
 import 'terms_screen.dart';
-=======
-import 'terms_and_policy_screen.dart';
->>>>>>> b22167a638fe5031603dbdfed85d081a7ce2eb77:go_ticket/lib/apps/pihak_user/screens/auth/customer_login_screen.dart
 
 class CustomerLoginScreen extends StatefulWidget {
   const CustomerLoginScreen({super.key});
@@ -52,7 +48,6 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     super.dispose();
   }
 
-<<<<<<< HEAD:go_ticket/lib/apps/user/screens/auth/customer_login_screen.dart
   /// Simulasi proses login / register dan masuk ke Dashboard
   Future<void> _submit() async {
     final formKey = _tabIndex == 0 ? _loginFormKey : _registerFormKey;
@@ -63,12 +58,8 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
       return;
     }
 
-=======
-  /// Masuk ke Dashboard (Login)
-  Future<void> _submitLogin() async {
->>>>>>> b22167a638fe5031603dbdfed85d081a7ce2eb77:go_ticket/lib/apps/pihak_user/screens/auth/customer_login_screen.dart
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 900));
+    await Future.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
     setState(() => _isLoading = false);
 
@@ -78,7 +69,6 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     );
   }
 
-<<<<<<< HEAD:go_ticket/lib/apps/user/screens/auth/customer_login_screen.dart
   void _showSnack(String msg) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -90,6 +80,19 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
       MaterialPageRoute(builder: (_) => const TermsScreen()),
     );
     if (agreed == true && mounted) setState(() => _agreeTerms = true);
+  }
+
+  void _submitRegister() {
+    Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const TermsScreen()),
+    ).then((agreed) {
+      if (!mounted) return;
+      if (agreed == true) {
+        setState(() {
+          _tabIndex = 0;
+        });
+      }
+    });
   }
 
   void _showForgotPassword() {
@@ -182,30 +185,15 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     if ((v ?? '').isEmpty) return 'Konfirmasi kata sandi tidak boleh kosong';
     if (v != _passwordRegisterController.text) return 'Kata sandi tidak sama';
     return null;
-=======
-  /// Ketika klik "Buat Akun" di form register:
-  /// Langsung mengarah ke Terms and Policy. Jika diklik (selesai/balik),
-  /// kembali ke login utama (tab Masuk).
-  void _submitRegister() {
-    Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => const TermsAndPolicyScreen()),
-    ).then((agreed) {
-      if (!mounted) return;
-      // Balik lagi ke login utama (tab Masuk)
-      setState(() {
-        _tabIndex = 0;
-      });
-    });
->>>>>>> b22167a638fe5031603dbdfed85d081a7ce2eb77:go_ticket/lib/apps/pihak_user/screens/auth/customer_login_screen.dart
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFBFBFE),
+      backgroundColor: Colors.white,
       appBar: Navigator.canPop(context)
           ? AppBar(
-              backgroundColor: Colors.transparent,
+              backgroundColor: Colors.white,
               elevation: 0,
               leading: IconButton(
                 icon: const Icon(
@@ -215,78 +203,67 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                 onPressed: () => Navigator.of(context).pop(),
               ),
               title: const Text(
-                'Pilih Portal',
+                'Pilih Portal Lain',
                 style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
               ),
             )
           : null,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Logo dengan glowing effect
-              const AuthLogoHeader(imagePath: 'assets/logo.png'),
-              const SizedBox(height: 18),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight - 40),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Logo dengan efek cyan glow
+                      const AuthLogoHeader(),
+                      const SizedBox(height: 18),
 
-              // Judul Utama: "Selamat Datang di Go Ticket"
-              RichText(
-                textAlign: TextAlign.center,
-                text: const TextSpan(
-                  style: TextStyle(
-                    fontSize: 25,
-                    fontWeight: FontWeight.w800,
-                    fontFamily: 'Inter',
-                    letterSpacing: -0.5,
+                      // Judul Utama: "Selamat Datang di Go Ticket"
+                      RichText(
+                        textAlign: TextAlign.center,
+                        text: const TextSpan(
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Inter',
+                            letterSpacing: -0.3,
+                          ),
+                          children: [
+                            TextSpan(
+                              text: 'Selamat Datang di ',
+                              style: TextStyle(color: Color(0xFF0F172A)),
+                            ),
+                            TextSpan(
+                              text: 'Go Ticket',
+                              style: TextStyle(color: Color(0xFF0077B6)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+
+                      // Switcher Tab: [ Masuk ] [ Daftar Akun ]
+                      _buildTabSwitcher(),
+                      const SizedBox(height: 24),
+
+                      // Form sesuai tab yang dipilih
+                      _tabIndex == 0 ? _buildLoginForm() : _buildRegisterForm(),
+                      const SizedBox(height: 24),
+
+                      // Badge Keamanan Enkripsi
+                      _buildSecurityBadge(),
+                    ],
                   ),
-                  children: [
-                    TextSpan(
-                      text: 'Selamat Datang di ',
-                      style: TextStyle(color: Color(0xFF0F172A)),
-                    ),
-                    TextSpan(
-                      text: 'Go\n',
-                      style: TextStyle(color: Color(0xFF00758F)),
-                    ),
-                    TextSpan(
-                      text: 'Ticket',
-                      style: TextStyle(color: Color(0xFF00758F)),
-                    ),
-                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-
-              // Subtitle
-              const Text(
-                'Akses kemudahan reservasi hotel & penginapan\nterbaik impianmu',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF64748B),
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 22),
-
-              // Switcher Tab: [ Masuk ] [ Daftar Akun ]
-              _buildTabSwitcher(),
-              const SizedBox(height: 22),
-
-              // Form sesuai tab yang dipilih
-              _tabIndex == 0 ? _buildLoginForm() : _buildRegisterForm(),
-              const SizedBox(height: 22),
-
-              // Badge Keamanan Enkripsi
-              _buildSecurityBadge(),
-              const SizedBox(height: 14),
-
-              // Banner Keuntungan Khusus Member
-              _buildMemberBenefitCard(),
-              const SizedBox(height: 10),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -296,12 +273,12 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
   // WIDGETS
   // ---------------------------------------------------------------------------
 
-  /// Tab switcher rounded pill: [ Masuk ] / [ Daftar Akun ]
+  /// Tab switcher rounded pill [ Masuk ] / [ Daftar Akun ]
   Widget _buildTabSwitcher() {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFE9F0FE),
+        color: const Color(0xFFE2E8F0).withValues(alpha: 0.65),
         borderRadius: BorderRadius.circular(30),
       ),
       child: Row(
@@ -317,7 +294,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           Expanded(
             child: _buildTabButton(
               title: 'Daftar Akun',
-              icon: Icons.person_add_alt_outlined,
+              icon: Icons.person_add_alt_1_outlined,
               isSelected: _tabIndex == 1,
               onTap: () => setState(() => _tabIndex = 1),
             ),
@@ -336,7 +313,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
+        duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
           color: isSelected ? Colors.white : Colors.transparent,
@@ -368,8 +345,8 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                 fontSize: 13,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                 color: isSelected
-                  ? const Color(0xFF0F172A)
-                  : const Color(0xFF64748B),
+                    ? const Color(0xFF0F172A)
+                    : const Color(0xFF64748B),
               ),
             ),
           ],
@@ -385,7 +362,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
       child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildInputLabel('Email atau No. WhatsApp'),
+        _buildInputLabel('Email / Nomor WhatsApp'),
         _buildTextField(
           controller: _emailLoginController,
           hintText: 'nama@email.com / 0812xxxx',
@@ -400,24 +377,13 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           children: [
             _buildInputLabel('Kata Sandi'),
             GestureDetector(
-<<<<<<< HEAD:go_ticket/lib/apps/user/screens/auth/customer_login_screen.dart
               onTap: _showForgotPassword,
-=======
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Fitur reset kata sandi dikirim ke WhatsApp/Email Anda.'),
-                    backgroundColor: Color(0xFF00758F),
-                  ),
-                );
-              },
->>>>>>> b22167a638fe5031603dbdfed85d081a7ce2eb77:go_ticket/lib/apps/pihak_user/screens/auth/customer_login_screen.dart
               child: const Text(
                 'Lupa Kata Sandi?',
                 style: TextStyle(
                   fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF0086A8),
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF00A8E8),
                 ),
               ),
             ),
@@ -434,7 +400,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
               _obscureLoginPassword
                   ? Icons.visibility_outlined
                   : Icons.visibility_off_outlined,
-              size: 19,
+              size: 18,
               color: const Color(0xFF94A3B8),
             ),
             onPressed: () =>
@@ -448,7 +414,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         const SizedBox(height: 18),
 
         // Tombol Masuk ke Akun
-        _buildPrimaryButton(title: 'Masuk ke Akun', onTap: _submitLogin),
+        _buildPrimaryButton(title: 'Masuk ke Akun', onTap: _submit),
         const SizedBox(height: 22),
 
         // Divider: ATAU LANJUTKAN DENGAN
@@ -459,7 +425,6 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         Row(
           children: [
             Expanded(
-<<<<<<< HEAD:go_ticket/lib/apps/user/screens/auth/customer_login_screen.dart
               child: _buildSocialButton(
                 title: 'Google',
                 onTap: () => _showSnack('Masuk dengan Google segera hadir'),
@@ -471,13 +436,6 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                 title: 'Apple',
                 onTap: () => _showSnack('Masuk dengan Apple segera hadir'),
               ),
-=======
-              child: _buildGoogleButton(),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildAppleButton(),
->>>>>>> b22167a638fe5031603dbdfed85d081a7ce2eb77:go_ticket/lib/apps/pihak_user/screens/auth/customer_login_screen.dart
             ),
           ],
         ),
@@ -534,7 +492,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
               _obscureRegisterPassword
                   ? Icons.visibility_outlined
                   : Icons.visibility_off_outlined,
-              size: 19,
+              size: 18,
               color: const Color(0xFF94A3B8),
             ),
             onPressed: () => setState(
@@ -555,7 +513,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
               _obscureConfirmPassword
                   ? Icons.visibility_outlined
                   : Icons.visibility_off_outlined,
-              size: 19,
+              size: 18,
               color: const Color(0xFF94A3B8),
             ),
             onPressed: () => setState(
@@ -568,11 +526,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         _buildTermsCheckbox(),
         const SizedBox(height: 18),
 
-        // Tombol Buat Akun -> mengarah ke Terms and Policy
-        _buildPrimaryButton(
-          title: 'Buat Akun',
-          onTap: _submitRegister,
-        ),
+        _buildPrimaryButton(title: 'Buat Akun', onTap: _submitRegister),
       ],
       ),
     );
@@ -632,7 +586,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         text,
         style: const TextStyle(
           fontSize: 12,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.bold,
           color: Color(0xFF334155),
         ),
       ),
@@ -650,8 +604,8 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F4FD),
-        borderRadius: BorderRadius.circular(14),
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: TextFormField(
         controller: controller,
@@ -665,14 +619,14 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
           prefixIcon: Icon(
             prefixIcon,
-            color: const Color(0xFF0096B4),
-            size: 19,
+            color: const Color(0xFF00A8E8),
+            size: 18,
           ),
           suffixIcon: suffixIcon,
           border: InputBorder.none,
           errorStyle: const TextStyle(fontSize: 11),
           contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
+            horizontal: 14,
             vertical: 14,
           ),
         ),
@@ -688,11 +642,11 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           height: 22,
           child: Checkbox(
             value: _rememberMe,
-            activeColor: const Color(0xFF00C2FF),
+            activeColor: const Color(0xFF00C7F2),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(4),
             ),
-            side: const BorderSide(color: Color(0xFF00C2FF), width: 1.6),
+            side: const BorderSide(color: Color(0xFF00C7F2), width: 1.5),
             onChanged: (val) => setState(() => _rememberMe = val ?? false),
           ),
         ),
@@ -715,9 +669,9 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
       child: ElevatedButton(
         onPressed: _isLoading ? null : onTap,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF00C2FF),
+          backgroundColor: const Color(0xFF00C7F2),
           elevation: 0,
-          shadowColor: const Color(0xFF00C2FF).withValues(alpha: 0.35),
+          shadowColor: const Color(0xFF00C7F2).withValues(alpha: 0.4),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
@@ -762,10 +716,10 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Text(
             'ATAU LANJUTKAN DENGAN',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF94A3B8),
+              color: const Color(0xFF94A3B8),
               letterSpacing: 0.8,
             ),
           ),
@@ -775,72 +729,29 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     );
   }
 
-  /// Tombol Google dengan Google Multi-color G
-  Widget _buildGoogleButton() {
+  Widget _buildSocialButton({
+    required String title,
+    required VoidCallback onTap,
+  }) {
     return InkWell(
-      onTap: _submitLogin,
-      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
       child: Container(
         height: 46,
         decoration: BoxDecoration(
-          color: const Color(0xFFF1F4FD),
-          borderRadius: BorderRadius.circular(14),
+          color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(12),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _buildGoogleGLogo(),
-            const SizedBox(width: 8),
-            const Text(
-              'Google',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF334155),
-              ),
+        child: Center(
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF334155),
             ),
-          ],
+          ),
         ),
-      ),
-    );
-  }
-
-  /// Tombol Apple
-  Widget _buildAppleButton() {
-    return InkWell(
-      onTap: _submitLogin,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        height: 46,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F4FD),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(Icons.apple, color: Colors.black, size: 20),
-            SizedBox(width: 8),
-            Text(
-              'Apple',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF334155),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGoogleGLogo() {
-    return SizedBox(
-      width: 18,
-      height: 18,
-      child: CustomPaint(
-        painter: _GoogleGPainter(),
       ),
     );
   }
@@ -849,108 +760,18 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: const [
-        Icon(Icons.verified_user_rounded, color: Color(0xFF00758F), size: 14),
+        Icon(Icons.verified_user_rounded, color: Color(0xFF0284C7), size: 14),
         SizedBox(width: 6),
         Text(
           'TERPROTEKSI ENKRIPSI 256-BIT KELAS PERBANKAN',
           style: TextStyle(
-            fontSize: 9.5,
+            fontSize: 9,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF475569),
+            color: Color(0xFF64748B),
             letterSpacing: 0.5,
           ),
         ),
       ],
     );
   }
-
-  /// Banner Keuntungan Khusus Member di bagian bawah
-  Widget _buildMemberBenefitCard() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE2F4FE),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.stars_rounded,
-              color: Color(0xFF008AA8),
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  'Keuntungan Khusus Member',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A),
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Dapatkan poin cashback & konfirmasi instan',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF036982),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Custom Painter untuk Google Multi-color Logo
-class _GoogleGPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final double w = size.width;
-    final double h = size.height;
-    final center = Offset(w / 2, h / 2);
-    final radius = w / 2;
-
-    final paintBlue = Paint()..color = const Color(0xFF4285F4);
-    final paintRed = Paint()..color = const Color(0xFFEA4335);
-    final paintYellow = Paint()..color = const Color(0xFFFBBC05);
-    final paintGreen = Paint()..color = const Color(0xFF34A853);
-
-    final rect = Rect.fromCircle(center: center, radius: radius);
-
-    // Top arc (Red)
-    canvas.drawArc(rect, -2.4, 1.6, true, paintRed);
-    // Left arc (Yellow)
-    canvas.drawArc(rect, -4.0, 1.6, true, paintYellow);
-    // Bottom arc (Green)
-    canvas.drawArc(rect, 0.8, 1.6, true, paintGreen);
-    // Right arc (Blue)
-    canvas.drawArc(rect, -0.8, 1.6, true, paintBlue);
-
-    // Inner cutout
-    final innerPaint = Paint()..color = const Color(0xFFF1F4FD);
-    canvas.drawCircle(center, radius * 0.58, innerPaint);
-
-    // Horizontal bar of G
-    final barRect = Rect.fromLTRB(w * 0.44, h * 0.38, w * 0.98, h * 0.62);
-    canvas.drawRect(barRect, paintBlue);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

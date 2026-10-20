@@ -369,20 +369,9 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
     );
   }
 
-<<<<<<< HEAD:go_ticket/lib/apps/user/screens/hotel_detail/room_selection_screen.dart
   Widget _navBtn(IconData i, VoidCallback onTap) => InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(20),
-=======
-  Widget _buildDateSummaryBar() {
-    return Container(
-      color: AppColors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: GestureDetector(
-        onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Pilih tanggal — coming soon')),
-        ),
->>>>>>> b22167a638fe5031603dbdfed85d081a7ce2eb77:go_ticket/lib/apps/pihak_user/screens/hotel_detail/room_selection_screen.dart
         child: Container(
           width: 38,
           height: 38,
@@ -455,20 +444,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
     );
   }
 
-<<<<<<< HEAD:go_ticket/lib/apps/user/screens/hotel_detail/room_selection_screen.dart
   // ------------------------------------------------------------- kartu kamar
-=======
-
-  Widget _buildRoomList() {
-    // TODO: Ganti dengan data dari RoomRepository
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: 3, // Placeholder 3 tipe kamar
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) => _buildRoomCard(index),
-    );
-  }
->>>>>>> b22167a638fe5031603dbdfed85d081a7ce2eb77:go_ticket/lib/apps/pihak_user/screens/hotel_detail/room_selection_screen.dart
 
   Widget _roomCard(int i) {
     final r = _rooms[i];
