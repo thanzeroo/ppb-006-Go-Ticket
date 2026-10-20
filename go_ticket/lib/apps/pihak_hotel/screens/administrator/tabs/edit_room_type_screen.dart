@@ -32,9 +32,12 @@ class _EditRoomTypeScreenState extends State<EditRoomTypeScreen> {
   String _selectedCategory = 'Suite Mewah (Luxury Suite)';
 
   final List<String> _categories = [
+    'Suite Room',
     'Suite Mewah (Luxury Suite)',
+    'Deluxe Series',
     'Deluxe Room (Executive)',
     'Standard Twin Room',
+    'Villa Signature',
     'Presidential Villa',
   ];
 
@@ -78,6 +81,10 @@ class _EditRoomTypeScreenState extends State<EditRoomTypeScreen> {
     _weekdayPriceController = TextEditingController(text: 'Rp 1.450.000');
     _weekendPriceController = TextEditingController(text: 'Rp 1.750.000');
     _depositController = TextEditingController(text: 'Rp 300.000');
+
+    if (!_categories.contains(widget.category)) {
+      _categories.insert(0, widget.category);
+    }
     _selectedCategory = widget.category;
     _selectedFacilities = Set.from(_facilities);
   }
@@ -529,7 +536,9 @@ class _EditRoomTypeScreenState extends State<EditRoomTypeScreen> {
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
-                value: _selectedCategory,
+                value: _categories.contains(_selectedCategory)
+                    ? _selectedCategory
+                    : _categories.first,
                 isExpanded: true,
                 icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF64748B)),
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
