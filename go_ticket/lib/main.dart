@@ -5,8 +5,13 @@ import 'apps/pihak_go_ticket/screens/splash/admin_splash_screen.dart';
 import 'apps/pihak_hotel/screens/splash/hotel_splash_screen.dart';
 import 'apps/pihak_user/router/customer_router.dart';
 import 'apps/pihak_user/screens/splash/customer_loading_screen.dart';
+import 'core/services/auth_service.dart';
+import 'core/services/supabase_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await SupabaseService.instance.initialize();
+  await AuthService.instance.loadSavedSession();
   runApp(const GoTicketApp());
 }
 

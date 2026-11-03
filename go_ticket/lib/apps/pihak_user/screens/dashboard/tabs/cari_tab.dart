@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../core/services/hotel_service.dart';
 import '../../../router/customer_router.dart';
 
 /// Tab Cari: Halaman hasil pencarian hotel seperti screenshot
@@ -76,13 +77,55 @@ class _CariTabState extends State<CariTab> {
     },
   ];
 
-  /// Data hotel diduplikasi 4x supaya daftar hasil terlihat banyak
-  /// (sementara, sebelum terhubung ke API). Salinan tidak ditandai favorit.
-  final List<Map<String, dynamic>> _hotels = [
-    for (var i = 0; i < 4; i++)
-      for (final h in _baseHotels)
-        {...h, if (i > 0) 'isFavorite': false},
-  ];
+  List<Map<String, dynamic>> _hotels = [];
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchHotels();
+  }
+
+  Future<void> _fetchHotels() async {
+    setState(() => _isLoading = true);
+    try {
+      final data = await HotelService.instance.getHotels(sortBy: _sort);
+      if (mounted) {
+        setState(() {
+          _hotels = data.map((h) => {
+            'id': h.id,
+            'name': h.name,
+            'location': '${h.city} • ${h.address}',
+            'type': 'Resor • ⭐ ${h.starRating}',
+            'rating': h.rating.toStringAsFixed(1),
+            'reviews': '${h.reviewCount} ulasan',
+            'distance': h.shortDescription ?? '',
+            'originalPrice': h.originalPrice != null ? 'Rp ${h.originalPrice}' : null,
+            'discountedPrice': 'Rp ${h.pricePerNight}',
+            'discount': h.originalPrice != null ? 'Promo' : null,
+            'features': h.amenities,
+            'tag': h.isRecommended ? 'Paling Diminati' : null,
+            'tagColor': const Color(0xFF00B4D8),
+            'isFavorite': false,
+            'isFree': false,
+            'imageUrl': h.thumbnailUrl ??
+                (h.photoUrls.isNotEmpty ? h.photoUrls.first : ''),
+            'badgeText': 'Bintang ${h.starRating}',
+          }).toList();
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _hotels = [
+            for (final h in _baseHotels) {...h, 'isFavorite': false}
+          ];
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   String _sort = 'Terpopuler';
 
@@ -119,6 +162,7 @@ class _CariTabState extends State<CariTab> {
     if (v != null) {
       setState(() => _sort = v);
       _snack('Diurutkan: $v');
+      _fetchHotels();
     }
   }
 

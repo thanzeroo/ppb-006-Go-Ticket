@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/services/auth_service.dart';
 import '../../../../core/widgets/auth_logo_header.dart';
 import '../../router/customer_router.dart';
 import 'terms_screen.dart';
@@ -48,7 +49,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     super.dispose();
   }
 
-  /// Simulasi proses login / register dan masuk ke Dashboard
+  /// Proses login / register nyata terhubung ke AuthService
   Future<void> _submit() async {
     final formKey = _tabIndex == 0 ? _loginFormKey : _registerFormKey;
     if (!(formKey.currentState?.validate() ?? false)) return;
@@ -59,14 +60,35 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     }
 
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 1200));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+    try {
+      if (_tabIndex == 0) {
+        // Login Customer
+        await AuthService.instance.loginCustomer(
+          email: _emailLoginController.text.trim(),
+          password: _passwordLoginController.text,
+        );
+      } else {
+        // Register Customer
+        await AuthService.instance.registerCustomer(
+          fullName: _nameController.text.trim(),
+          email: _emailRegisterController.text.trim(),
+          password: _passwordRegisterController.text,
+          phone: _phoneController.text.trim(),
+        );
+      }
 
-    Navigator.of(context).pushNamedAndRemoveUntil(
-      CustomerRouter.dashboard,
-      (_) => false,
-    );
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        CustomerRouter.dashboard,
+        (_) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _showSnack(e.toString().replaceAll('Exception: ', ''));
+    }
   }
 
   void _showSnack(String msg) {

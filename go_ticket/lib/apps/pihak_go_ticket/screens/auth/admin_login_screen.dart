@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/services/auth_service.dart';
 import '../dashboard/admin_dashboard_screen.dart';
 
 /// Layar Login Super Admin untuk Pihak Go Ticket.
@@ -52,14 +53,28 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
 
   Future<void> _submitLogin() async {
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+    try {
+      final pin = _pinControllers.map((c) => c.text).join();
+      await AuthService.instance.loginSuperAdmin(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        pin2FA: pin,
+      );
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
-    );
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Login Admin gagal: $e')),
+      );
+    }
   }
 
   @override
