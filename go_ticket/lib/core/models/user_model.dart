@@ -163,19 +163,49 @@ class UserModel {
   // SERIALIZATION — JSON ke Model dan sebaliknya
   // ---------------------------------------------------------------------------
 
-  /// Factory constructor dari JSON response API
+  /// Factory constructor dari JSON response API (Mendukung Supabase users, staf_hotel, super_admin)
   factory UserModel.fromJson(Map<String, dynamic> json) {
+    UserRole parseRole(dynamic val) {
+      if (val == null) return UserRole.customer;
+      final s = val.toString().toLowerCase();
+      if (s.contains('front office') || s == 'staff_fo') return UserRole.staffFo;
+      if (s.contains('maintenance') || s.contains('housekeeping') || s == 'maintenance') {
+        return UserRole.maintenance;
+      }
+      if (s.contains('admin') && !s.contains('super')) return UserRole.adminHotel;
+      if (s.contains('super')) return UserRole.superAdmin;
+      return UserRoleExtension.fromApiString(s);
+    }
+
+    final id = json['id']?.toString() ??
+        json['id_user']?.toString() ??
+        json['id_staf']?.toString() ??
+        json['id_admin']?.toString() ??
+        '';
+
+    final name = json['full_name'] ??
+        json['nama_lengkap'] ??
+        json['nama_staf'] ??
+        json['nama_admin'] ??
+        json['name'] ??
+        '';
+
+    final email = json['email'] ?? json['email_admin'];
+
     return UserModel(
-      id: json['id']?.toString() ?? '',
-      fullName: json['full_name'] ?? json['name'] ?? '',
-      email: json['email'],
-      phoneNumber: json['phone_number'] ?? json['phone'],
+      id: id,
+      fullName: name,
+      email: email,
+      phoneNumber: json['phone_number'] ?? json['phone'] ?? json['no_telepon'],
       avatarUrl: json['avatar_url'] ?? json['photo'],
-      role: UserRoleExtension.fromApiString(json['role'] ?? 'customer'),
-      managedHotelId: json['managed_hotel_id']?.toString(),
+      role: parseRole(json['role'] ?? json['role_jabatan'] ?? json['role_level']),
+      managedHotelId: json['managed_hotel_id']?.toString() ??
+          json['id_penginapan']?.toString(),
       managedHotelName: json['managed_hotel_name'],
-      isActive: json['is_active'] ?? true,
-      isVerified: json['is_verified'] ?? false,
+      isActive: json['is_active'] ??
+          json['status_aktif'] ??
+          (json['status_akun'] == 'aktif' || json['status_duty'] == 'aktif'),
+      isVerified: json['is_verified'] ?? true,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'])
           : null,

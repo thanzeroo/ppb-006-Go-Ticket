@@ -21,9 +21,26 @@ class BookingService {
 
     if (sb.isReady) {
       try {
+        final row = {
+          'id_user': int.tryParse(booking.customerId) ?? 1,
+          'id_penginapan': int.tryParse(booking.hotelId) ?? 1,
+          'id_tipe_kamar': booking.roomId.isNotEmpty ? booking.roomId : '1',
+          'kode_booking': booking.bookingCode,
+          'tgl_booking': DateTime.now().toIso8601String(),
+          'tgl_checkin': booking.checkInDate.toIso8601String().substring(0, 10),
+          'tgl_checkout': booking.checkOutDate.toIso8601String().substring(0, 10),
+          'jml_malam': booking.totalNights,
+          'jml_dewasa': booking.guestCount,
+          'jml_anak': 0,
+          'total_harga': booking.totalAmount.toDouble(),
+          'potongan_diskon': booking.discountAmount.toDouble(),
+          'status_booking': 'confirmed',
+          'permintaan_khusus': booking.specialRequest,
+        };
+
         final res = await sb
-            .table(SupabaseConfig.tableBookings)
-            ?.insert(booking.toJson())
+            .table(SupabaseConfig.tableBooking)
+            ?.insert(row)
             .select()
             .single();
 
@@ -50,18 +67,28 @@ class BookingService {
     final sb = SupabaseService.instance;
     final currentUserId = sb.currentAuthUser?.id;
 
-    if (sb.isReady && currentUserId != null) {
+    if (sb.isReady) {
       try {
-        var q = sb
-            .table(SupabaseConfig.tableBookings)
-            ?.select()
-            .eq('user_id', currentUserId);
+        var q = sb.table(SupabaseConfig.tableBooking)?.select(
+              '*, mitra_penginapan(nama_properti), tipe_kamar(nama_tipe), users(nama_lengkap)',
+            );
 
-        if (status != null) {
-          q = q?.eq('status', status.apiValue);
+        if (currentUserId != null && int.tryParse(currentUserId) != null) {
+          q = q?.eq('id_user', int.parse(currentUserId));
         }
 
-        final res = await q?.order('created_at', ascending: false);
+        if (status != null) {
+          final statusMap = {
+            BookingStatus.confirmed: 'confirmed',
+            BookingStatus.checkedIn: 'checked_in',
+            BookingStatus.checkedOut: 'completed',
+            BookingStatus.cancelled: 'cancelled',
+            BookingStatus.pendingPayment: 'pending',
+          };
+          q = q?.eq('status_booking', statusMap[status] ?? status.apiValue);
+        }
+
+        final res = await q?.order('tgl_booking', ascending: false);
         if (res != null && (res as List).isNotEmpty) {
           return res
               .map((b) => BookingModel.fromJson(Map<String, dynamic>.from(b)))
@@ -90,16 +117,23 @@ class BookingService {
 
     if (sb.isReady) {
       try {
-        var q = sb
-            .table(SupabaseConfig.tableBookings)
-            ?.select()
-            .eq('hotel_id', hotelId);
+        final hId = int.tryParse(hotelId) ?? 1;
+        var q = sb.table(SupabaseConfig.tableBooking)?.select(
+              '*, mitra_penginapan(nama_properti), tipe_kamar(nama_tipe), users(nama_lengkap)',
+            ).eq('id_penginapan', hId);
 
         if (status != null) {
-          q = q?.eq('status', status.apiValue);
+          final statusMap = {
+            BookingStatus.confirmed: 'confirmed',
+            BookingStatus.checkedIn: 'checked_in',
+            BookingStatus.checkedOut: 'completed',
+            BookingStatus.cancelled: 'cancelled',
+            BookingStatus.pendingPayment: 'pending',
+          };
+          q = q?.eq('status_booking', statusMap[status] ?? status.apiValue);
         }
 
-        final res = await q?.order('check_in_date', ascending: true);
+        final res = await q?.order('tgl_checkin', ascending: true);
         if (res != null && (res as List).isNotEmpty) {
           return res
               .map((b) => BookingModel.fromJson(Map<String, dynamic>.from(b)))
@@ -124,11 +158,18 @@ class BookingService {
     final sb = SupabaseService.instance;
     if (sb.isReady) {
       try {
-        final res = await sb
-            .table(SupabaseConfig.tableBookings)
-            ?.select()
-            .or('id.eq.$idOrCode,booking_code.eq.$idOrCode')
-            .maybeSingle();
+        final parsedId = int.tryParse(idOrCode);
+        var q = sb.table(SupabaseConfig.tableBooking)?.select(
+              '*, mitra_penginapan(nama_properti), tipe_kamar(nama_tipe), users(nama_lengkap)',
+            );
+
+        if (parsedId != null) {
+          q = q?.or('id_booking.eq.$parsedId,kode_booking.eq.$idOrCode');
+        } else {
+          q = q?.eq('kode_booking', idOrCode);
+        }
+
+        final res = await q?.maybeSingle();
 
         if (res != null) {
           return BookingModel.fromJson(Map<String, dynamic>.from(res));
@@ -164,10 +205,21 @@ class BookingService {
     final sb = SupabaseService.instance;
     if (sb.isReady) {
       try {
-        await sb.table(SupabaseConfig.tableBookings)?.update({
-          'status': BookingStatus.checkedIn.apiValue,
-          'checked_in_at': DateTime.now().toIso8601String(),
-        }).eq('id', booking.id);
+        final bId = int.tryParse(booking.id);
+        if (bId != null) {
+          await sb.table(SupabaseConfig.tableBooking)?.update({
+            'status_booking': 'checked_in',
+          }).eq('id_booking', bId);
+
+          // Masukkan ke tabel check_in
+          await sb.table(SupabaseConfig.tableCheckIn)?.insert({
+            'id_booking': bId,
+            'id_kamar': booking.roomNumber,
+            'id_staf': '1',
+            'waktu_checkin_aktual': DateTime.now().toIso8601String(),
+            'status_checkin': 'selesai',
+          });
+        }
       } catch (e) {
         debugPrint('⚠️ [BookingService] Supabase checkInGuest error: $e');
       }
@@ -197,10 +249,21 @@ class BookingService {
     final sb = SupabaseService.instance;
     if (sb.isReady) {
       try {
-        await sb.table(SupabaseConfig.tableBookings)?.update({
-          'status': BookingStatus.checkedOut.apiValue,
-          'checked_out_at': DateTime.now().toIso8601String(),
-        }).eq('id', booking.id);
+        final bId = int.tryParse(booking.id);
+        if (bId != null) {
+          await sb.table(SupabaseConfig.tableBooking)?.update({
+            'status_booking': 'completed',
+          }).eq('id_booking', bId);
+
+          // Masukkan ke tabel check_out
+          await sb.table(SupabaseConfig.tableCheckOut)?.insert({
+            'id_booking': bId,
+            'id_kamar': booking.roomNumber,
+            'id_staf': '1',
+            'waktu_checkout_aktual': DateTime.now().toIso8601String(),
+            'status_checkout': 'selesai',
+          });
+        }
       } catch (e) {
         debugPrint('⚠️ [BookingService] Supabase checkOutGuest error: $e');
       }
@@ -231,11 +294,21 @@ class BookingService {
     final sb = SupabaseService.instance;
     if (sb.isReady) {
       try {
-        await sb.table(SupabaseConfig.tableBookings)?.update({
-          'status': BookingStatus.confirmed.apiValue,
-          'is_paid': true,
-          'paid_at': DateTime.now().toIso8601String(),
-        }).eq('id', booking.id);
+        final bId = int.tryParse(booking.id);
+        if (bId != null) {
+          await sb.table(SupabaseConfig.tableBooking)?.update({
+            'status_booking': 'confirmed',
+          }).eq('id_booking', bId);
+
+          // Catat ke tabel verifikasi_booking
+          await sb.table(SupabaseConfig.tableVerifikasiBooking)?.insert({
+            'id_booking': bId,
+            'id_staf': '1',
+            'status_verifikasi': 'disetujui',
+            'tgl_verifikasi': DateTime.now().toIso8601String(),
+            'catatan_verifikasi': 'Pembayaran diverifikasi otomatis/manual',
+          });
+        }
       } catch (e) {
         debugPrint('⚠️ [BookingService] Supabase verifyPayment error: $e');
       }
@@ -253,9 +326,12 @@ class BookingService {
     final sb = SupabaseService.instance;
     if (sb.isReady) {
       try {
-        await sb.table(SupabaseConfig.tableBookings)?.update({
-          'status': BookingStatus.cancelled.apiValue,
-        }).eq('id', bookingId);
+        final bId = int.tryParse(bookingId);
+        if (bId != null) {
+          await sb.table(SupabaseConfig.tableBooking)?.update({
+            'status_booking': 'cancelled',
+          }).eq('id_booking', bId);
+        }
       } catch (e) {
         debugPrint('⚠️ [BookingService] Supabase cancelBooking error: $e');
       }
@@ -270,3 +346,4 @@ class BookingService {
     return false;
   }
 }
+

@@ -29,21 +29,24 @@ class HotelService {
 
     if (sb.isReady) {
       try {
-        var queryBuilder = sb.table(SupabaseConfig.tableHotels)?.select();
+        var queryBuilder =
+            sb.table(SupabaseConfig.tableMitraPenginapan)?.select();
         if (queryBuilder != null) {
           if (status != null) {
-            queryBuilder = queryBuilder.eq('status', status.apiValue);
+            final st = status == HotelStatus.active ? 'aktif' : status.apiValue;
+            queryBuilder = queryBuilder.eq('status_operasional', st);
           }
           if (city != null && city.isNotEmpty) {
-            queryBuilder = queryBuilder.ilike('city', '%$city%');
+            queryBuilder = queryBuilder.ilike('kota_wilayah', '%$city%');
           }
           if (query != null && query.isNotEmpty) {
-            queryBuilder = queryBuilder.ilike('name', '%$query%');
+            queryBuilder = queryBuilder.ilike('nama_properti', '%$query%');
           }
 
           final response = await queryBuilder;
           final list = (response as List)
-              .map((item) => HotelModel.fromJson(Map<String, dynamic>.from(item)))
+              .map((item) =>
+                  HotelModel.fromJson(Map<String, dynamic>.from(item)))
               .toList();
 
           if (list.isNotEmpty) return list;
@@ -96,11 +99,14 @@ class HotelService {
     final sb = SupabaseService.instance;
     if (sb.isReady) {
       try {
-        final res = await sb
-            .table(SupabaseConfig.tableHotels)
-            ?.select()
-            .eq('id', hotelId)
-            .maybeSingle();
+        final parsedId = int.tryParse(hotelId);
+        var q = sb.table(SupabaseConfig.tableMitraPenginapan)?.select();
+        if (parsedId != null) {
+          q = q?.eq('id_penginapan', parsedId);
+        } else {
+          q = q?.eq('id_penginapan', hotelId);
+        }
+        final res = await q?.maybeSingle();
         if (res != null) {
           return HotelModel.fromJson(Map<String, dynamic>.from(res));
         }
@@ -126,12 +132,16 @@ class HotelService {
     final sb = SupabaseService.instance;
     if (sb.isReady) {
       try {
-        final res = await sb
-            .table(SupabaseConfig.tableRooms)
-            ?.select()
-            .eq('hotel_id', hotelId);
+        final parsedId = int.tryParse(hotelId);
+        var q = sb.table(SupabaseConfig.tableTipeKamar)?.select('*, kamar(*)');
+        if (parsedId != null) {
+          q = q?.eq('id_penginapan', parsedId);
+        } else {
+          q = q?.eq('id_penginapan', hotelId);
+        }
+        final res = await q;
         if (res != null && (res as List).isNotEmpty) {
-          return res
+          return (res as List)
               .map((r) => RoomModel.fromJson(Map<String, dynamic>.from(r)))
               .toList();
         }
@@ -152,8 +162,17 @@ class HotelService {
     if (sb.isReady) {
       try {
         final res = await sb
-            .table(SupabaseConfig.tableRooms)
-            ?.insert(room.toJson())
+            .table(SupabaseConfig.tableTipeKamar)
+            ?.insert({
+              'id_penginapan': int.tryParse(room.hotelId) ?? 1,
+              'nama_tipe': room.typeName,
+              'kapasitas_tamu': room.maxGuests,
+              'harga_dasar': room.pricePerNight,
+              'harga_weekend': room.weekendPrice ?? room.pricePerNight,
+              'luas_m2': room.roomSizeM2 ?? 24.0,
+              'tipe_bed': room.bedType ?? 'King Bed',
+              'total_unit': 10,
+            })
             .select()
             .single();
         if (res != null) {
@@ -174,10 +193,12 @@ class HotelService {
     final sb = SupabaseService.instance;
     if (sb.isReady) {
       try {
-        await sb
-            .table(SupabaseConfig.tableRooms)
-            ?.update(room.toJson())
-            .eq('id', room.id);
+        await sb.table(SupabaseConfig.tableTipeKamar)?.update({
+          'nama_tipe': room.typeName,
+          'kapasitas_tamu': room.maxGuests,
+          'harga_dasar': room.pricePerNight,
+          'harga_weekend': room.weekendPrice ?? room.pricePerNight,
+        }).eq('id_tipe_kamar', room.id);
         return true;
       } catch (e) {
         debugPrint('⚠️ [HotelService] Update room Supabase error: $e');
@@ -193,14 +214,21 @@ class HotelService {
     return false;
   }
 
-  /// Update status kamar (misal dari Available -> Occupied / Dirty / Cleaning)
+  /// Update status kamar (Available -> Occupied / Dirty / Cleaning)
   Future<bool> updateRoomStatus(String roomId, RoomStatus newStatus) async {
     final sb = SupabaseService.instance;
     if (sb.isReady) {
       try {
-        await sb.table(SupabaseConfig.tableRooms)?.update({
-          'status': newStatus.apiValue,
-        }).eq('id', roomId);
+        final statusMap = {
+          RoomStatus.available: 'tersedia',
+          RoomStatus.occupied: 'terisi',
+          RoomStatus.dirty: 'kotor',
+          RoomStatus.cleaning: 'dibersihkan',
+          RoomStatus.maintenance: 'maintenance',
+        };
+        await sb.table(SupabaseConfig.tableKamar)?.update({
+          'status_kamar': statusMap[newStatus] ?? newStatus.apiValue,
+        }).eq('id_kamar', roomId);
         return true;
       } catch (e) {
         debugPrint('⚠️ [HotelService] updateRoomStatus error: $e');
@@ -221,7 +249,7 @@ class HotelService {
     final sb = SupabaseService.instance;
     if (sb.isReady) {
       try {
-        await sb.table(SupabaseConfig.tableRooms)?.delete().eq('id', roomId);
+        await sb.table(SupabaseConfig.tableKamar)?.delete().eq('id_kamar', roomId);
         return true;
       } catch (e) {
         debugPrint('⚠️ [HotelService] deleteRoom error: $e');
@@ -241,9 +269,16 @@ class HotelService {
     final sb = SupabaseService.instance;
     if (sb.isReady) {
       try {
-        await sb.table(SupabaseConfig.tableHotels)?.update({
-          'status': status.apiValue,
-        }).eq('id', hotelId);
+        final parsedId = int.tryParse(hotelId);
+        final val = status == HotelStatus.active ? 'aktif' : status.apiValue;
+        var q = sb.table(SupabaseConfig.tableMitraPenginapan)?.update({
+          'status_operasional': val,
+        });
+        if (parsedId != null) {
+          await q?.eq('id_penginapan', parsedId);
+        } else {
+          await q?.eq('id_penginapan', hotelId);
+        }
         return true;
       } catch (e) {
         debugPrint('⚠️ [HotelService] updateHotelStatus error: $e');
@@ -258,3 +293,4 @@ class HotelService {
     return false;
   }
 }
+

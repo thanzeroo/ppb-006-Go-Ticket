@@ -15,25 +15,36 @@ class MaintenanceService {
   /// Mengambil daftar tiket maintenance
   Future<List<MaintenanceTicketModel>> getTickets({
     String? hotelId,
-    TicketCategory? category,
-    TicketStatus? status,
+    String? category,
+    String? status,
   }) async {
     final sb = SupabaseService.instance;
 
     if (sb.isReady) {
       try {
-        var q = sb.table(SupabaseConfig.tableMaintenanceTickets)?.select();
-        if (hotelId != null) q = q?.eq('hotel_id', hotelId);
-        if (category != null) q = q?.eq('category', category.apiValue);
-        if (status != null) q = q?.eq('status', status.apiValue);
+        final List<MaintenanceTicketModel> results = [];
 
-        final res = await q?.order('created_at', ascending: false);
-        if (res != null && (res as List).isNotEmpty) {
-          return res
-              .map((t) =>
-                  MaintenanceTicketModel.fromJson(Map<String, dynamic>.from(t)))
-              .toList();
+        // Ambil dari laporan_kerusakan
+        final resK = await sb
+            .table(SupabaseConfig.tableLaporanKerusakan)
+            ?.select()
+            .order('tgl_lapor', ascending: false);
+        if (resK != null && (resK as List).isNotEmpty) {
+          results.addAll(resK.map((t) =>
+              MaintenanceTicketModel.fromJson(Map<String, dynamic>.from(t))));
         }
+
+        // Ambil dari laporan_kebersihan
+        final resB = await sb
+            .table(SupabaseConfig.tableLaporanKebersihan)
+            ?.select()
+            .order('tgl_tugas', ascending: false);
+        if (resB != null && (resB as List).isNotEmpty) {
+          results.addAll(resB.map((t) =>
+              MaintenanceTicketModel.fromJson(Map<String, dynamic>.from(t))));
+        }
+
+        if (results.isNotEmpty) return results;
       } catch (e) {
         debugPrint('⚠️ [MaintenanceService] getTickets error: $e');
       }
@@ -41,19 +52,7 @@ class MaintenanceService {
 
     // Fallback Mock
     await Future.delayed(const Duration(milliseconds: 250));
-    var list = List<MaintenanceTicketModel>.from(MockData.maintenanceTickets);
-
-    if (hotelId != null) {
-      list = list.where((t) => t.hotelId == hotelId).toList();
-    }
-    if (category != null) {
-      list = list.where((t) => t.category == category).toList();
-    }
-    if (status != null) {
-      list = list.where((t) => t.status == status).toList();
-    }
-
-    return list;
+    return List<MaintenanceTicketModel>.from(MockData.maintenanceTickets);
   }
 
   /// Membuat tiket laporan baru (contoh: Lapor Kerusakan atau Permintaan Kebersihan)
@@ -64,9 +63,19 @@ class MaintenanceService {
 
     if (sb.isReady) {
       try {
+        final row = {
+          'id_kamar': ticket.roomNumber ?? '1',
+          'dilaporkan_oleh': ticket.reportedById.isNotEmpty ? ticket.reportedById : '1',
+          'judul_masalah': ticket.title,
+          'deskripsi_kerusakan': ticket.description,
+          'tingkat_prioritas': ticket.priority.displayName.toLowerCase(),
+          'status_perbaikan': 'dalam_proses',
+          'tgl_lapor': DateTime.now().toIso8601String(),
+        };
+
         final res = await sb
-            .table(SupabaseConfig.tableMaintenanceTickets)
-            ?.insert(ticket.toJson())
+            .table(SupabaseConfig.tableLaporanKerusakan)
+            ?.insert(row)
             .select()
             .single();
 
@@ -80,10 +89,9 @@ class MaintenanceService {
       }
     }
 
-    // Jika kamar rusak, otomatis ubah status kamar ke Maintenance
-    if (ticket.category == TicketCategory.repair) {
+    if (ticket.roomId != null) {
       await HotelService.instance
-          .updateRoomStatus(ticket.roomId, RoomStatus.maintenance);
+          .updateRoomStatus(ticket.roomId!, RoomStatus.maintenance);
     }
 
     MockData.maintenanceTickets.insert(0, ticket);
@@ -93,26 +101,35 @@ class MaintenanceService {
   /// Mengubah status pengerjaan tiket
   Future<bool> updateTicketStatus(
     String ticketId,
-    TicketStatus newStatus, {
+    MaintenanceStatus newStatus, {
     String? resolutionNotes,
   }) async {
     final sb = SupabaseService.instance;
 
     if (sb.isReady) {
       try {
+        final parsedId = int.tryParse(ticketId);
+        final statusStr = newStatus == MaintenanceStatus.resolved
+            ? 'selesai'
+            : (newStatus == MaintenanceStatus.inProgress
+                ? 'dalam_proses'
+                : 'terbuka');
+
         final data = <String, dynamic>{
-          'status': newStatus.apiValue,
+          'status_perbaikan': statusStr,
         };
-        if (newStatus == TicketStatus.resolved) {
-          data['resolved_at'] = DateTime.now().toIso8601String();
+        if (newStatus == MaintenanceStatus.resolved) {
+          data['tgl_selesai'] = DateTime.now().toIso8601String();
           if (resolutionNotes != null) {
-            data['resolution_notes'] = resolutionNotes;
+            data['tindakan_perbaikan'] = resolutionNotes;
           }
         }
-        await sb
-            .table(SupabaseConfig.tableMaintenanceTickets)
-            ?.update(data)
-            .eq('id', ticketId);
+        if (parsedId != null) {
+          await sb
+              .table(SupabaseConfig.tableLaporanKerusakan)
+              ?.update(data)
+              .eq('id_tiket_kerusakan', parsedId);
+        }
       } catch (e) {
         debugPrint('⚠️ [MaintenanceService] updateTicketStatus error: $e');
       }
@@ -124,17 +141,17 @@ class MaintenanceService {
       final old = MockData.maintenanceTickets[idx];
       MockData.maintenanceTickets[idx] = old.copyWith(
         status: newStatus,
-        resolvedAt: newStatus == TicketStatus.resolved ? DateTime.now() : null,
+        resolvedAt: newStatus == MaintenanceStatus.resolved ? DateTime.now() : null,
         resolutionNotes: resolutionNotes ?? old.resolutionNotes,
       );
 
-      // Jika tiket selesai (resolved), kembalikan kamar jadi Available
-      if (newStatus == TicketStatus.resolved) {
+      if (newStatus == MaintenanceStatus.resolved && old.roomId != null) {
         await HotelService.instance
-            .updateRoomStatus(old.roomId, RoomStatus.available);
+            .updateRoomStatus(old.roomId!, RoomStatus.available);
       }
       return true;
     }
     return false;
   }
 }
+

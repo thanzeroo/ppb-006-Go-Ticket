@@ -35,7 +35,7 @@ class SupabaseService {
     try {
       await Supabase.initialize(
         url: SupabaseConfig.supabaseUrl,
-        anonKey: SupabaseConfig.supabaseAnonKey,
+        anonKey: SupabaseConfig.activeApiKey,
       );
       _isInitialized = true;
       debugPrint('✅ [SupabaseService] Supabase client berhasil diinisialisasi.');
@@ -56,3 +56,4 @@ class SupabaseService {
   /// Stream perubahan status autentikasi
   Stream<AuthState>? get authStateChanges => client?.auth.onAuthStateChange;
 }
+

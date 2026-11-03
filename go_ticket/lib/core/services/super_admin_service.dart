@@ -18,17 +18,18 @@ class SuperAdminService {
 
     if (sb.isReady) {
       try {
-        final usersCount = await sb.table(SupabaseConfig.tableProfiles)?.count();
-        final hotelsCount = await sb.table(SupabaseConfig.tableHotels)?.count();
+        final usersCount = await sb.table(SupabaseConfig.tableUsers)?.count();
+        final hotelsCount =
+            await sb.table(SupabaseConfig.tableMitraPenginapan)?.count();
         final bookingsCount =
-            await sb.table(SupabaseConfig.tableBookings)?.count();
+            await sb.table(SupabaseConfig.tableBooking)?.count();
 
         return {
           'totalUsers': usersCount?.count ?? MockData.users.length,
           'totalHotels': hotelsCount?.count ?? MockData.hotels.length,
           'totalBookings': bookingsCount?.count ?? MockData.bookings.length,
           'totalRevenue': 124500000,
-          'activePartners': 42,
+          'activePartners': hotelsCount?.count ?? 20,
         };
       } catch (e) {
         debugPrint('⚠️ [SuperAdminService] getPlatformStats error: $e');
@@ -52,7 +53,7 @@ class SuperAdminService {
     if (sb.isReady) {
       try {
         final res = await sb
-            .table(SupabaseConfig.tableProfiles)
+            .table(SupabaseConfig.tableUsers)
             ?.select()
             .order('created_at', ascending: false);
         if (res != null && (res as List).isNotEmpty) {
@@ -75,10 +76,13 @@ class SuperAdminService {
 
     if (sb.isReady) {
       try {
-        await sb.table(SupabaseConfig.tableProfiles)?.update({
-          'is_active': isActive,
-        }).eq('id', userId);
-        return true;
+        final parsedId = int.tryParse(userId);
+        if (parsedId != null) {
+          await sb.table(SupabaseConfig.tableUsers)?.update({
+            'status_akun': isActive ? 'aktif' : 'tersuspend',
+          }).eq('id_user', parsedId);
+          return true;
+        }
       } catch (e) {
         debugPrint('⚠️ [SuperAdminService] toggleUserStatus error: $e');
       }
@@ -99,9 +103,9 @@ class SuperAdminService {
     if (sb.isReady) {
       try {
         final res = await sb
-            .table(SupabaseConfig.tablePayouts)
+            .table(SupabaseConfig.tableMonitoringDana)
             ?.select()
-            .order('requested_at', ascending: false);
+            .order('tgl_pengajuan', ascending: false);
         if (res != null && (res as List).isNotEmpty) {
           return res
               .map((p) => PayoutModel.fromJson(Map<String, dynamic>.from(p)))
@@ -126,19 +130,25 @@ class SuperAdminService {
 
     if (sb.isReady) {
       try {
+        final parsedId = int.tryParse(payoutId);
+        final statusStr = newStatus == PayoutStatus.approved
+            ? 'disetujui'
+            : (newStatus == PayoutStatus.rejected ? 'ditolak' : 'menunggu');
+
         final data = <String, dynamic>{
-          'status': newStatus.apiValue,
-          'processed_at': DateTime.now().toIso8601String(),
+          'status_dana': statusStr,
         };
         if (referenceNumber != null) {
-          data['reference_number'] = referenceNumber;
+          data['no_referensi_payout'] = referenceNumber;
         }
 
-        await sb
-            .table(SupabaseConfig.tablePayouts)
-            ?.update(data)
-            .eq('id', payoutId);
-        return true;
+        if (parsedId != null) {
+          await sb
+              .table(SupabaseConfig.tableMonitoringDana)
+              ?.update(data)
+              .eq('id_monitoring', parsedId);
+          return true;
+        }
       } catch (e) {
         debugPrint('⚠️ [SuperAdminService] processPayout error: $e');
       }
@@ -156,3 +166,4 @@ class SuperAdminService {
     return false;
   }
 }
+

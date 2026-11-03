@@ -168,34 +168,76 @@ class PayoutModel {
     this.processedAt,
   });
 
+  int get amount => requestedAmount;
+  String get accountNumber => bankAccountNumber;
+  String get accountHolderName => bankAccountName;
+  DateTime get requestedAt => createdAt;
+  String? get referenceNumber => transferTransactionId;
+
   // ---------------------------------------------------------------------------
   // SERIALIZATION
   // ---------------------------------------------------------------------------
 
   factory PayoutModel.fromJson(Map<String, dynamic> json) {
+    PayoutStatus parseStatus(dynamic val) {
+      if (val == null) return PayoutStatus.pending;
+      final s = val.toString().toLowerCase();
+      if (s == 'disetujui' || s == 'approved' || s == 'selesai') {
+        return PayoutStatus.approved;
+      }
+      if (s == 'ditolak' || s == 'rejected') return PayoutStatus.rejected;
+      if (s == 'diproses' || s == 'processing') return PayoutStatus.processing;
+      return PayoutStatusExtension.fromString(s);
+    }
+
+    final now = DateTime.now();
+    final pStartStr = json['period_start'] ?? json['tgl_pengajuan'];
+    final pEndStr = json['period_end'] ?? json['tgl_jatuh_tempo'];
+    final cAtStr = json['created_at'] ?? json['tgl_pengajuan'];
+
     return PayoutModel(
-      id: json['id']?.toString() ?? '',
-      hotelId: json['hotel_id']?.toString() ?? '',
-      hotelName: json['hotel_name'] ?? '',
-      requestedById: json['requested_by_id']?.toString() ?? '',
-      requestedByName: json['requested_by_name'] ?? '',
-      periodStart: DateTime.parse(json['period_start']),
-      periodEnd: DateTime.parse(json['period_end']),
-      grossRevenue: json['gross_revenue'] ?? 0,
-      commissionPercent: (json['commission_percent'] as num?)?.toDouble() ?? 10.0,
-      commissionAmount: json['commission_amount'] ?? 0,
-      netAmount: json['net_amount'] ?? 0,
-      requestedAmount: json['requested_amount'] ?? 0,
-      status: PayoutStatusExtension.fromString(json['status'] ?? 'pending'),
-      bankName: json['bank_name'] ?? '',
-      bankAccountName: json['bank_account_name'] ?? '',
-      bankAccountNumber: json['bank_account_number'] ?? '',
-      notes: json['notes'],
+      id: json['id']?.toString() ?? json['id_monitoring']?.toString() ?? '',
+      hotelId: json['hotel_id']?.toString() ??
+          json['id_penginapan']?.toString() ??
+          '',
+      hotelName: json['hotel_name'] ?? 'Mitra Penginapan',
+      requestedById: json['requested_by_id']?.toString() ??
+          json['disetujui_oleh']?.toString() ??
+          '1',
+      requestedByName: json['requested_by_name'] ?? 'Owner Penginapan',
+      periodStart: pStartStr != null
+          ? (DateTime.tryParse(pStartStr) ?? now)
+          : now.subtract(const Duration(days: 30)),
+      periodEnd: pEndStr != null ? (DateTime.tryParse(pEndStr) ?? now) : now,
+      grossRevenue: (json['gross_revenue'] as num?)?.toInt() ??
+          (json['nominal_gross'] as num?)?.toInt() ??
+          0,
+      commissionPercent:
+          (json['commission_percent'] as num?)?.toDouble() ?? 10.0,
+      commissionAmount: (json['commission_amount'] as num?)?.toInt() ??
+          (json['komisi_platform'] as num?)?.toInt() ??
+          0,
+      netAmount: (json['net_amount'] as num?)?.toInt() ??
+          (json['nominal_netto'] as num?)?.toInt() ??
+          0,
+      requestedAmount: (json['requested_amount'] as num?)?.toInt() ??
+          (json['nominal_netto'] as num?)?.toInt() ??
+          (json['nominal_gross'] as num?)?.toInt() ??
+          0,
+      status: parseStatus(json['status_dana'] ?? json['status']),
+      bankName: json['bank_name'] ?? json['metode_pencairan'] ?? 'BCA',
+      bankAccountName:
+          json['bank_account_name'] ?? 'PT Mitra Penginapan Nusantara',
+      bankAccountNumber:
+          json['bank_account_number'] ?? '8830192841',
+      notes: json['notes'] ?? json['keterangan'],
       rejectionReason: json['rejection_reason'],
-      transferTransactionId: json['transfer_transaction_id'],
+      transferTransactionId:
+          json['transfer_transaction_id'] ?? json['no_referensi_payout'],
       transferProofUrl: json['transfer_proof_url'],
-      processedById: json['processed_by_id']?.toString(),
-      createdAt: DateTime.parse(json['created_at']),
+      processedById: json['processed_by_id']?.toString() ??
+          json['disetujui_oleh']?.toString(),
+      createdAt: cAtStr != null ? (DateTime.tryParse(cAtStr) ?? now) : now,
       processedAt: json['processed_at'] != null
           ? DateTime.tryParse(json['processed_at'])
           : null,

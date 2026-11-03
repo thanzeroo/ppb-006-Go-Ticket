@@ -241,39 +241,110 @@ class BookingModel {
     this.createdAt,
   });
 
+  String get userId => customerId;
+  String get guestName => customerName;
+  String? get guestPhoneNumber => customerPhone;
+  String? get guestEmail => 'customer@goticket.id';
+  String? get hotelAddress => 'Jl. Penginapan, Malang';
+  String? get hotelImageUrl =>
+      'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600';
+  int get nights => totalNights;
+  int get totalGuests => guestCount;
+  int get totalRooms => 1;
+  int get totalPrice => totalAmount;
+  int get subtotalPrice => subtotal;
+  int get taxAndServiceFee => (totalAmount * 0.1).round();
+  bool get isPaid =>
+      paymentStatus == 'paid' ||
+      paidAt != null ||
+      status != BookingStatus.pendingPayment;
+  DateTime? get checkedInAt => actualCheckInTime;
+  DateTime? get checkedOutAt => actualCheckOutTime;
+
   // ---------------------------------------------------------------------------
   // SERIALIZATION
   // ---------------------------------------------------------------------------
 
   factory BookingModel.fromJson(Map<String, dynamic> json) {
+    BookingStatus parseBookingStatus(dynamic val) {
+      if (val == null) return BookingStatus.confirmed;
+      final s = val.toString().toLowerCase();
+      if (s == 'confirmed' || s == 'dikonfirmasi') return BookingStatus.confirmed;
+      if (s == 'checked_in' || s == 'checkin') return BookingStatus.checkedIn;
+      if (s == 'checked_out' || s == 'checkout') return BookingStatus.checkedOut;
+      if (s == 'cancelled' || s == 'batal') return BookingStatus.cancelled;
+      if (s == 'pending') return BookingStatus.pendingPayment;
+      return BookingStatusExtension.fromString(s);
+    }
+
+    final ciStr = json['check_in_date'] ?? json['tgl_checkin'];
+    final coStr = json['check_out_date'] ?? json['tgl_checkout'];
+
     return BookingModel(
-      id: json['id']?.toString() ?? '',
-      bookingCode: json['booking_code'] ?? '',
-      customerId: json['customer_id']?.toString() ?? '',
-      customerName: json['customer_name'] ?? '',
-      customerPhone: json['customer_phone'],
-      hotelId: json['hotel_id']?.toString() ?? '',
-      hotelName: json['hotel_name'] ?? '',
-      roomId: json['room_id']?.toString() ?? '',
-      roomTypeName: json['room_type_name'] ?? '',
-      roomNumber: json['room_number'],
-      checkInDate: DateTime.parse(json['check_in_date']),
-      checkOutDate: DateTime.parse(json['check_out_date']),
-      totalNights: json['total_nights'] ?? 1,
-      guestCount: json['guest_count'] ?? 1,
-      specialRequest: json['special_request'],
-      pricePerNight: json['price_per_night'] ?? 0,
-      subtotal: json['subtotal'] ?? 0,
-      discountAmount: json['discount_amount'] ?? 0,
-      promoCode: json['promo_code'],
-      totalAmount: json['total_amount'] ?? 0,
-      paymentMethod: json['payment_method'],
-      paymentStatus: json['payment_status'],
+      id: json['id']?.toString() ?? json['id_booking']?.toString() ?? '',
+      bookingCode: json['booking_code'] ??
+          json['kode_booking'] ??
+          'GT-BKG-${json['id_booking'] ?? '0000'}',
+      customerId:
+          json['customer_id']?.toString() ?? json['id_user']?.toString() ?? '',
+      customerName: json['customer_name'] ??
+          json['guest_name'] ??
+          (json['users'] != null
+              ? json['users']['nama_lengkap']
+              : 'Tamu Go Ticket'),
+      customerPhone: json['customer_phone'] ?? json['guest_phone_number'],
+      hotelId: json['hotel_id']?.toString() ??
+          json['id_penginapan']?.toString() ??
+          '',
+      hotelName: json['hotel_name'] ??
+          (json['mitra_penginapan'] != null
+              ? json['mitra_penginapan']['nama_properti']
+              : 'Aruna Stay'),
+      roomId: json['room_id']?.toString() ??
+          json['id_tipe_kamar']?.toString() ??
+          '',
+      roomTypeName: json['room_type_name'] ??
+          (json['tipe_kamar'] != null
+              ? json['tipe_kamar']['nama_tipe']
+              : 'Standard Room'),
+      roomNumber: json['room_number'] ??
+          (json['kamar'] != null ? json['kamar']['nomor_kamar'] : '101'),
+      checkInDate: ciStr != null
+          ? (DateTime.tryParse(ciStr) ?? DateTime.now())
+          : DateTime.now(),
+      checkOutDate: coStr != null
+          ? (DateTime.tryParse(coStr) ??
+              DateTime.now().add(const Duration(days: 1)))
+          : DateTime.now().add(const Duration(days: 1)),
+      totalNights: json['total_nights'] ?? json['jml_malam'] ?? 1,
+      guestCount: json['guest_count'] ??
+          ((json['jml_dewasa'] as num? ?? 1) +
+                  (json['jml_anak'] as num? ?? 0))
+              .toInt(),
+      specialRequest: json['special_request'] ?? json['permintaan_khusus'],
+      pricePerNight: (json['price_per_night'] as num?)?.toInt() ?? 250000,
+      subtotal: (json['subtotal'] as num?)?.toInt() ??
+          (json['total_harga'] as num?)?.toInt() ??
+          0,
+      discountAmount: (json['discount_amount'] as num?)?.toInt() ??
+          (json['potongan_diskon'] as num?)?.toInt() ??
+          0,
+      promoCode: json['promo_code'] ??
+          (json['id_promo'] != null ? 'PROMO-${json['id_promo']}' : null),
+      totalAmount: (json['total_amount'] as num?)?.toInt() ??
+          (json['total_harga'] as num?)?.toInt() ??
+          0,
+      paymentMethod: json['payment_method'] ?? 'QRIS / Virtual Account',
+      paymentStatus: json['payment_status'] ?? 'paid',
       paymentTransactionId: json['payment_transaction_id'],
       paymentProofUrl: json['payment_proof_url'],
-      paidAt: json['paid_at'] != null ? DateTime.tryParse(json['paid_at']) : null,
-      status: BookingStatusExtension.fromString(json['status'] ?? 'pending_payment'),
-      qrCodeData: json['qr_code_data'],
+      paidAt: json['paid_at'] != null
+          ? DateTime.tryParse(json['paid_at'])
+          : (json['tgl_booking'] != null
+              ? DateTime.tryParse(json['tgl_booking'])
+              : null),
+      status: parseBookingStatus(json['status_booking'] ?? json['status']),
+      qrCodeData: json['qr_code_data'] ?? json['kode_booking'],
       actualCheckInTime: json['actual_check_in_time'] != null
           ? DateTime.tryParse(json['actual_check_in_time'])
           : null,
@@ -284,7 +355,9 @@ class BookingModel {
       hasReviewed: json['has_reviewed'] ?? false,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'])
-          : null,
+          : (json['tgl_booking'] != null
+              ? DateTime.tryParse(json['tgl_booking'])
+              : null),
     );
   }
 
