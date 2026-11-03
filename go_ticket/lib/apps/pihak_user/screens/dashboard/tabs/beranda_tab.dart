@@ -46,30 +46,31 @@ class _BerandaTabState extends State<BerandaTab> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(),
-            const SizedBox(height: 16),
-            _buildSearchCard(),
-            const SizedBox(height: 16),
-            _buildPromoCard(),
-            const SizedBox(height: 20),
-            _buildKategoriSection(),
-            const SizedBox(height: 20),
-            _buildRekomendasiSection(),
-            const SizedBox(height: 20),
-            _buildWhyGoTicket(),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
-    );
+ 
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: const Color(0xFFF5F7FA),
+    body: ListView(
+      primary: false,
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(bottom: 100),
+      children: [
+        _buildHeader(),
+        const SizedBox(height: 16),
+        _buildSearchCard(),
+        const SizedBox(height: 16),
+        _buildPromoCard(),
+        const SizedBox(height: 20),
+        _buildKategoriSection(),
+        const SizedBox(height: 20),
+        _buildRekomendasiSection(),
+        const SizedBox(height: 20),
+        _buildWhyGoTicket(),
+        const SizedBox(height: 24),
+      ],
+    ),
+  );
   }
 
   Widget _buildHeader() {
