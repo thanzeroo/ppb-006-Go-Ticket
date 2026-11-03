@@ -79,6 +79,9 @@ enum MaintenancePriority {
 
   /// Darurat — harus ditangani segera (misal: kebocoran listrik, pipa bocor)
   critical,
+
+  /// Urgent / mendesak
+  urgent,
 }
 
 /// Extension untuk MaintenancePriority
@@ -93,6 +96,8 @@ extension MaintenancePriorityExtension on MaintenancePriority {
         return 'high';
       case MaintenancePriority.critical:
         return 'critical';
+      case MaintenancePriority.urgent:
+        return 'urgent';
     }
   }
 
@@ -104,6 +109,8 @@ extension MaintenancePriorityExtension on MaintenancePriority {
         return MaintenancePriority.high;
       case 'critical':
         return MaintenancePriority.critical;
+      case 'urgent':
+        return MaintenancePriority.urgent;
       default:
         return MaintenancePriority.low;
     }
@@ -119,8 +126,22 @@ extension MaintenancePriorityExtension on MaintenancePriority {
         return 'Tinggi';
       case MaintenancePriority.critical:
         return 'Kritis';
+      case MaintenancePriority.urgent:
+        return 'Mendesak';
     }
   }
+}
+
+typedef TicketPriority = MaintenancePriority;
+typedef TicketStatus = MaintenanceStatus;
+
+class TicketCategory {
+  TicketCategory._();
+  static const String cleaning = 'Kebersihan';
+  static const String repair = 'Perbaikan';
+  static const String plumbing = 'Air/Ledeng';
+  static const String electrical = 'Kelistrikan';
+  static const String ac = 'AC / Pendingin';
 }
 
 // =============================================================================
@@ -198,8 +219,8 @@ class MaintenanceTicketModel {
   const MaintenanceTicketModel({
     required this.id,
     required this.hotelId,
-    required this.reportedById,
-    required this.reportedByName,
+    this.reportedById = 'usr-admin-01',
+    this.reportedByName = 'Admin Hotel',
     required this.title,
     required this.description,
     required this.category,
@@ -228,7 +249,7 @@ class MaintenanceTicketModel {
     MaintenancePriority parsePriority(dynamic val) {
       if (val == null) return MaintenancePriority.medium;
       final s = val.toString().toLowerCase();
-      if (s == 'urgent' || s == 'tinggi') return MaintenancePriority.urgent;
+      if (s == 'urgent' || s == 'tinggi') return MaintenancePriority.high;
       if (s == 'rendah' || s == 'low') return MaintenancePriority.low;
       return MaintenancePriorityExtension.fromString(s);
     }

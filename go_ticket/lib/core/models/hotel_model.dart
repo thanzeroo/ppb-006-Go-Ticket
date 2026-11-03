@@ -144,6 +144,11 @@ class HotelModel {
   /// Tanggal disetujui oleh Super Admin
   final DateTime? approvedAt;
 
+  final int? _starRating;
+  final int? _originalPrice;
+  final bool? _isRecommended;
+  final bool? _isPopular;
+
   const HotelModel({
     required this.id,
     required this.name,
@@ -158,18 +163,31 @@ class HotelModel {
     this.phoneNumber,
     this.email,
     this.website,
-    this.mainImageUrl,
-    this.imageUrls = const [],
+    String? mainImageUrl,
+    String? thumbnailUrl,
+    List<String> imageUrls = const [],
+    List<String>? photoUrls,
     this.amenities = const [],
     this.rating = 0.0,
     this.reviewCount = 0,
     this.status = HotelStatus.pending,
     this.adminUserId,
-    this.startingPrice,
+    int? startingPrice,
+    int? pricePerNight,
+    int? originalPrice,
+    int? starRating,
+    bool? isRecommended,
+    bool? isPopular,
     this.totalRooms,
     this.registeredAt,
     this.approvedAt,
-  });
+  })  : mainImageUrl = mainImageUrl ?? thumbnailUrl,
+        imageUrls = photoUrls ?? imageUrls,
+        startingPrice = startingPrice ?? pricePerNight,
+        _originalPrice = originalPrice,
+        _starRating = starRating,
+        _isRecommended = isRecommended,
+        _isPopular = isPopular;
 
   // ---------------------------------------------------------------------------
   // CONVENIENCE GETTERS
@@ -187,12 +205,13 @@ class HotelModel {
 
   int get pricePerNight => startingPrice ?? 350000;
   int? get originalPrice =>
-      startingPrice != null ? (startingPrice! * 1.25).round() : 450000;
+      _originalPrice ??
+      (startingPrice != null ? (startingPrice! * 1.25).round() : 450000);
   String? get thumbnailUrl => mainImageUrl;
   List<String> get photoUrls => imageUrls;
-  int get starRating => 4;
-  bool get isRecommended => true;
-  bool get isPopular => rating >= 4.5;
+  int get starRating => _starRating ?? 4;
+  bool get isRecommended => _isRecommended ?? true;
+  bool get isPopular => _isPopular ?? (rating >= 4.5);
 
   // ---------------------------------------------------------------------------
   // SERIALIZATION

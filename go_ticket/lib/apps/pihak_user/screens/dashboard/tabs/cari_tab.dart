@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../../core/services/hotel_service.dart';
+import 'package:go_ticket/core/services/hotel_service.dart';
 import '../../../router/customer_router.dart';
 
 /// Tab Cari: Halaman hasil pencarian hotel seperti screenshot
@@ -209,13 +209,16 @@ class _CariTabState extends State<CariTab> {
           _buildFilterBar(),
           _buildResultsInfo(),
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              itemCount: _hotels.length,
-              itemBuilder: (context, index) {
-                return _buildHotelCard(_hotels[index]);
-              },
-            ),
+            child: _isLoading && _hotels.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.builder(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    itemCount: _hotels.length,
+                    itemBuilder: (context, index) {
+                      return _buildHotelCard(_hotels[index]);
+                    },
+                  ),
           ),
         ],
       ),

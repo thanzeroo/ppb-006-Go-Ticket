@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 
 import '../config/supabase_config.dart';
-import '../models/hotel_model.dart';
 import '../models/payout_model.dart';
 import '../models/user_model.dart';
 import 'mock_data.dart';
@@ -25,11 +24,11 @@ class SuperAdminService {
             await sb.table(SupabaseConfig.tableBooking)?.count();
 
         return {
-          'totalUsers': usersCount?.count ?? MockData.users.length,
-          'totalHotels': hotelsCount?.count ?? MockData.hotels.length,
-          'totalBookings': bookingsCount?.count ?? MockData.bookings.length,
+          'totalUsers': usersCount ?? MockData.users.length,
+          'totalHotels': hotelsCount ?? MockData.hotels.length,
+          'totalBookings': bookingsCount ?? MockData.bookings.length,
           'totalRevenue': 124500000,
-          'activePartners': hotelsCount?.count ?? 20,
+          'activePartners': hotelsCount ?? 20,
         };
       } catch (e) {
         debugPrint('⚠️ [SuperAdminService] getPlatformStats error: $e');
@@ -131,7 +130,7 @@ class SuperAdminService {
     if (sb.isReady) {
       try {
         final parsedId = int.tryParse(payoutId);
-        final statusStr = newStatus == PayoutStatus.approved
+        final statusStr = newStatus == PayoutStatus.completed
             ? 'disetujui'
             : (newStatus == PayoutStatus.rejected ? 'ditolak' : 'menunggu');
 

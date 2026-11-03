@@ -23,6 +23,9 @@ enum PayoutStatus {
 
   /// Payout ditolak oleh Super Admin (dengan alasan)
   rejected,
+
+  /// Payout disetujui
+  approved,
 }
 
 /// Extension untuk PayoutStatus
@@ -34,6 +37,7 @@ extension PayoutStatusExtension on PayoutStatus {
       case PayoutStatus.processing:
         return 'processing';
       case PayoutStatus.completed:
+      case PayoutStatus.approved:
         return 'completed';
       case PayoutStatus.rejected:
         return 'rejected';
@@ -45,8 +49,11 @@ extension PayoutStatusExtension on PayoutStatus {
       case 'processing':
         return PayoutStatus.processing;
       case 'completed':
+      case 'approved':
+      case 'disetujui':
         return PayoutStatus.completed;
       case 'rejected':
+      case 'ditolak':
         return PayoutStatus.rejected;
       default:
         return PayoutStatus.pending;
@@ -60,7 +67,8 @@ extension PayoutStatusExtension on PayoutStatus {
       case PayoutStatus.processing:
         return 'Sedang Diproses';
       case PayoutStatus.completed:
-        return 'Dana Diterima';
+      case PayoutStatus.approved:
+        return 'Selesai / Disetujui';
       case PayoutStatus.rejected:
         return 'Ditolak';
     }
@@ -142,31 +150,49 @@ class PayoutModel {
   /// Tanggal payout diproses / selesai
   final DateTime? processedAt;
 
-  const PayoutModel({
+  static final DateTime _defaultDate = DateTime(2026, 1, 1);
+
+  PayoutModel({
     required this.id,
     required this.hotelId,
     required this.hotelName,
-    required this.requestedById,
-    required this.requestedByName,
-    required this.periodStart,
-    required this.periodEnd,
-    required this.grossRevenue,
-    required this.commissionPercent,
-    required this.commissionAmount,
-    required this.netAmount,
-    required this.requestedAmount,
+    this.requestedById = 'usr-admin-01',
+    this.requestedByName = 'Admin Hotel',
+    DateTime? periodStart,
+    DateTime? periodEnd,
+    int? grossRevenue,
+    this.commissionPercent = 10,
+    int? commissionAmount,
+    int? netAmount,
+    int? requestedAmount,
+    int? amount,
     required this.bankName,
-    required this.bankAccountName,
-    required this.bankAccountNumber,
-    required this.createdAt,
+    String? bankAccountName,
+    String? accountHolderName,
+    String? bankAccountNumber,
+    String? accountNumber,
+    DateTime? createdAt,
+    DateTime? requestedAt,
     this.status = PayoutStatus.pending,
     this.notes,
     this.rejectionReason,
-    this.transferTransactionId,
+    String? transferTransactionId,
+    String? referenceNumber,
     this.transferProofUrl,
     this.processedById,
     this.processedAt,
-  });
+  })  : requestedAmount = requestedAmount ?? amount ?? 0,
+        grossRevenue = grossRevenue ?? requestedAmount ?? amount ?? 0,
+        commissionAmount = commissionAmount ?? 0,
+        netAmount = netAmount ?? requestedAmount ?? amount ?? 0,
+        bankAccountName =
+            bankAccountName ?? accountHolderName ?? 'PT Mitra Hotel',
+        bankAccountNumber =
+            bankAccountNumber ?? accountNumber ?? '0000000000',
+        createdAt = createdAt ?? requestedAt ?? _defaultDate,
+        transferTransactionId = transferTransactionId ?? referenceNumber,
+        periodStart = periodStart ?? _defaultDate,
+        periodEnd = periodEnd ?? _defaultDate;
 
   int get amount => requestedAmount;
   String get accountNumber => bankAccountNumber;
@@ -183,7 +209,7 @@ class PayoutModel {
       if (val == null) return PayoutStatus.pending;
       final s = val.toString().toLowerCase();
       if (s == 'disetujui' || s == 'approved' || s == 'selesai') {
-        return PayoutStatus.approved;
+        return PayoutStatus.completed;
       }
       if (s == 'ditolak' || s == 'rejected') return PayoutStatus.rejected;
       if (s == 'diproses' || s == 'processing') return PayoutStatus.processing;
@@ -269,6 +295,7 @@ class PayoutModel {
     PayoutStatus? status,
     String? rejectionReason,
     String? transferTransactionId,
+    String? referenceNumber,
     String? transferProofUrl,
     String? processedById,
     DateTime? processedAt,
@@ -294,7 +321,7 @@ class PayoutModel {
       notes: notes,
       rejectionReason: rejectionReason ?? this.rejectionReason,
       transferTransactionId:
-          transferTransactionId ?? this.transferTransactionId,
+          referenceNumber ?? transferTransactionId ?? this.transferTransactionId,
       transferProofUrl: transferProofUrl ?? this.transferProofUrl,
       processedById: processedById ?? this.processedById,
       processedAt: processedAt ?? this.processedAt,

@@ -52,19 +52,23 @@ class StaffData {
   final List<String> akses;
   final String wa;
   final String avatarUrl;
+  final String? shift;
+  final String? status;
 
   const StaffData({
     required this.name,
     required this.id,
     required this.role,
-    required this.statusLabel,
-    required this.statusBg,
-    required this.statusFg,
-    required this.onlineDotColor,
-    required this.akses,
-    required this.wa,
+    String? statusLabel,
+    this.statusBg = const Color(0xFFDCFCE7),
+    this.statusFg = const Color(0xFF16A34A),
+    this.onlineDotColor = const Color(0xFF22C55E),
+    this.akses = const ['Check-in', 'Check-out'],
+    this.wa = '081234567890',
     required this.avatarUrl,
-  });
+    this.shift,
+    this.status,
+  }) : statusLabel = statusLabel ?? status ?? 'Aktif Bertugas';
 }
 
 class TransactionData {

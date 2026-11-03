@@ -3,8 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:go_ticket/core/models/booking_args.dart';
-import '../../../../core/models/hotel_model.dart';
-import '../../../../core/services/hotel_service.dart';
+import 'package:go_ticket/core/models/hotel_model.dart';
+import 'package:go_ticket/core/services/hotel_service.dart';
 import '../../../router/customer_router.dart';
 import '../customer_dashboard_screen.dart';
 

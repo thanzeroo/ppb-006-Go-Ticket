@@ -146,18 +146,23 @@ class RoomModel {
     required this.maxGuests,
     this.description,
     this.bedType,
-    this.areaM2,
+    double? areaM2,
+    double? roomSizeM2,
     this.weekendPrice,
     this.peakSeasonPrice,
     this.discountPercent = 0,
-    this.facilities = const [],
+    List<String> facilities = const [],
+    List<String>? amenities,
     this.mainImageUrl,
-    this.imageUrls = const [],
+    List<String> imageUrls = const [],
+    List<String>? photoUrls,
     this.status = RoomStatus.available,
     this.floorNumber,
     this.freeCancellation = true,
     this.statusUpdatedAt,
-  });
+  })  : areaM2 = areaM2 ?? roomSizeM2,
+        facilities = amenities ?? facilities,
+        imageUrls = photoUrls ?? imageUrls;
 
   // ---------------------------------------------------------------------------
   // CONVENIENCE GETTERS
