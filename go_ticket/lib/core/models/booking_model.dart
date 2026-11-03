@@ -206,29 +206,42 @@ class BookingModel {
   /// Tanggal booking dibuat
   final DateTime? createdAt;
 
+  final String? _hotelAddress;
+  final String? _hotelImageUrl;
+  final String? _guestEmail;
+  final int? _totalRooms;
+  final int? _taxAndServiceFee;
+
   const BookingModel({
     required this.id,
     required this.bookingCode,
-    required this.customerId,
-    required this.customerName,
+    String? customerId,
+    String? userId,
+    String? customerName,
+    String? guestName,
     required this.hotelId,
     required this.hotelName,
     required this.roomId,
     required this.roomTypeName,
     required this.checkInDate,
     required this.checkOutDate,
-    required this.totalNights,
-    required this.guestCount,
+    int? totalNights,
+    int? nights,
+    int? guestCount,
+    int? totalGuests,
     required this.pricePerNight,
-    required this.subtotal,
-    required this.totalAmount,
-    this.customerPhone,
+    int? subtotal,
+    int? subtotalPrice,
+    int? totalAmount,
+    int? totalPrice,
+    String? customerPhone,
+    String? guestPhoneNumber,
     this.roomNumber,
     this.specialRequest,
     this.discountAmount = 0,
     this.promoCode,
     this.paymentMethod,
-    this.paymentStatus,
+    String? paymentStatus,
     this.paymentTransactionId,
     this.paymentProofUrl,
     this.paidAt,
@@ -239,41 +252,131 @@ class BookingModel {
     this.checkoutNotes,
     this.hasReviewed = false,
     this.createdAt,
-  });
+    String? hotelAddress,
+    String? hotelImageUrl,
+    String? guestEmail,
+    int? totalRooms,
+    int? taxAndServiceFee,
+    bool? isPaid,
+  })  : customerId = customerId ?? userId ?? '',
+        customerName = customerName ?? guestName ?? '',
+        customerPhone = customerPhone ?? guestPhoneNumber,
+        totalNights = totalNights ?? nights ?? 1,
+        guestCount = guestCount ?? totalGuests ?? 1,
+        subtotal = subtotal ?? subtotalPrice ?? 0,
+        totalAmount = totalAmount ?? totalPrice ?? 0,
+        paymentStatus = isPaid == true ? 'paid' : paymentStatus,
+        _hotelAddress = hotelAddress,
+        _hotelImageUrl = hotelImageUrl,
+        _guestEmail = guestEmail,
+        _totalRooms = totalRooms,
+        _taxAndServiceFee = taxAndServiceFee;
+
+  String get userId => customerId;
+  String get guestName => customerName;
+  String? get guestPhoneNumber => customerPhone;
+  String? get guestEmail => _guestEmail ?? 'customer@goticket.id';
+  String? get hotelAddress => _hotelAddress ?? 'Jl. Penginapan, Malang';
+  String? get hotelImageUrl =>
+      _hotelImageUrl ??
+      'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600';
+  int get nights => totalNights;
+  int get totalGuests => guestCount;
+  int get totalRooms => _totalRooms ?? 1;
+  int get totalPrice => totalAmount;
+  int get subtotalPrice => subtotal;
+  int get taxAndServiceFee => _taxAndServiceFee ?? (totalAmount * 0.1).round();
+  bool get isPaid =>
+      paymentStatus == 'paid' ||
+      paidAt != null ||
+      status != BookingStatus.pendingPayment;
+  DateTime? get checkedInAt => actualCheckInTime;
+  DateTime? get checkedOutAt => actualCheckOutTime;
 
   // ---------------------------------------------------------------------------
   // SERIALIZATION
   // ---------------------------------------------------------------------------
 
   factory BookingModel.fromJson(Map<String, dynamic> json) {
+    BookingStatus parseBookingStatus(dynamic val) {
+      if (val == null) return BookingStatus.confirmed;
+      final s = val.toString().toLowerCase();
+      if (s == 'confirmed' || s == 'dikonfirmasi') return BookingStatus.confirmed;
+      if (s == 'checked_in' || s == 'checkin') return BookingStatus.checkedIn;
+      if (s == 'checked_out' || s == 'checkout') return BookingStatus.checkedOut;
+      if (s == 'cancelled' || s == 'batal') return BookingStatus.cancelled;
+      if (s == 'pending') return BookingStatus.pendingPayment;
+      return BookingStatusExtension.fromString(s);
+    }
+
+    final ciStr = json['check_in_date'] ?? json['tgl_checkin'];
+    final coStr = json['check_out_date'] ?? json['tgl_checkout'];
+
     return BookingModel(
-      id: json['id']?.toString() ?? '',
-      bookingCode: json['booking_code'] ?? '',
-      customerId: json['customer_id']?.toString() ?? '',
-      customerName: json['customer_name'] ?? '',
-      customerPhone: json['customer_phone'],
-      hotelId: json['hotel_id']?.toString() ?? '',
-      hotelName: json['hotel_name'] ?? '',
-      roomId: json['room_id']?.toString() ?? '',
-      roomTypeName: json['room_type_name'] ?? '',
-      roomNumber: json['room_number'],
-      checkInDate: DateTime.parse(json['check_in_date']),
-      checkOutDate: DateTime.parse(json['check_out_date']),
-      totalNights: json['total_nights'] ?? 1,
-      guestCount: json['guest_count'] ?? 1,
-      specialRequest: json['special_request'],
-      pricePerNight: json['price_per_night'] ?? 0,
-      subtotal: json['subtotal'] ?? 0,
-      discountAmount: json['discount_amount'] ?? 0,
-      promoCode: json['promo_code'],
-      totalAmount: json['total_amount'] ?? 0,
-      paymentMethod: json['payment_method'],
-      paymentStatus: json['payment_status'],
+      id: json['id']?.toString() ?? json['id_booking']?.toString() ?? '',
+      bookingCode: json['booking_code'] ??
+          json['kode_booking'] ??
+          'GT-BKG-${json['id_booking'] ?? '0000'}',
+      customerId:
+          json['customer_id']?.toString() ?? json['id_user']?.toString() ?? '',
+      customerName: json['customer_name'] ??
+          json['guest_name'] ??
+          (json['users'] != null
+              ? json['users']['nama_lengkap']
+              : 'Tamu Go Ticket'),
+      customerPhone: json['customer_phone'] ?? json['guest_phone_number'],
+      hotelId: json['hotel_id']?.toString() ??
+          json['id_penginapan']?.toString() ??
+          '',
+      hotelName: json['hotel_name'] ??
+          (json['mitra_penginapan'] != null
+              ? json['mitra_penginapan']['nama_properti']
+              : 'Aruna Stay'),
+      roomId: json['room_id']?.toString() ??
+          json['id_tipe_kamar']?.toString() ??
+          '',
+      roomTypeName: json['room_type_name'] ??
+          (json['tipe_kamar'] != null
+              ? json['tipe_kamar']['nama_tipe']
+              : 'Standard Room'),
+      roomNumber: json['room_number'] ??
+          (json['kamar'] != null ? json['kamar']['nomor_kamar'] : '101'),
+      checkInDate: ciStr != null
+          ? (DateTime.tryParse(ciStr) ?? DateTime.now())
+          : DateTime.now(),
+      checkOutDate: coStr != null
+          ? (DateTime.tryParse(coStr) ??
+              DateTime.now().add(const Duration(days: 1)))
+          : DateTime.now().add(const Duration(days: 1)),
+      totalNights: json['total_nights'] ?? json['jml_malam'] ?? 1,
+      guestCount: json['guest_count'] ??
+          ((json['jml_dewasa'] as num? ?? 1) +
+                  (json['jml_anak'] as num? ?? 0))
+              .toInt(),
+      specialRequest: json['special_request'] ?? json['permintaan_khusus'],
+      pricePerNight: (json['price_per_night'] as num?)?.toInt() ?? 250000,
+      subtotal: (json['subtotal'] as num?)?.toInt() ??
+          (json['total_harga'] as num?)?.toInt() ??
+          0,
+      discountAmount: (json['discount_amount'] as num?)?.toInt() ??
+          (json['potongan_diskon'] as num?)?.toInt() ??
+          0,
+      promoCode: json['promo_code'] ??
+          (json['id_promo'] != null ? 'PROMO-${json['id_promo']}' : null),
+      totalAmount: (json['total_amount'] as num?)?.toInt() ??
+          (json['total_harga'] as num?)?.toInt() ??
+          0,
+      paymentMethod: json['payment_method'] ?? 'QRIS / Virtual Account',
+      paymentStatus: json['payment_status'] ?? 'paid',
       paymentTransactionId: json['payment_transaction_id'],
       paymentProofUrl: json['payment_proof_url'],
-      paidAt: json['paid_at'] != null ? DateTime.tryParse(json['paid_at']) : null,
-      status: BookingStatusExtension.fromString(json['status'] ?? 'pending_payment'),
-      qrCodeData: json['qr_code_data'],
+      paidAt: json['paid_at'] != null
+          ? DateTime.tryParse(json['paid_at'])
+          : (json['tgl_booking'] != null
+              ? DateTime.tryParse(json['tgl_booking'])
+              : null),
+      status: parseBookingStatus(json['status_booking'] ?? json['status']),
+      qrCodeData: json['qr_code_data'] ?? json['kode_booking'],
       actualCheckInTime: json['actual_check_in_time'] != null
           ? DateTime.tryParse(json['actual_check_in_time'])
           : null,
@@ -284,7 +387,9 @@ class BookingModel {
       hasReviewed: json['has_reviewed'] ?? false,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'])
-          : null,
+          : (json['tgl_booking'] != null
+              ? DateTime.tryParse(json['tgl_booking'])
+              : null),
     );
   }
 
@@ -311,26 +416,56 @@ class BookingModel {
     };
   }
 
-  BookingModel copyWith({BookingStatus? status, bool? hasReviewed, String? qrCodeData}) {
+  BookingModel copyWith({
+    BookingStatus? status,
+    bool? hasReviewed,
+    String? qrCodeData,
+    DateTime? checkedInAt,
+    DateTime? checkedOutAt,
+    DateTime? actualCheckInTime,
+    DateTime? actualCheckOutTime,
+    bool? isPaid,
+    DateTime? paidAt,
+    String? paymentStatus,
+    String? roomNumber,
+  }) {
     return BookingModel(
       id: id,
       bookingCode: bookingCode,
       customerId: customerId,
       customerName: customerName,
+      customerPhone: customerPhone,
       hotelId: hotelId,
       hotelName: hotelName,
       roomId: roomId,
       roomTypeName: roomTypeName,
+      roomNumber: roomNumber ?? this.roomNumber,
       checkInDate: checkInDate,
       checkOutDate: checkOutDate,
       totalNights: totalNights,
       guestCount: guestCount,
+      specialRequest: specialRequest,
       pricePerNight: pricePerNight,
       subtotal: subtotal,
+      discountAmount: discountAmount,
+      promoCode: promoCode,
       totalAmount: totalAmount,
+      paymentMethod: paymentMethod,
+      paymentStatus: isPaid == true
+          ? 'paid'
+          : (paymentStatus ?? this.paymentStatus),
+      paymentTransactionId: paymentTransactionId,
+      paymentProofUrl: paymentProofUrl,
+      paidAt: paidAt ?? this.paidAt,
       status: status ?? this.status,
-      hasReviewed: hasReviewed ?? this.hasReviewed,
       qrCodeData: qrCodeData ?? this.qrCodeData,
+      actualCheckInTime:
+          checkedInAt ?? actualCheckInTime ?? this.actualCheckInTime,
+      actualCheckOutTime:
+          checkedOutAt ?? actualCheckOutTime ?? this.actualCheckOutTime,
+      checkoutNotes: checkoutNotes,
+      hasReviewed: hasReviewed ?? this.hasReviewed,
+      createdAt: createdAt,
     );
   }
 

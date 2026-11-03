@@ -146,18 +146,23 @@ class RoomModel {
     required this.maxGuests,
     this.description,
     this.bedType,
-    this.areaM2,
+    double? areaM2,
+    double? roomSizeM2,
     this.weekendPrice,
     this.peakSeasonPrice,
     this.discountPercent = 0,
-    this.facilities = const [],
+    List<String> facilities = const [],
+    List<String>? amenities,
     this.mainImageUrl,
-    this.imageUrls = const [],
+    List<String> imageUrls = const [],
+    List<String>? photoUrls,
     this.status = RoomStatus.available,
     this.floorNumber,
     this.freeCancellation = true,
     this.statusUpdatedAt,
-  });
+  })  : areaM2 = areaM2 ?? roomSizeM2,
+        facilities = amenities ?? facilities,
+        imageUrls = photoUrls ?? imageUrls;
 
   // ---------------------------------------------------------------------------
   // CONVENIENCE GETTERS
@@ -176,35 +181,72 @@ class RoomModel {
   String get displayImage =>
       mainImageUrl ?? 'https://via.placeholder.com/400x300?text=Room+$roomNumber';
 
+  List<String> get photoUrls => imageUrls;
+  List<String> get amenities => facilities;
+  double? get roomSizeM2 => areaM2;
+
   // ---------------------------------------------------------------------------
   // SERIALIZATION
   // ---------------------------------------------------------------------------
 
   factory RoomModel.fromJson(Map<String, dynamic> json) {
+    RoomStatus parseStatus(dynamic val) {
+      if (val == null) return RoomStatus.available;
+      final s = val.toString().toLowerCase();
+      if (s == 'tersedia' || s == 'available') return RoomStatus.available;
+      if (s == 'terisi' || s == 'occupied') return RoomStatus.occupied;
+      if (s == 'kotor' || s == 'dirty') return RoomStatus.dirty;
+      if (s == 'dibersihkan' || s == 'cleaning') return RoomStatus.cleaning;
+      if (s == 'maintenance') return RoomStatus.maintenance;
+      return RoomStatusExtension.fromString(s);
+    }
+
     return RoomModel(
-      id: json['id']?.toString() ?? '',
-      hotelId: json['hotel_id']?.toString() ?? '',
-      roomNumber: json['room_number'] ?? '',
-      typeName: json['type_name'] ?? json['type'] ?? '',
-      pricePerNight: json['price_per_night'] ?? 0,
-      maxGuests: json['max_guests'] ?? 2,
-      description: json['description'],
-      bedType: json['bed_type'],
-      areaM2: (json['area_m2'] as num?)?.toDouble(),
-      weekendPrice: json['weekend_price'],
-      peakSeasonPrice: json['peak_season_price'],
+      id: json['id']?.toString() ??
+          json['id_kamar']?.toString() ??
+          json['id_tipe_kamar']?.toString() ??
+          '',
+      hotelId: json['hotel_id']?.toString() ??
+          json['id_penginapan']?.toString() ??
+          '',
+      roomNumber: json['room_number'] ??
+          json['nomor_kamar'] ??
+          json['nama_tipe'] ??
+          '101',
+      typeName: json['type_name'] ?? json['nama_tipe'] ?? json['type'] ?? '',
+      pricePerNight: (json['price_per_night'] as num?)?.toInt() ??
+          (json['harga_dasar'] as num?)?.toInt() ??
+          250000,
+      maxGuests: json['max_guests'] ?? json['kapasitas_tamu'] ?? 2,
+      description: json['description'] ?? json['fasilitas_kamar'],
+      bedType: json['bed_type'] ?? json['tipe_bed'],
+      areaM2: (json['area_m2'] as num?)?.toDouble() ??
+          (json['luas_m2'] as num?)?.toDouble(),
+      weekendPrice: (json['weekend_price'] as num?)?.toInt() ??
+          (json['harga_weekend'] as num?)?.toInt(),
+      peakSeasonPrice: (json['peak_season_price'] as num?)?.toInt(),
       discountPercent: json['discount_percent'] ?? 0,
       facilities: (json['facilities'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
-          [],
-      mainImageUrl: json['main_image_url'] ?? json['image'],
+          (json['amenities'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const ['WiFi', 'AC', 'TV', 'Shower Air Hangat'],
+      mainImageUrl: json['main_image_url'] ??
+          json['image'] ??
+          'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=600',
       imageUrls: (json['image_urls'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
-          [],
-      status: RoomStatusExtension.fromString(json['status'] ?? 'available'),
-      floorNumber: json['floor_number'],
+          (json['photo_urls'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [
+            'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800'
+          ],
+      status: parseStatus(json['status_kamar'] ?? json['status']),
+      floorNumber: json['floor_number'] ?? json['lantai'],
       freeCancellation: json['free_cancellation'] ?? true,
       statusUpdatedAt: json['status_updated_at'] != null
           ? DateTime.tryParse(json['status_updated_at'])

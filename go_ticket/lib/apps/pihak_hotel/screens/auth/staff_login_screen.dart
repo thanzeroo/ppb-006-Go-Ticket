@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/models/user_model.dart';
+import '../../../../core/services/auth_service.dart';
 import '../administrator/administrator_dashboard_screen.dart';
 import '../front_office/fo_dashboard_screen.dart';
 import '../maintenance/maintenance_dashboard_screen.dart';
@@ -66,29 +68,54 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
 
   Future<void> _submitLogin() async {
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 800));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+    try {
+      final UserRole role;
+      final String idOrEmail;
+      final String password;
 
-    if (_selectedRoleIndex == 0) {
-      if (_selectedStaffRole == 0) {
-        // Role Staf (Front Office) -> Masuk ke FO Dashboard
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const FoDashboardScreen()),
-        );
+      if (_selectedRoleIndex == 0) {
+        idOrEmail = _staffIdController.text.trim();
+        password = _staffPasswordController.text;
+        role = _selectedStaffRole == 0 ? UserRole.staffFo : UserRole.maintenance;
       } else {
-        // Role Maintenance -> Masuk ke Maintenance Dashboard
+        idOrEmail = _adminIdController.text.trim();
+        password = _adminPasswordController.text;
+        role = UserRole.adminHotel;
+      }
+
+      await AuthService.instance.loginHotelStaff(
+        staffIdOrEmail: idOrEmail,
+        password: password,
+        role: role,
+        shift: _selectedShift,
+      );
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      if (_selectedRoleIndex == 0) {
+        if (_selectedStaffRole == 0) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const FoDashboardScreen()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const MaintenanceDashboardScreen()),
+          );
+        }
+      } else {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const MaintenanceDashboardScreen()),
+          MaterialPageRoute(builder: (_) => const AdministratorDashboardScreen()),
         );
       }
-    } else {
-      // Role Administrator -> Langsung masuk ke Dashboard Administrator Hotel
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const AdministratorDashboardScreen()),
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Login gagal: $e')),
       );
     }
   }

@@ -23,6 +23,9 @@ enum PayoutStatus {
 
   /// Payout ditolak oleh Super Admin (dengan alasan)
   rejected,
+
+  /// Payout disetujui
+  approved,
 }
 
 /// Extension untuk PayoutStatus
@@ -34,6 +37,7 @@ extension PayoutStatusExtension on PayoutStatus {
       case PayoutStatus.processing:
         return 'processing';
       case PayoutStatus.completed:
+      case PayoutStatus.approved:
         return 'completed';
       case PayoutStatus.rejected:
         return 'rejected';
@@ -45,8 +49,11 @@ extension PayoutStatusExtension on PayoutStatus {
       case 'processing':
         return PayoutStatus.processing;
       case 'completed':
+      case 'approved':
+      case 'disetujui':
         return PayoutStatus.completed;
       case 'rejected':
+      case 'ditolak':
         return PayoutStatus.rejected;
       default:
         return PayoutStatus.pending;
@@ -60,7 +67,8 @@ extension PayoutStatusExtension on PayoutStatus {
       case PayoutStatus.processing:
         return 'Sedang Diproses';
       case PayoutStatus.completed:
-        return 'Dana Diterima';
+      case PayoutStatus.approved:
+        return 'Selesai / Disetujui';
       case PayoutStatus.rejected:
         return 'Ditolak';
     }
@@ -142,60 +150,120 @@ class PayoutModel {
   /// Tanggal payout diproses / selesai
   final DateTime? processedAt;
 
-  const PayoutModel({
+  static final DateTime _defaultDate = DateTime(2026, 1, 1);
+
+  PayoutModel({
     required this.id,
     required this.hotelId,
     required this.hotelName,
-    required this.requestedById,
-    required this.requestedByName,
-    required this.periodStart,
-    required this.periodEnd,
-    required this.grossRevenue,
-    required this.commissionPercent,
-    required this.commissionAmount,
-    required this.netAmount,
-    required this.requestedAmount,
+    this.requestedById = 'usr-admin-01',
+    this.requestedByName = 'Admin Hotel',
+    DateTime? periodStart,
+    DateTime? periodEnd,
+    int? grossRevenue,
+    this.commissionPercent = 10,
+    int? commissionAmount,
+    int? netAmount,
+    int? requestedAmount,
+    int? amount,
     required this.bankName,
-    required this.bankAccountName,
-    required this.bankAccountNumber,
-    required this.createdAt,
+    String? bankAccountName,
+    String? accountHolderName,
+    String? bankAccountNumber,
+    String? accountNumber,
+    DateTime? createdAt,
+    DateTime? requestedAt,
     this.status = PayoutStatus.pending,
     this.notes,
     this.rejectionReason,
-    this.transferTransactionId,
+    String? transferTransactionId,
+    String? referenceNumber,
     this.transferProofUrl,
     this.processedById,
     this.processedAt,
-  });
+  })  : requestedAmount = requestedAmount ?? amount ?? 0,
+        grossRevenue = grossRevenue ?? requestedAmount ?? amount ?? 0,
+        commissionAmount = commissionAmount ?? 0,
+        netAmount = netAmount ?? requestedAmount ?? amount ?? 0,
+        bankAccountName =
+            bankAccountName ?? accountHolderName ?? 'PT Mitra Hotel',
+        bankAccountNumber =
+            bankAccountNumber ?? accountNumber ?? '0000000000',
+        createdAt = createdAt ?? requestedAt ?? _defaultDate,
+        transferTransactionId = transferTransactionId ?? referenceNumber,
+        periodStart = periodStart ?? _defaultDate,
+        periodEnd = periodEnd ?? _defaultDate;
+
+  int get amount => requestedAmount;
+  String get accountNumber => bankAccountNumber;
+  String get accountHolderName => bankAccountName;
+  DateTime get requestedAt => createdAt;
+  String? get referenceNumber => transferTransactionId;
 
   // ---------------------------------------------------------------------------
   // SERIALIZATION
   // ---------------------------------------------------------------------------
 
   factory PayoutModel.fromJson(Map<String, dynamic> json) {
+    PayoutStatus parseStatus(dynamic val) {
+      if (val == null) return PayoutStatus.pending;
+      final s = val.toString().toLowerCase();
+      if (s == 'disetujui' || s == 'approved' || s == 'selesai') {
+        return PayoutStatus.completed;
+      }
+      if (s == 'ditolak' || s == 'rejected') return PayoutStatus.rejected;
+      if (s == 'diproses' || s == 'processing') return PayoutStatus.processing;
+      return PayoutStatusExtension.fromString(s);
+    }
+
+    final now = DateTime.now();
+    final pStartStr = json['period_start'] ?? json['tgl_pengajuan'];
+    final pEndStr = json['period_end'] ?? json['tgl_jatuh_tempo'];
+    final cAtStr = json['created_at'] ?? json['tgl_pengajuan'];
+
     return PayoutModel(
-      id: json['id']?.toString() ?? '',
-      hotelId: json['hotel_id']?.toString() ?? '',
-      hotelName: json['hotel_name'] ?? '',
-      requestedById: json['requested_by_id']?.toString() ?? '',
-      requestedByName: json['requested_by_name'] ?? '',
-      periodStart: DateTime.parse(json['period_start']),
-      periodEnd: DateTime.parse(json['period_end']),
-      grossRevenue: json['gross_revenue'] ?? 0,
-      commissionPercent: (json['commission_percent'] as num?)?.toDouble() ?? 10.0,
-      commissionAmount: json['commission_amount'] ?? 0,
-      netAmount: json['net_amount'] ?? 0,
-      requestedAmount: json['requested_amount'] ?? 0,
-      status: PayoutStatusExtension.fromString(json['status'] ?? 'pending'),
-      bankName: json['bank_name'] ?? '',
-      bankAccountName: json['bank_account_name'] ?? '',
-      bankAccountNumber: json['bank_account_number'] ?? '',
-      notes: json['notes'],
+      id: json['id']?.toString() ?? json['id_monitoring']?.toString() ?? '',
+      hotelId: json['hotel_id']?.toString() ??
+          json['id_penginapan']?.toString() ??
+          '',
+      hotelName: json['hotel_name'] ?? 'Mitra Penginapan',
+      requestedById: json['requested_by_id']?.toString() ??
+          json['disetujui_oleh']?.toString() ??
+          '1',
+      requestedByName: json['requested_by_name'] ?? 'Owner Penginapan',
+      periodStart: pStartStr != null
+          ? (DateTime.tryParse(pStartStr) ?? now)
+          : now.subtract(const Duration(days: 30)),
+      periodEnd: pEndStr != null ? (DateTime.tryParse(pEndStr) ?? now) : now,
+      grossRevenue: (json['gross_revenue'] as num?)?.toInt() ??
+          (json['nominal_gross'] as num?)?.toInt() ??
+          0,
+      commissionPercent:
+          (json['commission_percent'] as num?)?.toDouble() ?? 10.0,
+      commissionAmount: (json['commission_amount'] as num?)?.toInt() ??
+          (json['komisi_platform'] as num?)?.toInt() ??
+          0,
+      netAmount: (json['net_amount'] as num?)?.toInt() ??
+          (json['nominal_netto'] as num?)?.toInt() ??
+          0,
+      requestedAmount: (json['requested_amount'] as num?)?.toInt() ??
+          (json['nominal_netto'] as num?)?.toInt() ??
+          (json['nominal_gross'] as num?)?.toInt() ??
+          0,
+      status: parseStatus(json['status_dana'] ?? json['status']),
+      bankName: json['bank_name'] ?? json['metode_pencairan'] ?? 'BCA',
+      bankAccountName:
+          json['bank_account_name'] ?? 'PT Mitra Penginapan Nusantara',
+      bankAccountNumber:
+          json['bank_account_number'] ?? '8830192841',
+      notes: json['notes'] ?? json['keterangan'],
       rejectionReason: json['rejection_reason'],
-      transferTransactionId: json['transfer_transaction_id'],
+      transferTransactionId:
+          json['transfer_transaction_id'] ?? json['no_referensi_payout'],
       transferProofUrl: json['transfer_proof_url'],
-      processedById: json['processed_by_id']?.toString(),
-      createdAt: DateTime.parse(json['created_at']),
+      processedById: json['processed_by_id']?.toString() ??
+          json['disetujui_oleh']?.toString(),
+      createdAt: cAtStr != null ? (DateTime.tryParse(cAtStr) ?? now) : now,
       processedAt: json['processed_at'] != null
           ? DateTime.tryParse(json['processed_at'])
           : null,
@@ -227,6 +295,7 @@ class PayoutModel {
     PayoutStatus? status,
     String? rejectionReason,
     String? transferTransactionId,
+    String? referenceNumber,
     String? transferProofUrl,
     String? processedById,
     DateTime? processedAt,
@@ -252,7 +321,7 @@ class PayoutModel {
       notes: notes,
       rejectionReason: rejectionReason ?? this.rejectionReason,
       transferTransactionId:
-          transferTransactionId ?? this.transferTransactionId,
+          referenceNumber ?? transferTransactionId ?? this.transferTransactionId,
       transferProofUrl: transferProofUrl ?? this.transferProofUrl,
       processedById: processedById ?? this.processedById,
       processedAt: processedAt ?? this.processedAt,

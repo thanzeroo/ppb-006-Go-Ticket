@@ -110,6 +110,41 @@ class StorageHelper {
     return prefs.getString(AppConstants.keyUserRole);
   }
 
+  static Future<String?> getUserName() async {
+    final prefs = await _getPrefs();
+    return prefs.getString('user_name');
+  }
+
+  static Future<String?> getUserEmail() async {
+    final prefs = await _getPrefs();
+    return prefs.getString('user_email');
+  }
+
+  static Future<void> clearAuthData() async {
+    await clearSession();
+  }
+
+  static Future<void> saveTokens({
+    required String accessToken,
+    required String refreshToken,
+  }) async {
+    await saveAccessToken(accessToken);
+    await saveRefreshToken(refreshToken);
+  }
+
+  static Future<void> saveUserData({
+    required String userId,
+    required String fullName,
+    required String email,
+    required String role,
+  }) async {
+    final prefs = await _getPrefs();
+    await prefs.setString('user_id', userId);
+    await prefs.setString('user_name', fullName);
+    await prefs.setString('user_email', email);
+    await prefs.setString(AppConstants.keyUserRole, role);
+  }
+
   /// Menyimpan Hotel ID yang dikelola oleh staff (Hotel Partner app)
   static Future<void> saveManagedHotelId(String hotelId) async {
     final prefs = await _getPrefs();

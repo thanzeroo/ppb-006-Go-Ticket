@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:go_ticket/core/models/booking_args.dart';
+import 'package:go_ticket/core/models/hotel_model.dart';
+import 'package:go_ticket/core/services/hotel_service.dart';
 import '../../../router/customer_router.dart';
 import '../customer_dashboard_screen.dart';
 
@@ -543,32 +545,23 @@ Widget build(BuildContext context) {
     );
   }
 
-  Widget _buildRekomendasiSection() {
-    final hotels = [
-      {
-        'name': 'The Grand Amora Resort & Spa',
-        'location': 'Seminyak, Bali • 400m dari pantai',
-        'rating': '4.9',
-        'reviews': '349',
-        'badge': 'Bintang 5',
-        'price': 'Rp 850.000',
-        'features': ['WiFi Cepat', 'Infinity Pool', 'Sarapan Gratis'],
-        'imageUrl': 'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=400',
-        'tag': null,
-      },
-      {
-        'name': 'The Alila Cliff Sanctuary',
-        'location': 'Uluwatu, Bali • Panorama Tebing Samudra',
-        'rating': '4.8',
-        'reviews': '212',
-        'badge': 'Ocean View',
-        'price': 'Rp 1.450.000',
-        'features': ['Spa Alami', 'Jacuzzi Privat', 'Sunset Lounge'],
-        'imageUrl': 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=400',
-        'tag': null,
-      },
-    ];
+  Map<String, dynamic> _hotelToMap(HotelModel h) {
+    return {
+      'id': h.id,
+      'name': h.name,
+      'location': '${h.city} • ${h.address}',
+      'rating': h.rating.toStringAsFixed(1),
+      'reviews': '${h.reviewCount}',
+      'badge': 'Bintang ${h.starRating}',
+      'price': 'Rp ${h.pricePerNight}',
+      'features': h.amenities,
+      'imageUrl': h.thumbnailUrl ??
+          (h.photoUrls.isNotEmpty ? h.photoUrls.first : ''),
+      'tag': h.isRecommended ? 'Rekomendasi' : null,
+    };
+  }
 
+  Widget _buildRekomendasiSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -588,7 +581,7 @@ Widget build(BuildContext context) {
               TextButton(
                 onPressed: () => CustomerDashboardScreen.tabNotifier.value = 1,
                 child: Text(
-                  'Semua (42)',
+                  'Lihat Semua',
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     color: const Color(0xFF00B4D8),
@@ -600,11 +593,34 @@ Widget build(BuildContext context) {
           ),
         ),
         const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            children: hotels.map((h) => _buildHotelCard(h)).toList(),
-          ),
+        FutureBuilder<List<HotelModel>>(
+          future: HotelService.instance.getFeaturedHotels(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
+            final list = snapshot.data ?? [];
+            if (list.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                child: Center(child: Text('Tidak ada hotel yang tersedia.')),
+              );
+            }
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                children: list
+                    .map((h) => _buildHotelCard(_hotelToMap(h)))
+                    .toList(),
+              ),
+            );
+          },
         ),
       ],
     );

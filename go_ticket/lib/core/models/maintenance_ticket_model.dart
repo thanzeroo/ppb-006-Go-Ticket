@@ -79,6 +79,9 @@ enum MaintenancePriority {
 
   /// Darurat — harus ditangani segera (misal: kebocoran listrik, pipa bocor)
   critical,
+
+  /// Urgent / mendesak
+  urgent,
 }
 
 /// Extension untuk MaintenancePriority
@@ -93,6 +96,8 @@ extension MaintenancePriorityExtension on MaintenancePriority {
         return 'high';
       case MaintenancePriority.critical:
         return 'critical';
+      case MaintenancePriority.urgent:
+        return 'urgent';
     }
   }
 
@@ -104,6 +109,8 @@ extension MaintenancePriorityExtension on MaintenancePriority {
         return MaintenancePriority.high;
       case 'critical':
         return MaintenancePriority.critical;
+      case 'urgent':
+        return MaintenancePriority.urgent;
       default:
         return MaintenancePriority.low;
     }
@@ -119,8 +126,22 @@ extension MaintenancePriorityExtension on MaintenancePriority {
         return 'Tinggi';
       case MaintenancePriority.critical:
         return 'Kritis';
+      case MaintenancePriority.urgent:
+        return 'Mendesak';
     }
   }
+}
+
+typedef TicketPriority = MaintenancePriority;
+typedef TicketStatus = MaintenanceStatus;
+
+class TicketCategory {
+  TicketCategory._();
+  static const String cleaning = 'Kebersihan';
+  static const String repair = 'Perbaikan';
+  static const String plumbing = 'Air/Ledeng';
+  static const String electrical = 'Kelistrikan';
+  static const String ac = 'AC / Pendingin';
 }
 
 // =============================================================================
@@ -198,8 +219,8 @@ class MaintenanceTicketModel {
   const MaintenanceTicketModel({
     required this.id,
     required this.hotelId,
-    required this.reportedById,
-    required this.reportedByName,
+    this.reportedById = 'usr-admin-01',
+    this.reportedByName = 'Admin Hotel',
     required this.title,
     required this.description,
     required this.category,
@@ -225,19 +246,56 @@ class MaintenanceTicketModel {
   // ---------------------------------------------------------------------------
 
   factory MaintenanceTicketModel.fromJson(Map<String, dynamic> json) {
+    MaintenancePriority parsePriority(dynamic val) {
+      if (val == null) return MaintenancePriority.medium;
+      final s = val.toString().toLowerCase();
+      if (s == 'urgent' || s == 'tinggi') return MaintenancePriority.high;
+      if (s == 'rendah' || s == 'low') return MaintenancePriority.low;
+      return MaintenancePriorityExtension.fromString(s);
+    }
+
+    MaintenanceStatus parseStatus(dynamic val) {
+      if (val == null) return MaintenanceStatus.open;
+      final s = val.toString().toLowerCase();
+      if (s == 'selesai' || s == 'bersih' || s == 'resolved') {
+        return MaintenanceStatus.resolved;
+      }
+      if (s == 'dalam_proses' || s == 'in_progress' || s == 'sedang_dibersihkan') {
+        return MaintenanceStatus.inProgress;
+      }
+      return MaintenanceStatusExtension.fromString(s);
+    }
+
+    final cAtStr = json['created_at'] ?? json['tgl_lapor'] ?? json['tgl_tugas'];
+
     return MaintenanceTicketModel(
-      id: json['id']?.toString() ?? '',
-      hotelId: json['hotel_id']?.toString() ?? '',
-      roomId: json['room_id']?.toString(),
-      roomNumber: json['room_number'],
-      reportedById: json['reported_by_id']?.toString() ?? '',
-      reportedByName: json['reported_by_name'] ?? '',
-      title: json['title'] ?? '',
-      description: json['description'] ?? '',
-      category: json['category'] ?? 'Umum',
-      priority: MaintenancePriorityExtension.fromString(
-          json['priority'] ?? 'medium'),
-      status: MaintenanceStatusExtension.fromString(json['status'] ?? 'open'),
+      id: json['id']?.toString() ??
+          json['id_tiket_kerusakan']?.toString() ??
+          json['id_tugas_kebersihan']?.toString() ??
+          '',
+      hotelId: json['hotel_id']?.toString() ?? '1',
+      roomId: json['room_id']?.toString() ?? json['id_kamar']?.toString(),
+      roomNumber: json['room_number'] ??
+          (json['id_kamar'] != null ? 'Kamar ${json['id_kamar']}' : null),
+      reportedById: json['reported_by_id']?.toString() ??
+          json['dilaporkan_oleh']?.toString() ??
+          '1',
+      reportedByName: json['reported_by_name'] ?? 'Staff Ops',
+      title: json['title'] ??
+          json['judul_masalah'] ??
+          (json['id_tugas_kebersihan'] != null
+              ? 'Tugas Kebersihan Kamar'
+              : 'Perbaikan Fasilitas'),
+      description: json['description'] ??
+          json['deskripsi_kerusakan'] ??
+          json['catatan_kebersihan'] ??
+          '',
+      category: json['category'] ??
+          (json['id_tugas_kebersihan'] != null ? 'Kebersihan' : 'Kerusakan'),
+      priority: parsePriority(json['tingkat_prioritas'] ?? json['priority']),
+      status: parseStatus(json['status_perbaikan'] ??
+          json['status_kebersihan'] ??
+          json['status']),
       damagePhotoUrls: (json['damage_photo_urls'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
@@ -246,18 +304,24 @@ class MaintenanceTicketModel {
               ?.map((e) => e.toString())
               .toList() ??
           [],
-      assignedToId: json['assigned_to_id']?.toString(),
-      assignedToName: json['assigned_to_name'],
-      resolutionNotes: json['resolution_notes'],
+      assignedToId: json['assigned_to_id']?.toString() ??
+          json['ditugaskan_ke']?.toString() ??
+          json['id_staf_petugas']?.toString(),
+      assignedToName: json['assigned_to_name'] ?? 'Teknisi Maintenance',
+      resolutionNotes: json['resolution_notes'] ?? json['tindakan_perbaikan'],
       estimatedCost: json['estimated_cost'],
       actualCost: json['actual_cost'],
-      createdAt: DateTime.parse(json['created_at']),
+      createdAt: cAtStr != null
+          ? (DateTime.tryParse(cAtStr) ?? DateTime.now())
+          : DateTime.now(),
       startedAt: json['started_at'] != null
           ? DateTime.tryParse(json['started_at'])
           : null,
       resolvedAt: json['resolved_at'] != null
           ? DateTime.tryParse(json['resolved_at'])
-          : null,
+          : (json['tgl_selesai'] != null
+              ? DateTime.tryParse(json['tgl_selesai'])
+              : null),
       closedAt: json['closed_at'] != null
           ? DateTime.tryParse(json['closed_at'])
           : null,
