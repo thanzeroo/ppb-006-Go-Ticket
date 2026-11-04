@@ -7,6 +7,7 @@ import 'package:go_ticket/core/utils/currency_formatter.dart';
 import 'package:go_ticket/core/widgets/user_avatar.dart';
 import '../../../router/customer_router.dart';
 import '../customer_dashboard_screen.dart';
+import 'pesanan_tab.dart';
 
 enum _HotelSortOrder {
   recommended,
@@ -28,9 +29,10 @@ class _SavedHotelFilters {
 }
 
 /// Tab Saved Hotel (dari halaman Pesanan → tab Saved Hotel)
-/// Digunakan sebagai layar terpisah
 class SavedHotelScreen extends StatefulWidget {
-  const SavedHotelScreen({super.key});
+  final VoidCallback? onSwitchToPemesanan;
+
+  const SavedHotelScreen({super.key, this.onSwitchToPemesanan});
 
   @override
   State<SavedHotelScreen> createState() => _SavedHotelScreenState();
@@ -309,8 +311,9 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
                               const SizedBox(height: 20),
                               ElevatedButton(
                                 onPressed: () {
-                                  CustomerDashboardScreen.tabNotifier.value = 0;
-                                  if (Navigator.canPop(context)) {
+                                  CustomerDashboardScreen.tabNotifier.value = 1;
+                                  if (widget.onSwitchToPemesanan == null &&
+                                      Navigator.canPop(context)) {
                                     Navigator.pop(context);
                                   }
                                 },
@@ -440,7 +443,12 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
       onTap: isSelected
           ? null
           : () {
+              if (widget.onSwitchToPemesanan != null) {
+                widget.onSwitchToPemesanan!();
+                return;
+              }
               CustomerDashboardScreen.tabNotifier.value = 2;
+              PesananTab.subTabNotifier.value = 0;
               if (Navigator.canPop(context)) {
                 Navigator.pop(context);
               } else {
@@ -451,6 +459,7 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
                 );
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   CustomerDashboardScreen.tabNotifier.value = 2;
+                  PesananTab.subTabNotifier.value = 0;
                 });
               }
             },

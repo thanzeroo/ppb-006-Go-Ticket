@@ -10,6 +10,7 @@ import '../../settings/profile_screen.dart';
 import '../../settings/saved_guests_screen.dart';
 import '../../settings/security_screen.dart';
 import '../../settings/voucher_screen.dart';
+import '../customer_dashboard_screen.dart';
 import 'pesanan_tab.dart';
 import 'saved_hotel_screen.dart';
 
@@ -24,8 +25,8 @@ class PengaturanTab extends StatefulWidget {
 class _PengaturanTabState extends State<PengaturanTab> {
   bool _notifEnabled = true;
   String _language = 'Bahasa Indonesia';
-  int _savedGuestsCount = 3;
-  int _savedHotelsCount = 5;
+  int _savedGuestsCount = 0;
+  int _savedHotelsCount = 0;
 
   @override
   void initState() {
@@ -278,7 +279,10 @@ class _PengaturanTabState extends State<PengaturanTab> {
                       icon: Icons.receipt_long_outlined,
                       title: 'Riwayat Pesanan & E-Tiket Saya',
                       subtitle: 'Akses tiket aktif, voucher hotel & invoice',
-                      onTap: () => _go(const PesananTab()),
+                      onTap: () {
+                        PesananTab.subTabNotifier.value = 0;
+                        CustomerDashboardScreen.tabNotifier.value = 2;
+                      },
                     ),
                     const Divider(
                         height: 1, indent: 56, color: Color(0xFFF1F5F9)),
@@ -288,7 +292,10 @@ class _PengaturanTabState extends State<PengaturanTab> {
                       subtitle: 'Daftar villa & resort favorit Anda',
                       badge: '$_savedHotelsCount Hotel',
                       badgeColor: const Color(0xFF00B4D8),
-                      onTap: () => _go(const SavedHotelScreen()),
+                      onTap: () {
+                        PesananTab.subTabNotifier.value = 1;
+                        CustomerDashboardScreen.tabNotifier.value = 2;
+                      },
                     ),
                     const Divider(
                         height: 1, indent: 56, color: Color(0xFFF1F5F9)),

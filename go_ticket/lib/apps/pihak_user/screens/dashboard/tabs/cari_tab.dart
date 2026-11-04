@@ -402,39 +402,49 @@ class _CariTabState extends State<CariTab> {
     final visibleHotels = _visibleHotels;
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
-      body: Column(
+      body: Stack(
         children: [
-          _buildSearchHeader(),
-          _buildFilterBar(),
-          _buildResultsInfo(),
-          Expanded(
-            child: _isLoading && _hotels.isEmpty
-                ? const Center(child: CircularProgressIndicator())
-                : visibleHotels.isEmpty
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(
-                            'Penginapan tidak ditemukan. Ubah kata pencarian atau filter.',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.inter(
-                              color: const Color(0xFF6B7280),
+          Column(
+            children: [
+              _buildSearchHeader(),
+              _buildFilterBar(),
+              _buildResultsInfo(),
+              Expanded(
+                child: _isLoading && _hotels.isEmpty
+                    ? const Center(child: CircularProgressIndicator())
+                    : visibleHotels.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Text(
+                                'Penginapan tidak ditemukan. Ubah kata pencarian atau filter.',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.inter(
+                                  color: const Color(0xFF6B7280),
+                                ),
+                              ),
                             ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                            itemCount: visibleHotels.length,
+                            itemBuilder: (context, index) {
+                              return _buildHotelCard(visibleHotels[index]);
+                            },
                           ),
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        itemCount: visibleHotels.length,
-                        itemBuilder: (context, index) {
-                          return _buildHotelCard(visibleHotels[index]);
-                        },
-                      ),
+              ),
+            ],
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 24,
+            child: Center(
+              child: _buildBottomButtons(),
+            ),
           ),
         ],
       ),
-      bottomSheet: _buildBottomButtons(),
     );
   }
 
@@ -1003,70 +1013,64 @@ class _CariTabState extends State<CariTab> {
         (_filters.maxPrice < 5000000 ? 1 : 0);
 
     return Container(
-      color: Colors.transparent,
-      padding: const EdgeInsets.only(bottom: 24),
-      child: Center(
-        child: Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E293B),
-            borderRadius: BorderRadius.circular(30),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              InkWell(
-                onTap: _showSort,
-                child: Row(
-                  children: [
-                    const Icon(Icons.swap_vert,
-                        color: Color(0xFF00B4D8), size: 18),
-                    const SizedBox(width: 6),
-                    Text(
-                      _sort,
-                      style: GoogleFonts.inter(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            onTap: _showSort,
+            child: Row(
+              children: [
+                const Icon(Icons.swap_vert,
+                    color: Color(0xFF00B4D8), size: 18),
+                const SizedBox(width: 6),
+                Text(
+                  _sort,
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
                 ),
-              ),
-              Container(
-                height: 16,
-                width: 1,
-                color: Colors.white24,
-                margin: const EdgeInsets.symmetric(horizontal: 14),
-              ),
-              InkWell(
-                onTap: _showFilter,
-                child: Row(
-                  children: [
-                    const Icon(Icons.tune,
-                        color: Color(0xFF00B4D8), size: 16),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Filter ${activeFiltersCount > 0 ? "($activeFiltersCount)" : ""}',
-                      style: GoogleFonts.inter(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+          Container(
+            height: 16,
+            width: 1,
+            color: Colors.white24,
+            margin: const EdgeInsets.symmetric(horizontal: 14),
+          ),
+          InkWell(
+            onTap: _showFilter,
+            child: Row(
+              children: [
+                const Icon(Icons.tune,
+                    color: Color(0xFF00B4D8), size: 16),
+                const SizedBox(width: 6),
+                Text(
+                  'Filter ${activeFiltersCount > 0 ? "($activeFiltersCount)" : ""}',
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

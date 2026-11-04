@@ -31,7 +31,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _male = true;
   bool _notif = true;
   bool _phoneEditable = false;
-  String _language = 'Bahasa Indonesia';
   String _currency = 'IDR - Indonesian Rupiah (Rp)';
 
   static const _months = [
@@ -263,10 +262,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         fontWeight: FontWeight.w800,
                         color: GT.ink)),
                 const SizedBox(height: 12),
-                _prefRow(Icons.translate, 'Bahasa Aplikasi', _language,
-                    onTap: () => _choose('Pilih Bahasa',
-                        ['Bahasa Indonesia', 'English'], _language,
-                        (v) => setState(() => _language = v))),
                 _prefRow(Icons.payments_outlined, 'Mata Uang Pilihan',
                     _currency,
                     onTap: () => _choose(

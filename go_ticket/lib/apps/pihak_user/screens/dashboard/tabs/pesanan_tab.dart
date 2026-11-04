@@ -12,6 +12,9 @@ import 'saved_hotel_screen.dart';
 class PesananTab extends StatefulWidget {
   const PesananTab({super.key});
 
+  /// 0 = Pemesanan, 1 = Saved Hotel
+  static final ValueNotifier<int> subTabNotifier = ValueNotifier<int>(0);
+
   @override
   State<PesananTab> createState() => _PesananTabState();
 }
@@ -19,6 +22,7 @@ class PesananTab extends StatefulWidget {
 class _PesananTabState extends State<PesananTab>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late final PageController _subPageController;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -29,10 +33,30 @@ class _PesananTabState extends State<PesananTab>
     _tabController.addListener(() {
       setState(() {});
     });
+
+    _subPageController =
+        PageController(initialPage: PesananTab.subTabNotifier.value);
+    PesananTab.subTabNotifier.addListener(_onSubTabChanged);
+  }
+
+  void _onSubTabChanged() {
+    if (!mounted) return;
+    final target = PesananTab.subTabNotifier.value;
+    if (_subPageController.hasClients &&
+        _subPageController.page?.round() != target) {
+      _subPageController.animateToPage(
+        target,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeInOutCubic,
+      );
+    }
+    setState(() {});
   }
 
   @override
   void dispose() {
+    PesananTab.subTabNotifier.removeListener(_onSubTabChanged);
+    _subPageController.dispose();
     _searchController.dispose();
     _tabController.dispose();
     super.dispose();
@@ -46,6 +70,29 @@ class _PesananTabState extends State<PesananTab>
 
   @override
   Widget build(BuildContext context) {
+    return PageView(
+      controller: _subPageController,
+      onPageChanged: (page) {
+        if (PesananTab.subTabNotifier.value != page) {
+          PesananTab.subTabNotifier.value = page;
+        }
+      },
+      children: [
+        _buildPemesananView(),
+        SavedHotelScreen(
+          onSwitchToPemesanan: () {
+            _subPageController.animateToPage(
+              0,
+              duration: const Duration(milliseconds: 320),
+              curve: Curves.easeInOutCubic,
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPemesananView() {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       body: Column(
@@ -227,13 +274,11 @@ class _PesananTabState extends State<PesananTab>
     return InkWell(
       borderRadius: BorderRadius.circular(20),
       onTap: () {
-        if (index == 0) {
-          CustomerDashboardScreen.tabNotifier.value = 2;
-          return;
-        }
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const SavedHotelScreen()),
+        if (index == 0) return;
+        _subPageController.animateToPage(
+          1,
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeInOutCubic,
         );
       },
       child: Container(
@@ -260,7 +305,19 @@ class _PesananTabState extends State<PesananTab>
   }
 
   Widget _buildTabBar() {
-    final tabs = ['Semua (5)', 'Aktif / Mendatang 2', 'Selesai (2)', 'D...'];
+    final isFresh = CustomerDataService.instance.isFreshUser;
+    final int countActive = isFresh ? 0 : 1;
+    final int countCompleted = isFresh ? 0 : 2;
+    final int countCancelled = isFresh ? 0 : 1;
+    final int countAll = countActive + countCompleted + countCancelled;
+
+    final tabs = [
+      'Semua ($countAll)',
+      'Aktif ($countActive)',
+      'Selesai ($countCompleted)',
+      'Dibatalkan ($countCancelled)',
+    ];
+
     return Container(
       color: Colors.white,
       child: Column(
@@ -268,13 +325,15 @@ class _PesananTabState extends State<PesananTab>
           TabBar(
             controller: _tabController,
             isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             labelColor: const Color(0xFF00B4D8),
             unselectedLabelColor: const Color(0xFF6B7280),
             indicatorColor: const Color(0xFF00B4D8),
             labelStyle:
-                GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
+                GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
             unselectedLabelStyle:
-                GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w400),
+                GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
             tabs: tabs.map((t) => Tab(text: t)).toList(),
           ),
           const Divider(height: 1, color: Color(0xFFE5E7EB)),
