@@ -1,3 +1,5 @@
+import '../utils/currency_formatter.dart';
+
 /// Data yang dibawa sepanjang alur pemesanan:
 /// Detail Hotel -> Pilih Kamar -> Checkout -> Pembayaran -> Sukses.
 class BookingArgs {
@@ -10,6 +12,7 @@ class BookingArgs {
   final String roomName;
   final String roomImage;
   final int roomPrice; // per malam
+  final int? originalPrice;
 
   final DateTime checkIn;
   final DateTime checkOut;
@@ -33,6 +36,7 @@ class BookingArgs {
     required this.roomName,
     required this.roomImage,
     required this.roomPrice,
+    this.originalPrice,
     required this.checkIn,
     required this.checkOut,
     this.adults = 2,
@@ -51,10 +55,25 @@ class BookingArgs {
 
   /// Dibuat dari argumen hotel (Map dari tab Beranda/Cari/Tersimpan) atau default.
   factory BookingArgs.fromHotel(dynamic arg) {
-    if (arg is BookingArgs) return arg;
+    if (arg is BookingArgs) {
+      return arg.roomPrice > 0 ? arg : arg.copyWith(roomPrice: 850000);
+    }
     final m = arg is Map ? arg : const {};
     final start = DateTime.now().add(const Duration(days: 2));
     final checkIn = DateTime(start.year, start.month, start.day);
+    final listedPrice = m['discountedPrice'] ??
+        m['price'] ??
+        m['pricePerNight'];
+    final parsedPrice = listedPrice is num
+        ? listedPrice.toInt()
+        : CurrencyFormatter.parseToInt(listedPrice?.toString() ?? '');
+    final listedOriginalPrice = m['originalPrice'];
+    final parsedOriginalPrice = listedOriginalPrice is num
+        ? listedOriginalPrice.toInt()
+        : CurrencyFormatter.parseToInt(
+            listedOriginalPrice?.toString() ?? '',
+          );
+    final validPrice = parsedPrice > 0 ? parsedPrice : 850000;
     return BookingArgs(
       hotelName: (m['name'] ?? 'The Grand Amora Resort & Spa').toString(),
       hotelType: 'RESORT BINTANG 5',
@@ -63,7 +82,9 @@ class BookingArgs {
       rating: (m['rating'] ?? '4.9').toString(),
       roomName: 'Deluxe Ocean View',
       roomImage: defaultRoomImage,
-      roomPrice: 850000,
+      roomPrice: validPrice,
+      originalPrice:
+          parsedOriginalPrice > validPrice ? parsedOriginalPrice : null,
       checkIn: checkIn,
       checkOut: checkIn.add(const Duration(days: 2)),
     );
@@ -73,6 +94,7 @@ class BookingArgs {
     String? roomName,
     String? roomImage,
     int? roomPrice,
+    int? originalPrice,
     DateTime? checkIn,
     DateTime? checkOut,
     int? adults,
@@ -83,6 +105,7 @@ class BookingArgs {
     bool? promoApplied,
     String? paymentMethod,
   }) {
+    final nextRoomPrice = roomPrice ?? this.roomPrice;
     return BookingArgs(
       hotelName: hotelName,
       hotelType: hotelType,
@@ -91,7 +114,8 @@ class BookingArgs {
       rating: rating,
       roomName: roomName ?? this.roomName,
       roomImage: roomImage ?? this.roomImage,
-      roomPrice: roomPrice ?? this.roomPrice,
+      roomPrice: nextRoomPrice > 0 ? nextRoomPrice : 850000,
+      originalPrice: originalPrice ?? this.originalPrice,
       checkIn: checkIn ?? this.checkIn,
       checkOut: checkOut ?? this.checkOut,
       adults: adults ?? this.adults,
@@ -106,12 +130,25 @@ class BookingArgs {
 
   int get nights => checkOut.difference(checkIn).inDays;
   int get subtotal => roomPrice * nights;
-  int get discount => promoApplied ? 100000 : 0;
+  int get discount {
+    if (!promoApplied || subtotal <= 1) return 0;
+    return subtotal - 1 < 100000 ? subtotal - 1 : 100000;
+  }
   int get total => subtotal - discount;
 
   static const _m = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-    'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'Mei',
+    'Jun',
+    'Jul',
+    'Agu',
+    'Sep',
+    'Okt',
+    'Nov',
+    'Des',
   ];
   static String monthShort(int m) => _m[m - 1];
 

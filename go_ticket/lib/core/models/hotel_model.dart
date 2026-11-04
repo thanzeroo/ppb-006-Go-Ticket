@@ -203,10 +203,11 @@ class HotelModel {
   String get displayImage =>
       mainImageUrl ?? 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600';
 
-  int get pricePerNight => startingPrice ?? 350000;
-  int? get originalPrice =>
-      _originalPrice ??
-      (startingPrice != null ? (startingPrice! * 1.25).round() : 450000);
+  int get pricePerNight {
+    final price = startingPrice;
+    return price == null || price <= 0 ? 350000 : price;
+  }
+  int? get originalPrice => _originalPrice;
   String? get thumbnailUrl => mainImageUrl;
   List<String> get photoUrls => imageUrls;
   int get starRating => _starRating ?? 4;

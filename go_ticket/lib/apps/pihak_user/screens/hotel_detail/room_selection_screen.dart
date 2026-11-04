@@ -46,40 +46,6 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
   DateTime? _out;
   int _room = 0;
 
-  static const _rooms = [
-    _Room(
-      name: 'Deluxe Ocean View',
-      capacity: 'Maks. 2 Dewasa, 1 Anak',
-      features: ['1 King Bed', 'Balkon Menghadap Laut', 'Sarapan Gratis',
-        'High-Speed WiFi'],
-      price: 850000,
-      oldPrice: 1100000,
-      image:
-          'https://images.unsplash.com/photo-1540541338287-41700207dee6?w=800',
-      badge: 'Sisa 2 Kamar Lagi!',
-    ),
-    _Room(
-      name: 'Executive Suite Jacuzzi',
-      capacity: 'Maks. 3 Dewasa',
-      features: ['Ruang Tamu Terpisah', 'Private Jacuzzi', 'Akses VIP Lounge'],
-      price: 1450000,
-      image:
-          'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=800',
-      note: 'Tersedia untuk 2 malam',
-    ),
-    _Room(
-      name: 'Sunset Villa with Private Pool',
-      capacity: 'Maks. 4 Dewasa',
-      features: [],
-      price: 2900000,
-      image:
-          'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800',
-      note:
-          'Kolam renang pribadi, dek berjemur eksklusif, pelayanan pribadi 24 jam.',
-      soldOut: true,
-    ),
-  ];
-
   static const _monthNames = [
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli',
     'Agustus', 'September', 'Oktober', 'November', 'Desember'
@@ -140,6 +106,53 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
   int get _nights => (_in != null && _out != null)
       ? _out!.difference(_in!).inDays
       : 0;
+
+  int get _baseRoomPrice => _args.roomPrice > 0 ? _args.roomPrice : 850000;
+
+  List<_Room> get _rooms => [
+        _Room(
+          name: 'Deluxe Ocean View',
+          capacity: 'Maks. 2 Dewasa, 1 Anak',
+          features: const [
+            '1 King Bed',
+            'Balkon Menghadap Laut',
+            'Sarapan Gratis',
+            'High-Speed WiFi',
+          ],
+          price: _baseRoomPrice,
+          oldPrice: _args.originalPrice != null &&
+                  _args.originalPrice! > _baseRoomPrice
+              ? _args.originalPrice
+              : null,
+          image:
+              'https://images.unsplash.com/photo-1540541338287-41700207dee6?w=800',
+          badge: 'Sisa 2 Kamar Lagi!',
+        ),
+        _Room(
+          name: 'Executive Suite Jacuzzi',
+          capacity: 'Maks. 3 Dewasa',
+          features: const [
+            'Ruang Tamu Terpisah',
+            'Private Jacuzzi',
+            'Akses VIP Lounge',
+          ],
+          price: (_baseRoomPrice * 17 / 10).round(),
+          image:
+              'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=800',
+          note: 'Tersedia untuk 2 malam',
+        ),
+        _Room(
+          name: 'Sunset Villa with Private Pool',
+          capacity: 'Maks. 4 Dewasa',
+          features: const [],
+          price: (_baseRoomPrice * 34 / 10).round(),
+          image:
+              'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800',
+          note:
+              'Kolam renang pribadi, dek berjemur eksklusif, pelayanan pribadi 24 jam.',
+          soldOut: true,
+        ),
+      ];
 
   void _next() {
     if (_in == null || _out == null) {

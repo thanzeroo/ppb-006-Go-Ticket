@@ -120,26 +120,34 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(children: const [
-                    Text('MULAI DARI',
+                  Row(children: [
+                    const Text('MULAI DARI',
                         style: TextStyle(
                             fontSize: 10,
                             color: GT.muted,
                             fontWeight: FontWeight.w600)),
-                    SizedBox(width: 6),
-                    GTChip('Hemat 20%',
-                        bg: Color(0xFFFEE2E2), fg: GT.red),
+                    const SizedBox(width: 6),
+                    if (_args.originalPrice != null &&
+                        _args.originalPrice! > _args.roomPrice)
+                      GTChip(
+                        'Hemat ${((_args.originalPrice! - _args.roomPrice) *
+                                    100 /
+                                    _args.originalPrice!)
+                                .round()}%',
+                        bg: Color(0xFFFEE2E2),
+                        fg: GT.red,
+                      ),
                   ]),
                   const SizedBox(height: 2),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
-                    children: const [
-                      Text('Rp 850.000',
-                          style: TextStyle(
+                    children: [
+                      Text(rp(_args.roomPrice),
+                          style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.w800,
                               color: GT.teal)),
-                      Text('/mlm',
+                      const Text('/mlm',
                           style: TextStyle(fontSize: 12, color: GT.muted)),
                     ],
                   ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:go_ticket/core/services/hotel_service.dart';
+import 'package:go_ticket/core/utils/currency_formatter.dart';
 import '../../../router/customer_router.dart';
 
 /// Tab Cari: Halaman hasil pencarian hotel seperti screenshot
@@ -23,7 +24,7 @@ class _CariTabState extends State<CariTab> {
       'rating': '4.9',
       'reviews': '428 ulasan',
       'distance': '190m ke Pantai',
-      'originalPrice': 'Rp 1.900.000',
+      'originalPrice': 'Rp 1.200.000',
       'discountedPrice': 'Rp 850.000',
       'discount': 'Hemat 29%',
       'features': ['Kolam Infinity', 'Spa Mewah', 'Bebas Batal'],
@@ -91,26 +92,43 @@ class _CariTabState extends State<CariTab> {
     try {
       final data = await HotelService.instance.getHotels(sortBy: _sort);
       if (mounted) {
+        final promoIndex = data.indexWhere(
+          (hotel) =>
+              hotel.originalPrice != null &&
+              hotel.originalPrice! > hotel.pricePerNight,
+        );
         setState(() {
-          _hotels = data.map((h) => {
-            'id': h.id,
-            'name': h.name,
-            'location': '${h.city} • ${h.address}',
-            'type': 'Resor • ⭐ ${h.starRating}',
-            'rating': h.rating.toStringAsFixed(1),
-            'reviews': '${h.reviewCount} ulasan',
-            'distance': h.shortDescription ?? '',
-            'originalPrice': h.originalPrice != null ? 'Rp ${h.originalPrice}' : null,
-            'discountedPrice': 'Rp ${h.pricePerNight}',
-            'discount': h.originalPrice != null ? 'Promo' : null,
-            'features': h.amenities,
-            'tag': h.isRecommended ? 'Paling Diminati' : null,
-            'tagColor': const Color(0xFF00B4D8),
-            'isFavorite': false,
-            'isFree': false,
-            'imageUrl': h.thumbnailUrl ??
-                (h.photoUrls.isNotEmpty ? h.photoUrls.first : ''),
-            'badgeText': 'Bintang ${h.starRating}',
+          _hotels = data.asMap().entries.map((entry) {
+            final h = entry.value;
+            final originalPrice =
+                entry.key == promoIndex ? h.originalPrice : null;
+            final discountPercent = originalPrice == null
+                ? null
+                : ((originalPrice - h.pricePerNight) * 100 / originalPrice)
+                    .round();
+            return {
+              'id': h.id,
+              'name': h.name,
+              'location': '${h.city} • ${h.address}',
+              'type': 'Resor • ⭐ ${h.starRating}',
+              'rating': h.rating.toStringAsFixed(1),
+              'reviews': '${h.reviewCount} ulasan',
+              'distance': h.shortDescription ?? '',
+              'originalPrice': originalPrice == null
+                  ? null
+                  : CurrencyFormatter.toRupiah(originalPrice),
+              'discountedPrice': CurrencyFormatter.toRupiah(h.pricePerNight),
+              'discount':
+                  discountPercent == null ? null : 'Hemat $discountPercent%',
+              'features': h.amenities,
+              'tag': h.isRecommended ? 'Paling Diminati' : null,
+              'tagColor': const Color(0xFF00B4D8),
+              'isFavorite': false,
+              'isFree': false,
+              'imageUrl': h.thumbnailUrl ??
+                  (h.photoUrls.isNotEmpty ? h.photoUrls.first : ''),
+              'badgeText': 'Bintang ${h.starRating}',
+            };
           }).toList();
           _isLoading = false;
         });
