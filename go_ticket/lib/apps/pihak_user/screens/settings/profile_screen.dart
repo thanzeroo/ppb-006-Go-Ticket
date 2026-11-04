@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:go_ticket/core/services/auth_service.dart';
 import 'package:go_ticket/core/widgets/gt_ui.dart';
+import 'package:go_ticket/core/widgets/user_avatar.dart';
 
 /// Edit Profil Saya (Figma: "USER Page Profil Saya").
 class ProfileScreen extends StatefulWidget {
@@ -11,10 +13,19 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final _name = TextEditingController(text: 'Aditya Pratama');
-  final _phone = TextEditingController(text: '+62 812-3456-7890');
+  late final TextEditingController _name;
+  late final TextEditingController _phone;
   final _address = TextEditingController(text: 'Kec. Kuta, Kab. Badung, Bali');
-  final _email = 'aditya.pratama@email.com';
+  late String _email;
+
+  @override
+  void initState() {
+    super.initState();
+    final user = AuthService.instance.currentUser;
+    _name = TextEditingController(text: user?.fullName ?? '');
+    _phone = TextEditingController(text: user?.phoneNumber ?? '+62 812-3456-7890');
+    _email = user?.email ?? 'user@goticket.com';
+  }
 
   DateTime _birth = DateTime(1994, 8, 14);
   bool _male = true;
@@ -46,15 +57,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (d != null) setState(() => _birth = d);
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (_name.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Nama lengkap wajib diisi')));
       return;
     }
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Profil berhasil disimpan')));
-    Navigator.of(context).pop();
+    try {
+      await AuthService.instance.updateProfile(
+        fullName: _name.text.trim(),
+        phone: _phone.text.trim(),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Profil berhasil disimpan')));
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Gagal menyimpan: $e')));
+    }
   }
 
   Future<void> _choose(String title, List<String> options, String current,
@@ -93,26 +115,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           GTCard(
             child: Row(children: [
-              Stack(children: [
-                const CircleAvatar(
-                    radius: 38,
-                    backgroundColor: GT.sky,
-                    child: Icon(Icons.person, size: 44, color: GT.teal)),
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: GestureDetector(
-                    onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('Ganti foto segera hadir'))),
-                    child: const CircleAvatar(
-                        radius: 14,
-                        backgroundColor: GT.teal,
-                        child: Icon(Icons.photo_camera,
-                            size: 14, color: Colors.white)),
+              Stack(
+                children: [
+                  UserAvatar(
+                    name: _name.text,
+                    radius: 36,
+                    showVerifiedBadge:
+                        AuthService.instance.currentUser?.isVerified ?? false,
                   ),
-                ),
-              ]),
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: GestureDetector(
+                      onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Ganti foto segera hadir'))),
+                      child: const CircleAvatar(
+                          radius: 14,
+                          backgroundColor: GT.teal,
+                          child: Icon(Icons.photo_camera,
+                              size: 14, color: Colors.white)),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(

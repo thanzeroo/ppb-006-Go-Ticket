@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:go_ticket/core/models/booking_args.dart';
+import 'package:go_ticket/core/services/auth_service.dart';
 import '../../router/customer_router.dart';
 import 'package:go_ticket/core/widgets/gt_ui.dart';
 
@@ -24,9 +25,9 @@ class _GuestDetailFormScreenState extends State<GuestDetailFormScreen> {
   int _children = 0;
   bool _forSelf = true;
 
-  final _name = TextEditingController(text: 'Aditya Pratama');
-  final _email = TextEditingController(text: 'aditya.pratama@email.com');
-  final _phone = TextEditingController(text: '812-3456-7890');
+  late final TextEditingController _name;
+  late final TextEditingController _email;
+  late final TextEditingController _phone;
   final _note = TextEditingController();
 
   final Set<String> _requests = {};
@@ -36,6 +37,18 @@ class _GuestDetailFormScreenState extends State<GuestDetailFormScreen> {
     'Check-in Awal',
     'King Size Bed',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    final user = AuthService.instance.currentUser;
+    _name = TextEditingController(text: user?.fullName ?? '');
+    _email = TextEditingController(text: user?.email ?? '');
+    final rawPhone = user?.phoneNumber ?? '';
+    _phone = TextEditingController(
+      text: rawPhone.replaceFirst('+62', '').trim(),
+    );
+  }
 
   @override
   void dispose() {

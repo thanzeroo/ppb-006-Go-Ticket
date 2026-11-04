@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:go_ticket/core/services/auth_service.dart';
+import 'package:go_ticket/core/services/customer_data_service.dart';
 import 'package:go_ticket/core/utils/currency_formatter.dart';
+import 'package:go_ticket/core/widgets/user_avatar.dart';
 import '../../../router/customer_router.dart';
 import '../customer_dashboard_screen.dart';
 
@@ -59,65 +62,24 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
     },
   ];
 
-  final List<Map<String, dynamic>> _hotels = [
-    {
-      'name': 'The Grand Amora Resort & Spa',
-      'location': 'Seminyak, Bali • 450m dari Pantai Petittenget',
-      'type': 'Resor Mewah',
-      'rating': '5.0',
-      'originalPrice': 'Rp 1.190.000',
-      'price': 'Rp 850.000',
-      'discount': 'Hemat 25%',
-      'features': ['Infinity Pool', 'Spa & Wellness'],
-      'extras': ['Sarapan Gratis'],
-      'availability': 'Tersedia 2 Kamar',
-      'priceValue': 850000,
-      'category': 'Resor Bali',
-      'folders': ['Liburan Akhir Tahun', 'Staycation Romantis'],
-      'imageUrl':
-          'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=400',
-      'isFavorite': true,
-      'badgeIcon': Icons.local_offer,
-    },
-    {
-      'name': 'Kayumanis Private Villa',
-      'location': 'Ubud, Bali • Nuansa Hutan Tropis',
-      'type': 'Hutan Tropis Alri',
-      'rating': '4.9',
-      'originalPrice': null,
-      'price': 'Rp 1.450.000',
-      'discount': null,
-      'features': ['Private Pool', 'Jacuzzi Pribadi'],
-      'extras': ['Romantic Dinner'],
-      'availability': 'Best Seller',
-      'priceValue': 1450000,
-      'category': 'Villa Privat',
-      'folders': ['Staycation Romantis'],
-      'imageUrl':
-          'https://images.unsplash.com/photo-1540541338287-41700207dee6?w=400',
-      'isFavorite': true,
-      'badgeIcon': null,
-    },
-    {
-      'name': 'Seminyak Beach Breeze Hotel',
-      'location': 'Seminyak, Bali • Kawasan Pantai Utama',
-      'type': 'Akses Langsung Pantai',
-      'rating': '4.7',
-      'originalPrice': null,
-      'price': 'Rp 550.000',
-      'discount': null,
-      'features': ['Wi-Fi Cepat', 'Gym Center'],
-      'extras': ['Coffee Bar'],
-      'availability': 'Populer',
-      'priceValue': 550000,
-      'category': 'Hotel Kota',
-      'folders': ['Liburan Akhir Tahun'],
-      'imageUrl':
-          'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=400',
-      'isFavorite': true,
-      'badgeIcon': null,
-    },
-  ];
+  List<Map<String, dynamic>> _hotels = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHotels();
+  }
+
+  Future<void> _loadHotels() async {
+    final list = await CustomerDataService.instance.getSavedHotels();
+    if (mounted) {
+      setState(() {
+        _hotels = List<Map<String, dynamic>>.from(list);
+        _isLoading = false;
+      });
+    }
+  }
 
   List<Map<String, dynamic>> get _filteredHotels {
     final query = _searchQuery.trim().toLowerCase();
@@ -302,24 +264,80 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
           _buildFolderSection(),
           _buildCategoryTabs(),
           Expanded(
-            child: filteredHotels.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Text(
-                        'Hotel tersimpan tidak ditemukan. Coba ubah pencarian atau filter.',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.inter(
-                          color: const Color(0xFF6B7280),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : filteredHotels.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 36),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 68,
+                                height: 68,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFC8F0FA),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.favorite_border_rounded,
+                                  color: Color(0xFF0077B6),
+                                  size: 34,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Belum Ada Hotel Tersimpan',
+                                style: GoogleFonts.inter(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Simpan hotel favorit Anda dengan menekan ikon hati di Beranda atau Cari untuk melihatnya di sini.',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  color: const Color(0xFF64748B),
+                                  height: 1.4,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              ElevatedButton(
+                                onPressed: () {
+                                  CustomerDashboardScreen.tabNotifier.value = 0;
+                                  if (Navigator.canPop(context)) {
+                                    Navigator.pop(context);
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF00B4D8),
+                                  foregroundColor: Colors.white,
+                                  shape: const StadiumBorder(),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 22, vertical: 12),
+                                  elevation: 0,
+                                ),
+                                child: Text(
+                                  'Jelajahi Hotel Sekarang',
+                                  style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                        itemCount: filteredHotels.length,
+                        itemBuilder: (ctx, i) =>
+                            _buildHotelCard(filteredHotels[i]),
                       ),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                    itemCount: filteredHotels.length,
-                    itemBuilder: (ctx, i) => _buildHotelCard(filteredHotels[i]),
-                  ),
           ),
         ],
       ),
@@ -391,12 +409,9 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
                         size: 22,
                       ),
                       const SizedBox(width: 12),
-                      CircleAvatar(
+                      UserAvatar(
+                        name: AuthService.instance.currentUser?.fullName,
                         radius: 17,
-                        backgroundImage: const NetworkImage(
-                          'https://i.pravatar.cc/100?img=11',
-                        ),
-                        backgroundColor: Colors.grey[200],
                       ),
                     ],
                   ),

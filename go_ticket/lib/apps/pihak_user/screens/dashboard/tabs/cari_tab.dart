@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:go_ticket/core/services/auth_service.dart';
 import 'package:go_ticket/core/services/hotel_service.dart';
 import 'package:go_ticket/core/utils/currency_formatter.dart';
+import 'package:go_ticket/core/widgets/user_avatar.dart';
 import '../../../router/customer_router.dart';
 
 class _CariFilters {
@@ -477,14 +479,16 @@ class _CariTabState extends State<CariTab> {
                             ],
                           )),
                   const Spacer(),
-                  const Icon(Icons.notifications_none_outlined,
-                      color: Color(0xFF111827), size: 22),
-                  const SizedBox(width: 12),
-                  CircleAvatar(
-                    radius: 17,
-                    backgroundImage:
-                        const NetworkImage('https://i.pravatar.cc/100?img=11'),
-                    backgroundColor: Colors.grey[200],
+                  Row(
+                    children: [
+                      const Icon(Icons.notifications_none_outlined,
+                          color: Color(0xFF111827), size: 22),
+                      const SizedBox(width: 12),
+                      UserAvatar(
+                        name: AuthService.instance.currentUser?.fullName,
+                        radius: 17,
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -993,53 +997,76 @@ class _CariTabState extends State<CariTab> {
   }
 
   Widget _buildBottomButtons() {
+    final activeFiltersCount = (_filters.promotionsOnly ? 1 : 0) +
+        (_filters.rating45Plus ? 1 : 0) +
+        (_filters.poolOnly ? 1 : 0) +
+        (_filters.maxPrice < 5000000 ? 1 : 0);
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: _showSort,
-              icon: const Icon(Icons.sort,
-                  color: Color(0xFF00B4D8), size: 16),
-              label: Text(
-                _sort,
-                style: GoogleFonts.inter(
-                    fontSize: 13, color: const Color(0xFF00B4D8)),
+      color: Colors.transparent,
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Center(
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
               ),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFF00B4D8)),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-            ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: _showFilter,
-              icon: const Icon(Icons.filter_list, size: 16),
-              label: Text(
-                'Filter (${(_filters.promotionsOnly ? 1 : 0) + (_filters.rating45Plus ? 1 : 0) + (_filters.poolOnly ? 1 : 0) + (_filters.maxPrice < 5000000 ? 1 : 0)})',
-                style: GoogleFonts.inter(
-                    fontSize: 13, fontWeight: FontWeight.w600),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              InkWell(
+                onTap: _showSort,
+                child: Row(
+                  children: [
+                    const Icon(Icons.swap_vert,
+                        color: Color(0xFF00B4D8), size: 18),
+                    const SizedBox(width: 6),
+                    Text(
+                      _sort,
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00B4D8),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                elevation: 0,
+              Container(
+                height: 16,
+                width: 1,
+                color: Colors.white24,
+                margin: const EdgeInsets.symmetric(horizontal: 14),
               ),
-            ),
+              InkWell(
+                onTap: _showFilter,
+                child: Row(
+                  children: [
+                    const Icon(Icons.tune,
+                        color: Color(0xFF00B4D8), size: 16),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Filter ${activeFiltersCount > 0 ? "($activeFiltersCount)" : ""}',
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

@@ -132,17 +132,36 @@ class StorageHelper {
     await saveRefreshToken(refreshToken);
   }
 
+  static Future<String?> getUserPhone() async {
+    final prefs = await _getPrefs();
+    return prefs.getString('user_phone');
+  }
+
+  static Future<bool> getUserVerified() async {
+    final prefs = await _getPrefs();
+    return prefs.getBool('user_is_verified') ?? false;
+  }
+
+  static Future<void> saveUserVerified(bool isVerified) async {
+    final prefs = await _getPrefs();
+    await prefs.setBool('user_is_verified', isVerified);
+  }
+
   static Future<void> saveUserData({
     required String userId,
     required String fullName,
     required String email,
     required String role,
+    String? phone,
+    bool isVerified = false,
   }) async {
     final prefs = await _getPrefs();
     await prefs.setString('user_id', userId);
     await prefs.setString('user_name', fullName);
     await prefs.setString('user_email', email);
     await prefs.setString(AppConstants.keyUserRole, role);
+    if (phone != null) await prefs.setString('user_phone', phone);
+    await prefs.setBool('user_is_verified', isVerified);
   }
 
   /// Menyimpan Hotel ID yang dikelola oleh staff (Hotel Partner app)

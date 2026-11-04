@@ -69,12 +69,18 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         );
       } else {
         // Register Customer
+        final regEmail = _emailRegisterController.text.trim();
         await AuthService.instance.registerCustomer(
           fullName: _nameController.text.trim(),
-          email: _emailRegisterController.text.trim(),
+          email: regEmail,
           password: _passwordRegisterController.text,
           phone: _phoneController.text.trim(),
         );
+
+        if (mounted) {
+          setState(() => _isLoading = false);
+          await _showVerificationDialog(regEmail);
+        }
       }
 
       if (!mounted) return;
@@ -95,6 +101,148 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<void> _showVerificationDialog(String email) async {
+    final otpController = TextEditingController(text: '1234');
+    bool isVerifying = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 24,
+              right: 24,
+              top: 24,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE0F7FA),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.mark_email_read_outlined,
+                    color: Color(0xFF00B4D8),
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Verifikasi Akun Anda',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF111827),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Kami telah mengirimkan 4-digit kode verifikasi ke email:\n$email',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF6B7280),
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: otpController,
+                  textAlign: TextAlign.center,
+                  keyboardType: TextInputType.number,
+                  maxLength: 4,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    letterSpacing: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF00B4D8),
+                  ),
+                  decoration: InputDecoration(
+                    counterText: '',
+                    filled: true,
+                    fillColor: const Color(0xFFF3F4F6),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF00B4D8),
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00B4D8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    onPressed: isVerifying
+                        ? null
+                        : () async {
+                            setModalState(() => isVerifying = true);
+                            await Future.delayed(
+                                const Duration(milliseconds: 400));
+                            await AuthService.instance
+                                .verifyAccount(otpCode: otpController.text);
+                            if (ctx.mounted) Navigator.pop(ctx);
+                          },
+                    child: isVerifying
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                            'Verifikasi & Lanjutkan',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text(
+                    'Lewati untuk sekarang',
+                    style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _openTerms() async {

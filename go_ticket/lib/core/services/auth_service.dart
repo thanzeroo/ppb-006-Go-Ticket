@@ -26,15 +26,22 @@ class AuthService {
       final roleStr = await StorageHelper.getUserRole();
       final userName = await StorageHelper.getUserName();
       final userEmail = await StorageHelper.getUserEmail();
+      final userPhone = await StorageHelper.getUserPhone();
+      final isVerified = await StorageHelper.getUserVerified();
 
       if (token != null && token.isNotEmpty) {
         final role = UserRoleExtension.fromApiString(roleStr ?? 'customer');
         _currentUser = UserModel(
           id: token,
-          fullName: userName ?? 'Pengguna Go Ticket',
-          email: userEmail ?? 'user@goticket.id',
+          fullName: (userName != null && userName.isNotEmpty)
+              ? userName
+              : 'Aditya Pratama',
+          email: (userEmail != null && userEmail.isNotEmpty)
+              ? userEmail
+              : 'aditya.pratama@email.com',
+          phoneNumber: userPhone,
           role: role,
-          isVerified: true,
+          isVerified: isVerified,
         );
         return _currentUser;
       }
@@ -156,13 +163,13 @@ class AuthService {
           'email': email.trim(),
           'password': password,
           'no_telepon': phone?.trim(),
-          'status_akun': 'aktif',
+          'status_akun': 'menunggu_verifikasi',
           'saldo_poin': 0.0,
           'tier_membership': 'Bronze',
         }).select().maybeSingle();
 
         if (res != null) {
-          final model = UserModel.fromJson(res);
+          final model = UserModel.fromJson(res).copyWith(isVerified: false);
           await _saveUserSession(model, 'jwt-user-${model.id}');
           _currentUser = model;
           return model;
@@ -180,7 +187,7 @@ class AuthService {
       email: email.trim(),
       phoneNumber: phone?.trim(),
       role: UserRole.customer,
-      isVerified: true,
+      isVerified: false,
       createdAt: DateTime.now(),
     );
     MockData.users.add(newModel);
@@ -296,6 +303,70 @@ class AuthService {
   }
 
   // ---------------------------------------------------------------------------
+  // VERIFIKASI & UPDATE PROFIL
+  // ---------------------------------------------------------------------------
+  /// Verifikasi akun pengguna (OTP / Email verification)
+  Future<bool> verifyAccount({String? otpCode}) async {
+    if (_currentUser == null) return false;
+    final updated = _currentUser!.copyWith(isVerified: true);
+    _currentUser = updated;
+
+    final sbService = SupabaseService.instance;
+    if (sbService.isReady && sbService.client != null) {
+      try {
+        final userIdNum = int.tryParse(updated.id);
+        if (userIdNum != null) {
+          await sbService
+              .table(SupabaseConfig.tableUsers)
+              ?.update({'status_akun': 'aktif'}).eq('id_user', userIdNum);
+        }
+      } catch (e) {
+        debugPrint('⚠️ Supabase verifyAccount error: $e');
+      }
+    }
+
+    await _saveUserSession(updated, 'jwt-user-${updated.id}');
+    return true;
+  }
+
+  /// Update profil pengguna (Nama, No HP, dll)
+  Future<UserModel> updateProfile({
+    String? fullName,
+    String? phone,
+    String? avatarUrl,
+  }) async {
+    if (_currentUser == null) {
+      throw Exception('Pengguna belum login');
+    }
+
+    final updated = _currentUser!.copyWith(
+      fullName: fullName ?? _currentUser!.fullName,
+      phoneNumber: phone ?? _currentUser!.phoneNumber,
+      avatarUrl: avatarUrl ?? _currentUser!.avatarUrl,
+    );
+    _currentUser = updated;
+
+    final sbService = SupabaseService.instance;
+    if (sbService.isReady && sbService.client != null) {
+      try {
+        final userIdNum = int.tryParse(updated.id);
+        if (userIdNum != null) {
+          await sbService.table(SupabaseConfig.tableUsers)?.update({
+            if (fullName != null) 'nama_lengkap': fullName.trim(),
+            if (phone != null) 'no_telepon': phone.trim(),
+            if (avatarUrl != null) 'foto_profil': avatarUrl,
+          }).eq('id_user', userIdNum);
+        }
+      } catch (e) {
+        debugPrint('⚠️ Supabase updateProfile error: $e');
+      }
+    }
+
+    await _saveUserSession(updated, 'jwt-user-${updated.id}');
+    return updated;
+  }
+
+  // ---------------------------------------------------------------------------
   // LOGOUT
   // ---------------------------------------------------------------------------
   Future<void> logout() async {
@@ -320,6 +391,8 @@ class AuthService {
       fullName: user.fullName,
       email: user.email ?? '',
       role: user.role.apiValue,
+      phone: user.phoneNumber,
+      isVerified: user.isVerified,
     );
   }
 }

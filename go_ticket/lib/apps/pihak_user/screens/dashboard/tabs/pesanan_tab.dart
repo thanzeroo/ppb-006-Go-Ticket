@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+import 'package:go_ticket/core/services/auth_service.dart';
+import 'package:go_ticket/core/services/customer_data_service.dart';
+import 'package:go_ticket/core/widgets/user_avatar.dart';
 import '../../../router/customer_router.dart';
 import '../customer_dashboard_screen.dart';
 import 'saved_hotel_screen.dart';
@@ -124,11 +128,9 @@ class _PesananTabState extends State<PesananTab>
                       const Icon(Icons.notifications_none_outlined,
                           color: Color(0xFF111827), size: 22),
                       const SizedBox(width: 12),
-                      CircleAvatar(
+                      UserAvatar(
+                        name: AuthService.instance.currentUser?.fullName,
                         radius: 17,
-                        backgroundImage: const NetworkImage(
-                            'https://i.pravatar.cc/100?img=11'),
-                        backgroundColor: Colors.grey[200],
                       ),
                     ],
                   ),
@@ -282,6 +284,67 @@ class _PesananTabState extends State<PesananTab>
   }
 
   Widget _buildAllOrders({String? filterStatus}) {
+    if (CustomerDataService.instance.isFreshUser) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFC8F0FA),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.receipt_long_outlined,
+                  color: Color(0xFF0077B6),
+                  size: 36,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Belum Ada Pesanan',
+                style: GoogleFonts.inter(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Anda belum memiliki pesanan hotel aktif maupun riwayat pemesanan. Mulai jelajahi dan booking hotel impian Anda sekarang!',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: const Color(0xFF64748B),
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () => CustomerDashboardScreen.tabNotifier.value = 1,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00B4D8),
+                  foregroundColor: Colors.white,
+                  shape: const StadiumBorder(),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  elevation: 0,
+                ),
+                child: Text(
+                  'Cari Penginapan Sekarang',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final children = <Widget>[];
     if ((filterStatus == null || filterStatus == 'active') &&
         _matchesBookingQuery(const [

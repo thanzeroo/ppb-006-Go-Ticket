@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:go_ticket/core/services/auth_service.dart';
+import 'package:go_ticket/core/services/customer_data_service.dart';
 import 'package:go_ticket/core/widgets/gt_ui.dart';
 
 class _Guest {
@@ -40,27 +42,47 @@ class SavedGuestsScreen extends StatefulWidget {
 class _SavedGuestsScreenState extends State<SavedGuestsScreen> {
   int _filter = 0; // 0 semua, 1 dewasa, 2 anak
 
-  final List<_Guest> _guests = [
-    _Guest(
-        name: 'Aditya Pratama',
-        relation: 'Akun Utama',
-        nik: '3171••••••••1004',
-        phone: '+62 812-3456-7890',
-        email: 'aditya.pratama@email.com',
-        birth: '14 Agu 1994 (Dewasa)',
-        isMain: true),
-    _Guest(
-        name: 'Siti Rahmawati',
-        relation: 'Keluarga / Rekan',
-        nik: '3273••••••••8821',
-        phone: '+62 813-9876-5432',
-        birth: ''),
-    _Guest(
-        name: 'Kenzo Pratama',
-        relation: 'Anak Kandung',
-        birth: '20 Mei 2019',
-        isChild: true),
-  ];
+  List<_Guest> _guests = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadGuests();
+  }
+
+  void _loadGuests() {
+    if (CustomerDataService.instance.isFreshUser) {
+      _guests = [];
+      return;
+    }
+    final user = AuthService.instance.currentUser;
+    final name = (user != null && user.fullName.isNotEmpty)
+        ? user.fullName
+        : 'Aditya Pratama';
+    final email = user?.email ?? 'aditya.pratama@email.com';
+    final phone = user?.phoneNumber ?? '+62 812-3456-7890';
+    _guests = [
+      _Guest(
+          name: name,
+          relation: 'Akun Utama',
+          nik: '3171••••••••1004',
+          phone: phone,
+          email: email,
+          birth: '14 Agu 1994 (Dewasa)',
+          isMain: true),
+      _Guest(
+          name: 'Siti Rahmawati',
+          relation: 'Keluarga / Rekan',
+          nik: '3273••••••••8821',
+          phone: '+62 813-9876-5432',
+          birth: ''),
+      _Guest(
+          name: 'Kenzo Pratama',
+          relation: 'Anak Kandung',
+          birth: '20 Mei 2019',
+          isChild: true),
+    ];
+  }
 
   List<_Guest> get _visible => _guests.where((g) {
         if (_filter == 1) return !g.isChild;

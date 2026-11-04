@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import '../config/supabase_config.dart';
 import '../models/booking_model.dart';
 import '../models/room_model.dart';
+import 'auth_service.dart';
+import 'customer_data_service.dart';
 import 'hotel_service.dart';
 import 'mock_data.dart';
 import 'supabase_service.dart';
@@ -101,6 +103,19 @@ class BookingService {
 
     // Fallback Mock
     await Future.delayed(const Duration(milliseconds: 300));
+    final currentUser = AuthService.instance.currentUser;
+    if (currentUser != null && CustomerDataService.instance.isFreshUser) {
+      // Pengguna baru -> Fresh (hanya pesanan yang benar-benar dibuat oleh akun ini)
+      var userList = MockData.bookings
+          .where((b) =>
+              b.customerId == currentUser.id || b.userId == currentUser.id)
+          .toList();
+      if (status != null) {
+        userList = userList.where((b) => b.status == status).toList();
+      }
+      return userList;
+    }
+
     var list = List<BookingModel>.from(MockData.bookings);
     if (status != null) {
       list = list.where((b) => b.status == status).toList();
