@@ -5,6 +5,20 @@ import 'package:go_ticket/core/services/hotel_service.dart';
 import 'package:go_ticket/core/utils/currency_formatter.dart';
 import '../../../router/customer_router.dart';
 
+class _CariFilters {
+  const _CariFilters({
+    this.promotionsOnly = false,
+    this.rating45Plus = false,
+    this.poolOnly = false,
+    this.maxPrice = 5000000,
+  });
+
+  final bool promotionsOnly;
+  final bool rating45Plus;
+  final bool poolOnly;
+  final double maxPrice;
+}
+
 /// Tab Cari: Halaman hasil pencarian hotel seperti screenshot
 class CariTab extends StatefulWidget {
   const CariTab({super.key});
@@ -14,7 +28,9 @@ class CariTab extends StatefulWidget {
 }
 
 class _CariTabState extends State<CariTab> {
-  String _sortBy = 'Harga Terbaik';
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  _CariFilters _filters = const _CariFilters();
 
   static final List<Map<String, dynamic>> _baseHotels = [
     {
@@ -80,11 +96,81 @@ class _CariTabState extends State<CariTab> {
 
   List<Map<String, dynamic>> _hotels = [];
   bool _isLoading = false;
+  String _sort = 'Terpopuler';
 
   @override
   void initState() {
     super.initState();
     _fetchHotels();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<Map<String, dynamic>> get _visibleHotels {
+    final query = _searchQuery.trim().toLowerCase();
+    final hotels = _hotels.where((hotel) {
+      final searchableText = [
+        hotel['name'],
+        hotel['location'],
+        hotel['type'],
+        ...(hotel['features'] as List<String>),
+        ...((hotel['extras'] as List<String>?) ?? const <String>[]),
+      ].whereType<String>().join(' ').toLowerCase();
+      final price =
+          CurrencyFormatter.parseToInt(hotel['discountedPrice'] as String);
+      final originalPrice = hotel['originalPrice'] == null
+          ? null
+          : CurrencyFormatter.parseToInt(hotel['originalPrice'] as String);
+      final rating = double.tryParse(hotel['rating'] as String) ?? 0;
+      final amenities = [
+        ...(hotel['features'] as List<String>),
+        ...((hotel['extras'] as List<String>?) ?? const <String>[]),
+      ].join(' ').toLowerCase();
+      return (query.isEmpty || searchableText.contains(query)) &&
+          price <= _filters.maxPrice &&
+          (!_filters.promotionsOnly ||
+              (originalPrice != null && originalPrice > price)) &&
+          (!_filters.rating45Plus || rating >= 4.5) &&
+          (!_filters.poolOnly ||
+              amenities.contains('kolam') ||
+              amenities.contains('pool'));
+    }).toList();
+
+    switch (_sort) {
+      case 'Harga Terendah':
+        hotels.sort(
+          (a, b) => CurrencyFormatter.parseToInt(
+            a['discountedPrice'] as String,
+          ).compareTo(
+            CurrencyFormatter.parseToInt(b['discountedPrice'] as String),
+          ),
+        );
+      case 'Harga Tertinggi':
+        hotels.sort(
+          (a, b) => CurrencyFormatter.parseToInt(
+            b['discountedPrice'] as String,
+          ).compareTo(
+            CurrencyFormatter.parseToInt(a['discountedPrice'] as String),
+          ),
+        );
+      case 'Rating Tertinggi':
+        hotels.sort(
+          (a, b) => (double.tryParse(b['rating'] as String) ?? 0).compareTo(
+            double.tryParse(a['rating'] as String) ?? 0,
+          ),
+        );
+      default:
+        hotels.sort(
+          (a, b) => (double.tryParse(b['rating'] as String) ?? 0).compareTo(
+            double.tryParse(a['rating'] as String) ?? 0,
+          ),
+        );
+    }
+    return hotels;
   }
 
   Future<void> _fetchHotels() async {
@@ -145,12 +231,6 @@ class _CariTabState extends State<CariTab> {
     }
   }
 
-  String _sort = 'Terpopuler';
-
-  void _snack(String m) => ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(m)));
-
   Future<void> _showSort() async {
     final v = await showModalBottomSheet<String>(
       context: context,
@@ -179,46 +259,145 @@ class _CariTabState extends State<CariTab> {
     );
     if (v != null) {
       setState(() => _sort = v);
-      _snack('Diurutkan: $v');
-      _fetchHotels();
     }
   }
 
-  void _showFilter() {
-    showModalBottomSheet<void>(
+  Future<void> _showFilter() async {
+    var promotionsOnly = _filters.promotionsOnly;
+    var rating45Plus = _filters.rating45Plus;
+    var poolOnly = _filters.poolOnly;
+    var maxPrice = _filters.maxPrice;
+    final result = await showModalBottomSheet<_CariFilters>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
+      isScrollControlled: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+            child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Filter',
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Filter Penginapan',
+                      style: GoogleFonts.inter(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => setSheetState(() {
+                        promotionsOnly = false;
+                        rating45Plus = false;
+                        poolOnly = false;
+                        maxPrice = 5000000;
+                      }),
+                      child: const Text('Reset'),
+                    ),
+                  ],
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Promo saja'),
+                  value: promotionsOnly,
+                  activeThumbColor: const Color(0xFF00B4D8),
+                  onChanged: (value) =>
+                      setSheetState(() => promotionsOnly = value),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Rating 4.5 ke atas'),
+                  value: rating45Plus,
+                  activeThumbColor: const Color(0xFF00B4D8),
+                  onChanged: (value) =>
+                      setSheetState(() => rating45Plus = value),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Ada kolam renang'),
+                  value: poolOnly,
+                  activeThumbColor: const Color(0xFF00B4D8),
+                  onChanged: (value) => setSheetState(() => poolOnly = value),
+                ),
+                Text(
+                  'Harga maksimum ${CurrencyFormatter.toRupiah(maxPrice.round())}',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                ),
+                Slider(
+                  value: maxPrice,
+                  min: 100000,
+                  max: 5000000,
+                  divisions: 49,
+                  label: CurrencyFormatter.toRupiah(maxPrice.round()),
+                  activeColor: const Color(0xFF00B4D8),
+                  onChanged: (value) =>
+                      setSheetState(() => maxPrice = value),
+                ),
                 const SizedBox(height: 8),
-                const Text('Filter aktif: Promo Kilat • Rating 4.5+ • Kolam Renang',
-                    style: TextStyle(fontSize: 12)),
-                const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      _snack('Filter diterapkan');
-                    },
-                    child: const Text('Terapkan'),
+                    onPressed: () => Navigator.pop(
+                      sheetContext,
+                      _CariFilters(
+                        promotionsOnly: promotionsOnly,
+                        rating45Plus: rating45Plus,
+                        poolOnly: poolOnly,
+                        maxPrice: maxPrice,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00B4D8),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Terapkan Filter'),
                   ),
                 ),
-              ]),
+              ],
+            ),
+          ),
         ),
       ),
     );
+    if (result != null && mounted) {
+      setState(() => _filters = result);
+    }
+  }
+
+  void _toggleFilter(String filter) {
+    setState(() {
+      switch (filter) {
+        case 'Promo Kilat':
+          _filters = _CariFilters(
+            promotionsOnly: !_filters.promotionsOnly,
+            rating45Plus: _filters.rating45Plus,
+            poolOnly: _filters.poolOnly,
+            maxPrice: _filters.maxPrice,
+          );
+        case '⭐ 4.5+':
+          _filters = _CariFilters(
+            promotionsOnly: _filters.promotionsOnly,
+            rating45Plus: !_filters.rating45Plus,
+            poolOnly: _filters.poolOnly,
+            maxPrice: _filters.maxPrice,
+          );
+        case '🏊 Kolam Renang':
+          _filters = _CariFilters(
+            promotionsOnly: _filters.promotionsOnly,
+            rating45Plus: _filters.rating45Plus,
+            poolOnly: !_filters.poolOnly,
+            maxPrice: _filters.maxPrice,
+          );
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final visibleHotels = _visibleHotels;
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       body: Column(
@@ -229,14 +408,27 @@ class _CariTabState extends State<CariTab> {
           Expanded(
             child: _isLoading && _hotels.isEmpty
                 ? const Center(child: CircularProgressIndicator())
-                : ListView.builder(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    itemCount: _hotels.length,
-                    itemBuilder: (context, index) {
-                      return _buildHotelCard(_hotels[index]);
-                    },
-                  ),
+                : visibleHotels.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(
+                            'Penginapan tidak ditemukan. Ubah kata pencarian atau filter.',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.inter(
+                              color: const Color(0xFF6B7280),
+                            ),
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        itemCount: visibleHotels.length,
+                        itemBuilder: (context, index) {
+                          return _buildHotelCard(visibleHotels[index]);
+                        },
+                      ),
           ),
         ],
       ),
@@ -310,8 +502,11 @@ class _CariTabState extends State<CariTab> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: TextField(
+                        controller: _searchController,
+                        onChanged: (value) =>
+                            setState(() => _searchQuery = value),
                         decoration: InputDecoration(
-                          hintText: 'The Grand Amora Resort & Spa',
+                          hintText: 'Cari nama hotel, kota, atau fasilitas...',
                           hintStyle: GoogleFonts.inter(
                               color: const Color(0xFF374151),
                               fontSize: 13,
@@ -320,6 +515,16 @@ class _CariTabState extends State<CariTab> {
                           isDense: true,
                           contentPadding:
                               const EdgeInsets.symmetric(vertical: 10),
+                          suffixIcon: _searchQuery.isEmpty
+                              ? null
+                              : IconButton(
+                                  tooltip: 'Hapus pencarian',
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() => _searchQuery = '');
+                                  },
+                                  icon: const Icon(Icons.close, size: 18),
+                                ),
                         ),
                       ),
                     ),
@@ -334,7 +539,12 @@ class _CariTabState extends State<CariTab> {
   }
 
   Widget _buildFilterBar() {
-    final filters = ['Promo Kilat', 'Harga', '⭐ 4.5+', '🏊 Kolam R...'];
+    const filters = [
+      'Promo Kilat',
+      'Harga',
+      '⭐ 4.5+',
+      '🏊 Kolam Renang',
+    ];
     return Container(
       color: Colors.white,
       child: Column(
@@ -344,14 +554,31 @@ class _CariTabState extends State<CariTab> {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
-              children: filters.map((f) {
+              children: filters.map((filter) {
+                final selected = switch (filter) {
+                  'Promo Kilat' => _filters.promotionsOnly,
+                  '⭐ 4.5+' => _filters.rating45Plus,
+                  '🏊 Kolam Renang' => _filters.poolOnly,
+                  _ => _filters.maxPrice < 5000000,
+                };
                 return Container(
                   margin: const EdgeInsets.only(right: 8),
                   child: OutlinedButton(
-                    onPressed: () => _snack('Filter diterapkan'),
+                    onPressed: filter == 'Harga'
+                        ? _showFilter
+                        : () => _toggleFilter(filter),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF111827),
-                      side: const BorderSide(color: Color(0xFFE5E7EB)),
+                      foregroundColor: selected
+                          ? Colors.white
+                          : const Color(0xFF111827),
+                      backgroundColor: selected
+                          ? const Color(0xFF00B4D8)
+                          : Colors.white,
+                      side: BorderSide(
+                        color: selected
+                            ? const Color(0xFF00B4D8)
+                            : const Color(0xFFE5E7EB),
+                      ),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 6),
                       minimumSize: Size.zero,
@@ -359,7 +586,7 @@ class _CariTabState extends State<CariTab> {
                           borderRadius: BorderRadius.circular(20)),
                     ),
                     child: Text(
-                      f,
+                      filter,
                       style: GoogleFonts.inter(
                           fontSize: 12, fontWeight: FontWeight.w500),
                     ),
@@ -370,7 +597,7 @@ class _CariTabState extends State<CariTab> {
           ),
           const Divider(height: 1, color: Color(0xFFE5E7EB)),
           InkWell(
-            onTap: () => Navigator.pushNamed(context, CustomerRouter.calendar),
+            onTap: _showFilter,
             child: Padding(
               padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -379,15 +606,16 @@ class _CariTabState extends State<CariTab> {
                   const Icon(Icons.location_on,
                       color: Color(0xFF00B4D8), size: 16),
                   const SizedBox(width: 4),
-                  Text(
-                    'Seminyak, Bali  •  24 - 26 Okt  •  2 Tamu, 1 Kamar',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: const Color(0xFF374151),
-                      fontWeight: FontWeight.w500,
+                  Expanded(
+                    child: Text(
+                      'Seminyak, Bali  •  2 Tamu, 1 Kamar',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: const Color(0xFF374151),
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
-                  const Spacer(),
                   const Icon(Icons.tune, color: Color(0xFF00B4D8), size: 18),
                 ],
               ),
@@ -399,6 +627,7 @@ class _CariTabState extends State<CariTab> {
   }
 
   Widget _buildResultsInfo() {
+    final resultCount = _visibleHotels.length;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Row(
@@ -408,7 +637,7 @@ class _CariTabState extends State<CariTab> {
             text: TextSpan(
               children: [
                 TextSpan(
-                  text: '18 Penginapan ',
+                  text: '$resultCount Penginapan ',
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
@@ -430,7 +659,7 @@ class _CariTabState extends State<CariTab> {
               const Icon(Icons.sort, color: Color(0xFF00B4D8), size: 16),
               const SizedBox(width: 4),
               Text(
-                _sortBy,
+                _sort,
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   color: const Color(0xFF00B4D8),
@@ -775,10 +1004,10 @@ class _CariTabState extends State<CariTab> {
           Expanded(
             child: OutlinedButton.icon(
               onPressed: _showSort,
-              icon: const Icon(Icons.local_fire_department,
+              icon: const Icon(Icons.sort,
                   color: Color(0xFF00B4D8), size: 16),
               label: Text(
-                'Terpopuler',
+                _sort,
                 style: GoogleFonts.inter(
                     fontSize: 13, color: const Color(0xFF00B4D8)),
               ),
@@ -796,7 +1025,7 @@ class _CariTabState extends State<CariTab> {
               onPressed: _showFilter,
               icon: const Icon(Icons.filter_list, size: 16),
               label: Text(
-                'Filter (3)',
+                'Filter (${(_filters.promotionsOnly ? 1 : 0) + (_filters.rating45Plus ? 1 : 0) + (_filters.poolOnly ? 1 : 0) + (_filters.maxPrice < 5000000 ? 1 : 0)})',
                 style: GoogleFonts.inter(
                     fontSize: 13, fontWeight: FontWeight.w600),
               ),

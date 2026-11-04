@@ -426,7 +426,18 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
           ? null
           : () {
               CustomerDashboardScreen.tabNotifier.value = 2;
-              Navigator.pop(context);
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              } else {
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  CustomerRouter.dashboard,
+                  (route) => false,
+                );
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  CustomerDashboardScreen.tabNotifier.value = 2;
+                });
+              }
             },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
