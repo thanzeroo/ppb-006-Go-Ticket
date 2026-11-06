@@ -10,7 +10,7 @@ import 'mock_data.dart';
 import 'supabase_service.dart';
 
 /// Service untuk transaksi pemesanan tiket / reservasi hotel.
-/// Terkoneksi dengan tabel [bookings] di Supabase dengan fallback lokal.
+/// Terkoneksi dengan tabel [booking] di Supabase. MockData HANYA saat offline.
 class BookingService {
   BookingService._();
   static final BookingService instance = BookingService._();
@@ -54,7 +54,7 @@ class BookingService {
       }
     }
 
-    // Fallback Mock
+    // Fallback Mock — HANYA kalau Supabase belum terkoneksi
     await Future.delayed(const Duration(milliseconds: 500));
     MockData.bookings.insert(0, booking);
     return booking;
@@ -91,21 +91,23 @@ class BookingService {
         }
 
         final res = await q?.order('tgl_booking', ascending: false);
-        if (res != null && (res as List).isNotEmpty) {
-          return res
+        if (res != null) {
+          // Return data dari DB (meskipun kosong [])
+          return (res as List)
               .map((b) => BookingModel.fromJson(Map<String, dynamic>.from(b)))
               .toList();
         }
+        return [];
       } catch (e) {
         debugPrint('⚠️ [BookingService] Supabase getMyBookings error: $e');
+        return []; // Error → return kosong
       }
     }
 
-    // Fallback Mock
+    // Fallback Mock — HANYA kalau Supabase belum terkoneksi
     await Future.delayed(const Duration(milliseconds: 300));
     final currentUser = AuthService.instance.currentUser;
     if (currentUser != null && CustomerDataService.instance.isFreshUser) {
-      // Pengguna baru -> Fresh (hanya pesanan yang benar-benar dibuat oleh akun ini)
       var userList = MockData.bookings
           .where((b) =>
               b.customerId == currentUser.id || b.userId == currentUser.id)
@@ -149,17 +151,19 @@ class BookingService {
         }
 
         final res = await q?.order('tgl_checkin', ascending: true);
-        if (res != null && (res as List).isNotEmpty) {
-          return res
+        if (res != null) {
+          return (res as List)
               .map((b) => BookingModel.fromJson(Map<String, dynamic>.from(b)))
               .toList();
         }
+        return [];
       } catch (e) {
         debugPrint('⚠️ [BookingService] Supabase getHotelBookings error: $e');
+        return [];
       }
     }
 
-    // Fallback Mock
+    // Fallback Mock — HANYA kalau Supabase belum terkoneksi
     await Future.delayed(const Duration(milliseconds: 300));
     var list = MockData.bookings.where((b) => b.hotelId == hotelId).toList();
     if (status != null) {
@@ -189,8 +193,10 @@ class BookingService {
         if (res != null) {
           return BookingModel.fromJson(Map<String, dynamic>.from(res));
         }
+        return null; // Tidak ditemukan di DB
       } catch (e) {
         debugPrint('⚠️ [BookingService] Supabase getBookingById error: $e');
+        return null;
       }
     }
 
@@ -346,9 +352,11 @@ class BookingService {
           await sb.table(SupabaseConfig.tableBooking)?.update({
             'status_booking': 'cancelled',
           }).eq('id_booking', bId);
+          return true;
         }
       } catch (e) {
         debugPrint('⚠️ [BookingService] Supabase cancelBooking error: $e');
+        return false;
       }
     }
 
@@ -361,4 +369,3 @@ class BookingService {
     return false;
   }
 }
-

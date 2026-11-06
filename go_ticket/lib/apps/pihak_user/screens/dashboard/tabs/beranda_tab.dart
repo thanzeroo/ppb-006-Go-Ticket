@@ -9,6 +9,7 @@ import 'package:go_ticket/core/services/customer_data_service.dart';
 import 'package:go_ticket/core/services/hotel_service.dart';
 import 'package:go_ticket/core/utils/currency_formatter.dart';
 import 'package:go_ticket/core/widgets/user_avatar.dart';
+import 'package:go_ticket/core/services/promo_service.dart';
 import '../../../router/customer_router.dart';
 import '../customer_dashboard_screen.dart';
 
@@ -130,34 +131,38 @@ class _BerandaTabState extends State<BerandaTab> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF00B4D8),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Text(
-                          'GO',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 13,
+                  Image.asset(
+                    'assets/logo.png',
+                    height: 28,
+                    errorBuilder: (_, __, ___) => Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00B4D8),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'GO',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'GoTicket',
-                        style: GoogleFonts.inter(
-                          color: const Color(0xFF0F172A),
-                          fontWeight: FontWeight.w800,
-                          fontSize: 18,
+                        const SizedBox(width: 6),
+                        Text(
+                          'GoTicket',
+                          style: GoogleFonts.inter(
+                            color: const Color(0xFF0F172A),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   UserAvatar(
                     name: user?.fullName ?? 'Aditya Pratama',
@@ -407,152 +412,172 @@ class _BerandaTabState extends State<BerandaTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // PROMO CARD
+  // PROMO CARD (Dari Database / Supabase)
   // ---------------------------------------------------------------------------
   Widget _buildPromoCard() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0077B6), Color(0xFF0096C7)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0077B6).withOpacity(0.3),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Badge Weekend Escape
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.auto_awesome,
-                              color: Colors.white, size: 12),
-                          const SizedBox(width: 4),
-                          Text(
-                            'WEEKEND ESCAPE',
-                            style: GoogleFonts.inter(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Diskon 35% Spesial\nWeekend',
-                      style: GoogleFonts.inter(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        height: 1.25,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Eksplorasi villa privat dan resor mewah impian Anda.',
-                      style: GoogleFonts.inter(
-                        color: Colors.white.withOpacity(0.9),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.18),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(Icons.confirmation_number_outlined,
-                    color: Colors.white, size: 28),
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: PromoService.instance.getPromos(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox.shrink();
+        }
+        final promos = snapshot.data ?? [];
+        if (promos.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        final promo = promos.first;
+        final code = promo['code']?.toString() ?? 'PROMO';
+        final title = promo['title']?.toString() ?? 'Promo Spesial';
+        final desc = promo['description']?.toString() ?? '';
+        final discountPercent = promo['discountPercent']?.toString() ?? '10';
+
+        return Container(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0077B6), Color(0xFF0096C7)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0077B6).withOpacity(0.3),
+                blurRadius: 14,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Kode Promo Spesial:',
-                    style: GoogleFonts.inter(
-                      fontSize: 10,
-                      color: Colors.white70,
-                      fontWeight: FontWeight.w500,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.auto_awesome,
+                                  color: Colors.white, size: 12),
+                              const SizedBox(width: 4),
+                              Text(
+                                'DISKON $discountPercent%',
+                                style: GoogleFonts.inter(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          title,
+                          style: GoogleFonts.inter(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            height: 1.25,
+                          ),
+                        ),
+                        if (desc.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            desc,
+                            style: GoogleFonts.inter(
+                              color: Colors.white.withOpacity(0.9),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                  Text(
-                    'STAYHEMAT',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                      letterSpacing: 1.2,
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.18),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(Icons.confirmation_number_outlined,
+                        color: Colors.white, size: 28),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Kode Promo Spesial:',
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        code,
+                        style: GoogleFonts.inter(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: code));
+                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Kode promo $code berhasil disalin!'),
+                          duration: const Duration(seconds: 1),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFF0077B6),
+                      elevation: 0,
+                      shape: const StadiumBorder(),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 8),
+                    ),
+                    icon: const Icon(Icons.copy, size: 14),
+                    label: Text(
+                      'Salin Kode',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],
               ),
-              ElevatedButton.icon(
-                onPressed: () {
-                  Clipboard.setData(const ClipboardData(text: 'STAYHEMAT'));
-                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Kode promo STAYHEMAT berhasil disalin!'),
-                      duration: Duration(seconds: 1),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: const Color(0xFF0077B6),
-                  elevation: 0,
-                  shape: const StadiumBorder(),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                ),
-                icon: const Icon(Icons.copy, size: 14),
-                label: Text(
-                  'Salin Kode',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -659,77 +684,68 @@ class _BerandaTabState extends State<BerandaTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // REKOMENDASI TERPOPULER
+  // REKOMENDASI TERPOPULER (Dari Database / Supabase)
   // ---------------------------------------------------------------------------
   Widget _buildRekomendasiSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return FutureBuilder<List<HotelModel>>(
+      future: HotelService.instance.getFeaturedHotels(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox.shrink();
+        }
+        final list = snapshot.data ?? [];
+        if (list.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Rekomendasi Terpopuler',
-                  style: GoogleFonts.inter(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF0F172A),
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Rekomendasi Terpopuler',
+                      style: GoogleFonts.inter(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Dipilih khusus dengan skor ulasan tertinggi',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  'Dipilih khusus dengan skor ulasan tertinggi',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: const Color(0xFF64748B),
+                TextButton(
+                  onPressed: () =>
+                      CustomerDashboardScreen.tabNotifier.value = 1,
+                  child: Text(
+                    'Lihat Semua (${list.length})',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      color: const Color(0xFF0077B6),
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],
             ),
-            TextButton(
-              onPressed: () => CustomerDashboardScreen.tabNotifier.value = 1,
-              child: Text(
-                'Semua (42)',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: const Color(0xFF0077B6),
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+            const SizedBox(height: 12),
+            Column(
+              children: list.map((h) => _buildHotelCard(h)).toList(),
             ),
           ],
-        ),
-        const SizedBox(height: 12),
-        FutureBuilder<List<HotelModel>>(
-          future: HotelService.instance.getFeaturedHotels(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: CircularProgressIndicator(),
-                ),
-              );
-            }
-            final list = snapshot.data ?? [];
-            if (list.isEmpty) {
-              return const Center(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Text('Tidak ada hotel rekomendasi saat ini.'),
-                ),
-              );
-            }
-
-            return Column(
-              children: list.map((h) => _buildHotelCard(h)).toList(),
-            );
-          },
-        ),
-      ],
+        );
+      },
     );
   }
 

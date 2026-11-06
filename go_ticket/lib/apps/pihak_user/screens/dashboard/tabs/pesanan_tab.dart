@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:go_ticket/core/models/booking_model.dart';
 import 'package:go_ticket/core/services/auth_service.dart';
+import 'package:go_ticket/core/services/booking_service.dart';
 import 'package:go_ticket/core/services/customer_data_service.dart';
+import 'package:go_ticket/core/utils/currency_formatter.dart';
 import 'package:go_ticket/core/widgets/user_avatar.dart';
 import '../../../router/customer_router.dart';
 import '../customer_dashboard_screen.dart';
@@ -342,160 +345,170 @@ class _PesananTabState extends State<PesananTab>
     );
   }
 
-  Widget _buildAllOrders({String? filterStatus}) {
-    if (CustomerDataService.instance.isFreshUser) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFC8F0FA),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.receipt_long_outlined,
-                  color: Color(0xFF0077B6),
-                  size: 36,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Belum Ada Pesanan',
-                style: GoogleFonts.inter(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Anda belum memiliki pesanan hotel aktif maupun riwayat pemesanan. Mulai jelajahi dan booking hotel impian Anda sekarang!',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: const Color(0xFF64748B),
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () => CustomerDashboardScreen.tabNotifier.value = 1,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00B4D8),
-                  foregroundColor: Colors.white,
-                  shape: const StadiumBorder(),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  elevation: 0,
-                ),
-                child: Text(
-                  'Cari Penginapan Sekarang',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w700),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final children = <Widget>[];
-    if ((filterStatus == null || filterStatus == 'active') &&
-        _matchesBookingQuery(const [
-          'The Grand Amora Resort & Spa',
-          'Seminyak Bali',
-          'GT-884920',
-          'Deluxe Ocean View',
-          'Siap Check-In',
-        ])) {
-      children
-        ..add(_buildActiveBookingCard())
-        ..add(const SizedBox(height: 12));
-    }
-
-    final completedBookings = [
-      (
-        bookingId: 'GT-772109',
-        hotelName: 'Seminyak Beach Breeze Hotel',
-        location: 'Seminyak, Bali',
-        dates: '10 Sep - 12 Sep 2025  •  Rp 850.000',
-      ),
-      (
-        bookingId: 'GT-661084',
-        hotelName: 'Alila Ocean Suites',
-        location: 'Uluwatu, Bali',
-        dates: '22 Jul - 24 Jul 2025  •  Rp 2.900.000',
-      ),
+  static String _monthShort(int m) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+      'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
     ];
-    if (filterStatus == null || filterStatus == 'selesai') {
-      for (final booking in completedBookings) {
-        if (_matchesBookingQuery([
-          booking.bookingId,
-          booking.hotelName,
-          booking.location,
-          booking.dates,
-          'Selesai Menginap',
-        ])) {
-          children
-            ..add(
-              _buildCompletedBookingCard(
-                bookingId: booking.bookingId,
-                hotelName: booking.hotelName,
-                location: booking.location,
-                dates: booking.dates,
-                status: 'Selesai Menginap',
-                statusColor: const Color(0xFF6B7280),
+    return (m >= 1 && m <= 12) ? months[m - 1] : '';
+  }
+
+  Widget _buildEmptyOrdersState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: const BoxDecoration(
+                color: Color(0xFFC8F0FA),
+                shape: BoxShape.circle,
               ),
-            )
-            ..add(const SizedBox(height: 12));
-        }
-      }
-    }
-
-    if ((filterStatus == null || filterStatus == 'dibatalkan') &&
-        _matchesBookingQuery(const [
-          'GT-554101',
-          'The Grand Amora Resort & Spa',
-          'Seminyak Bali',
-          'Dibatalkan Refund Selesai',
-          'Rp 1.200.000',
-        ])) {
-      children
-        ..add(_buildCancelledBookingCard())
-        ..add(const SizedBox(height: 12));
-    }
-
-    if (_searchQuery.trim().isEmpty) {
-      children.add(_buildBantuanCard());
-    } else if (children.isEmpty) {
-      children.add(
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
-          child: Text(
-            'Pesanan tidak ditemukan. Coba nama hotel, kota, atau ID booking lain.',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              color: const Color(0xFF6B7280),
+              child: const Icon(
+                Icons.receipt_long_outlined,
+                color: Color(0xFF0077B6),
+                size: 36,
+              ),
             ),
-          ),
+            const SizedBox(height: 16),
+            Text(
+              'Belum Ada Pesanan',
+              style: GoogleFonts.inter(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Anda belum memiliki pesanan hotel aktif maupun riwayat pemesanan. Mulai jelajahi dan booking hotel impian Anda sekarang!',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: const Color(0xFF64748B),
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () => CustomerDashboardScreen.tabNotifier.value = 1,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00B4D8),
+                foregroundColor: Colors.white,
+                shape: const StadiumBorder(),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                elevation: 0,
+              ),
+              child: Text(
+                'Cari Penginapan Sekarang',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
         ),
-      );
-    }
-    children.add(const SizedBox(height: 80));
-
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      children: children,
+      ),
     );
   }
 
-  Widget _buildActiveBookingCard() {
+  Widget _buildAllOrders({String? filterStatus}) {
+    return FutureBuilder<List<BookingModel>>(
+      future: BookingService.instance.getMyBookings(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final allBookings = snapshot.data ?? [];
+        if (allBookings.isEmpty) {
+          return _buildEmptyOrdersState();
+        }
+
+        final filtered = allBookings.where((b) {
+          if (filterStatus == 'active') {
+            return b.status == BookingStatus.confirmed ||
+                b.status == BookingStatus.checkedIn ||
+                b.status == BookingStatus.pendingPayment;
+          }
+          if (filterStatus == 'selesai') {
+            return b.status == BookingStatus.checkedOut;
+          }
+          if (filterStatus == 'dibatalkan') {
+            return b.status == BookingStatus.cancelled ||
+                b.status == BookingStatus.expired;
+          }
+          return true;
+        }).where((b) {
+          return _matchesBookingQuery([
+            b.bookingCode,
+            b.hotelName,
+            b.hotelAddress ?? '',
+            b.roomTypeName,
+            b.status.displayName,
+          ]);
+        }).toList();
+
+        if (filtered.isEmpty) {
+          return _buildEmptyOrdersState();
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          itemCount: filtered.length,
+          itemBuilder: (context, index) {
+            final b = filtered[index];
+            if (b.status == BookingStatus.checkedOut) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildCompletedBookingCard(
+                  bookingId: b.bookingCode,
+                  hotelName: b.hotelName,
+                  location: b.hotelAddress ?? 'Seminyak, Bali',
+                  dates:
+                      '${b.checkInDate.day} ${_monthShort(b.checkInDate.month)} - ${b.checkOutDate.day} ${_monthShort(b.checkOutDate.month)} ${b.checkOutDate.year}  •  ${CurrencyFormatter.toRupiah(b.totalAmount)}',
+                  status: 'Selesai Menginap',
+                  statusColor: const Color(0xFF6B7280),
+                ),
+              );
+            }
+            if (b.status == BookingStatus.cancelled ||
+                b.status == BookingStatus.expired) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildCancelledBookingCard(),
+              );
+            }
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildActiveBookingCard(b),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildActiveBookingCard([BookingModel? b]) {
+    final bookingId = b?.bookingCode ?? 'GT-884920';
+    final hotelName = b?.hotelName ?? 'The Grand Amora Resort & Spa';
+    final roomType = b != null
+        ? '${b.roomTypeName} (${b.totalRooms} Kamar • ${b.nights} Malam)'
+        : 'Deluxe Ocean View (1 Kamar • 2 Malam)';
+    final dates = b != null
+        ? '${b.checkInDate.day} ${_monthShort(b.checkInDate.month)} – ${b.checkOutDate.day} ${_monthShort(b.checkOutDate.month)} ${b.checkOutDate.year}'
+        : '24 Okt – 26 Okt 2025';
+    final priceStr = b != null
+        ? CurrencyFormatter.toRupiah(b.totalAmount)
+        : 'Rp 1.600.000';
+    final paymentMethodStr = b?.paymentMethod ?? 'QRIS';
+    final statusStr = b?.status.displayName ?? 'Siap Check-In';
+    final imageUrl = b?.hotelImageUrl ??
+        'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=200';
+    final locationStr = b?.hotelAddress ?? 'Seminyak, Bali';
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -535,7 +548,7 @@ class _PesananTabState extends State<PesananTab>
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'Siap Check-In',
+                      statusStr,
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -547,7 +560,7 @@ class _PesananTabState extends State<PesananTab>
                 Row(
                   children: [
                     Text(
-                      'ID: GT-884920',
+                      'ID: $bookingId',
                       style: GoogleFonts.inter(
                           fontSize: 12, color: const Color(0xFF6B7280)),
                     ),
@@ -570,7 +583,7 @@ class _PesananTabState extends State<PesananTab>
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
                       child: Image.network(
-                        'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=200',
+                        imageUrl,
                         width: 80,
                         height: 70,
                         fit: BoxFit.cover,
@@ -592,7 +605,7 @@ class _PesananTabState extends State<PesananTab>
                               const Icon(Icons.star,
                                   color: Color(0xFFFBBC05), size: 13),
                               Text(
-                                ' Bintang 5  •  Seminyak, Bali',
+                                ' Bintang 5  •  $locationStr',
                                 style: GoogleFonts.inter(
                                     fontSize: 11,
                                     color: const Color(0xFF6B7280)),
@@ -601,7 +614,7 @@ class _PesananTabState extends State<PesananTab>
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            'The Grand Amora Resort &',
+                            hotelName,
                             style: GoogleFonts.inter(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
@@ -609,7 +622,7 @@ class _PesananTabState extends State<PesananTab>
                             ),
                           ),
                           Text(
-                            'Deluxe Ocean View (1 Kamar • 2 Malam)',
+                            roomType,
                             style: GoogleFonts.inter(
                                 fontSize: 12,
                                 color: const Color(0xFF6B7280)),
@@ -621,7 +634,7 @@ class _PesananTabState extends State<PesananTab>
                                   size: 12, color: Color(0xFF9CA3AF)),
                               const SizedBox(width: 4),
                               Text(
-                                '24 Okt – 26 Okt 2025',
+                                dates,
                                 style: GoogleFonts.inter(
                                     fontSize: 12,
                                     color: const Color(0xFF6B7280)),
@@ -662,7 +675,7 @@ class _PesananTabState extends State<PesananTab>
                     Row(
                       children: [
                         Text(
-                          'Rp 1.600.000',
+                          priceStr,
                           style: GoogleFonts.inter(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
@@ -670,6 +683,83 @@ class _PesananTabState extends State<PesananTab>
                           ),
                         ),
                         const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0FDF4),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFF86EFAC)),
+                          ),
+                          child: Text(
+                            '✓ Lunas ($paymentMethodStr)',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: const Color(0xFF16A34A),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () =>
+                        Navigator.pushNamed(context, CustomerRouter.eTicket),
+                    icon: const Icon(Icons.qr_code, size: 16),
+                    label: Text(
+                      'Lihat E-Tiket & QR',
+                      style: GoogleFonts.inter(
+                          fontSize: 13, fontWeight: FontWeight.w700),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00B4D8),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      elevation: 0,
+                      minimumSize: const Size(double.infinity, 0),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text(
+                                'Petunjuk arah & kontak resepsionis dikirim ke WhatsApp'))),
+                    icon: const Icon(Icons.support_agent,
+                        color: Color(0xFF00B4D8), size: 16),
+                    label: Text(
+                      'Petunjuk & Resepsionis',
+                      style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: const Color(0xFF00B4D8),
+                          fontWeight: FontWeight.w600),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFF00B4D8)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      minimumSize: const Size(double.infinity, 0),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 3),

@@ -7,8 +7,8 @@ import 'mock_data.dart';
 import 'supabase_service.dart';
 
 /// Service untuk mengelola data Hotel dan Kamar.
-/// Mengambil data dari Supabase Table [hotels] & [rooms]
-/// dengan fallback ke [MockData] saat offline / belum terkoneksi.
+/// Mengambil data dari Supabase Table [mitra_penginapan] & [tipe_kamar]
+/// dengan fallback ke [MockData] HANYA saat Supabase belum terkoneksi.
 class HotelService {
   HotelService._();
   static final HotelService instance = HotelService._();
@@ -49,14 +49,23 @@ class HotelService {
                   HotelModel.fromJson(Map<String, dynamic>.from(item)))
               .toList();
 
-          if (list.isNotEmpty) return list;
+          // Sorting
+          if (sortBy == 'Harga Terendah') {
+            list.sort((a, b) => a.pricePerNight.compareTo(b.pricePerNight));
+          } else if (sortBy == 'Rating Tertinggi') {
+            list.sort((a, b) => b.rating.compareTo(a.rating));
+          }
+
+          // Return data dari DB (meskipun kosong)
+          return list;
         }
       } catch (e) {
         debugPrint('⚠️ [HotelService] Supabase getHotels error: $e');
+        return []; // Error saat query → return kosong, bukan MockData
       }
     }
 
-    // Fallback Mock Data
+    // Fallback Mock Data — HANYA kalau Supabase belum terkoneksi
     await Future.delayed(const Duration(milliseconds: 300));
     var results = List<HotelModel>.from(MockData.hotels);
 
@@ -90,6 +99,7 @@ class HotelService {
   /// Mengambil hotel featured / rekomendasi untuk Beranda Tab
   Future<List<HotelModel>> getFeaturedHotels() async {
     final all = await getHotels();
+    if (all.isEmpty) return [];
     final featured = all.where((h) => h.isRecommended || h.isPopular).toList();
     return featured.isNotEmpty ? featured : all;
   }
@@ -110,12 +120,14 @@ class HotelService {
         if (res != null) {
           return HotelModel.fromJson(Map<String, dynamic>.from(res));
         }
+        return null; // Tidak ditemukan di DB
       } catch (e) {
         debugPrint('⚠️ [HotelService] Supabase getHotelById error: $e');
+        return null;
       }
     }
 
-    // Fallback Mock
+    // Fallback Mock — HANYA kalau Supabase belum terkoneksi
     try {
       return MockData.hotels.firstWhere((h) => h.id == hotelId);
     } catch (_) {
@@ -140,17 +152,19 @@ class HotelService {
           q = q?.eq('id_penginapan', hotelId);
         }
         final res = await q;
-        if (res != null && (res as List).isNotEmpty) {
+        if (res != null) {
           return (res as List)
               .map((r) => RoomModel.fromJson(Map<String, dynamic>.from(r)))
               .toList();
         }
+        return [];
       } catch (e) {
         debugPrint('⚠️ [HotelService] Supabase getRooms error: $e');
+        return [];
       }
     }
 
-    // Fallback Mock
+    // Fallback Mock — HANYA kalau Supabase belum terkoneksi
     await Future.delayed(const Duration(milliseconds: 250));
     final rooms = MockData.rooms.where((r) => r.hotelId == hotelId).toList();
     return rooms.isNotEmpty ? rooms : MockData.rooms;
@@ -202,6 +216,7 @@ class HotelService {
         return true;
       } catch (e) {
         debugPrint('⚠️ [HotelService] Update room Supabase error: $e');
+        return false;
       }
     }
 
@@ -232,6 +247,7 @@ class HotelService {
         return true;
       } catch (e) {
         debugPrint('⚠️ [HotelService] updateRoomStatus error: $e');
+        return false;
       }
     }
 
@@ -253,6 +269,7 @@ class HotelService {
         return true;
       } catch (e) {
         debugPrint('⚠️ [HotelService] deleteRoom error: $e');
+        return false;
       }
     }
 
@@ -282,6 +299,7 @@ class HotelService {
         return true;
       } catch (e) {
         debugPrint('⚠️ [HotelService] updateHotelStatus error: $e');
+        return false;
       }
     }
 
@@ -293,4 +311,3 @@ class HotelService {
     return false;
   }
 }
-

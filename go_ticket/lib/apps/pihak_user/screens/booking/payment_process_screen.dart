@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:go_ticket/core/models/booking_args.dart';
+import 'package:go_ticket/core/models/booking_model.dart';
+import 'package:go_ticket/core/services/auth_service.dart';
+import 'package:go_ticket/core/services/booking_service.dart';
 import '../../router/customer_router.dart';
 import 'package:go_ticket/core/widgets/gt_ui.dart';
 
@@ -82,12 +85,51 @@ class _PaymentProcessScreenState extends State<PaymentProcessScreen> {
     return '$m:$s';
   }
 
-  void _pay() {
+  Future<void> _pay() async {
     _timer?.cancel();
+    final paymentMethodName = _methods[_method][2];
+    final user = AuthService.instance.currentUser;
+    final bookingCode =
+        'GT-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+
+    final booking = BookingModel(
+      id: 'bkg-${DateTime.now().millisecondsSinceEpoch}',
+      bookingCode: bookingCode,
+      customerId: user?.id ?? '1',
+      customerName: _args.guestName.isNotEmpty
+          ? _args.guestName
+          : (user?.fullName ?? 'Tamu Go Ticket'),
+      customerPhone:
+          _args.phone.isNotEmpty ? _args.phone : user?.phoneNumber,
+      hotelId: '1',
+      hotelName: _args.hotelName,
+      roomId: '1',
+      roomTypeName: _args.roomName,
+      checkInDate: _args.checkIn,
+      checkOutDate: _args.checkOut,
+      totalNights: _args.nights > 0 ? _args.nights : 1,
+      guestCount: _args.adults + _args.children,
+      pricePerNight: _args.roomPrice,
+      subtotal: _args.subtotal,
+      discountAmount: _args.discount,
+      totalAmount: _args.total,
+      paymentMethod: paymentMethodName,
+      paymentStatus: 'paid',
+      status: BookingStatus.confirmed,
+      isPaid: true,
+      paidAt: DateTime.now(),
+      qrCodeData: '$bookingCode-CHECKIN',
+    );
+
+    try {
+      await BookingService.instance.createBooking(booking);
+    } catch (_) {}
+
+    if (!mounted) return;
     Navigator.pushReplacementNamed(
       context,
       CustomerRouter.paymentSuccess,
-      arguments: _args.copyWith(paymentMethod: _methods[_method][2]),
+      arguments: _args.copyWith(paymentMethod: paymentMethodName),
     );
   }
 

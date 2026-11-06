@@ -8,6 +8,7 @@ import 'mock_data.dart';
 import 'supabase_service.dart';
 
 /// Service untuk operasional pemeliharaan hotel (Kebersihan & Kerusakan).
+/// Data dari Supabase. MockData HANYA saat offline.
 class MaintenanceService {
   MaintenanceService._();
   static final MaintenanceService instance = MaintenanceService._();
@@ -44,18 +45,20 @@ class MaintenanceService {
               MaintenanceTicketModel.fromJson(Map<String, dynamic>.from(t))));
         }
 
-        if (results.isNotEmpty) return results;
+        // Return data dari DB (meskipun kosong)
+        return results;
       } catch (e) {
         debugPrint('⚠️ [MaintenanceService] getTickets error: $e');
+        return []; // Error → return kosong
       }
     }
 
-    // Fallback Mock
+    // Fallback Mock — HANYA kalau Supabase belum terkoneksi
     await Future.delayed(const Duration(milliseconds: 250));
     return List<MaintenanceTicketModel>.from(MockData.maintenanceTickets);
   }
 
-  /// Membuat tiket laporan baru (contoh: Lapor Kerusakan atau Permintaan Kebersihan)
+  /// Membuat tiket laporan baru
   Future<MaintenanceTicketModel> createTicket(
     MaintenanceTicketModel ticket,
   ) async {
@@ -129,9 +132,11 @@ class MaintenanceService {
               .table(SupabaseConfig.tableLaporanKerusakan)
               ?.update(data)
               .eq('id_tiket_kerusakan', parsedId);
+          return true;
         }
       } catch (e) {
         debugPrint('⚠️ [MaintenanceService] updateTicketStatus error: $e');
+        return false;
       }
     }
 
@@ -154,4 +159,3 @@ class MaintenanceService {
     return false;
   }
 }
-

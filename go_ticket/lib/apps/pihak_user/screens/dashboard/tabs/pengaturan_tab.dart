@@ -27,6 +27,8 @@ class _PengaturanTabState extends State<PengaturanTab> {
   String _language = 'Bahasa Indonesia';
   int _savedGuestsCount = 0;
   int _savedHotelsCount = 0;
+  int _points = 0;
+  String _tier = 'MEMBER BRONZE GO TICKET';
 
   @override
   void initState() {
@@ -37,10 +39,14 @@ class _PengaturanTabState extends State<PengaturanTab> {
   Future<void> _loadDynamicCounts() async {
     final guests = await CustomerDataService.instance.getSavedGuests();
     final hotels = await CustomerDataService.instance.getSavedHotels();
+    final points = await CustomerDataService.instance.getRewardPoints();
+    final tier = await CustomerDataService.instance.getMembershipTier();
     if (mounted) {
       setState(() {
         _savedGuestsCount = guests.length;
         _savedHotelsCount = hotels.length;
+        _points = points;
+        _tier = tier;
       });
     }
   }
@@ -226,8 +232,8 @@ class _PengaturanTabState extends State<PengaturanTab> {
     final email =
         (user?.email?.isNotEmpty == true) ? user!.email! : 'aditya.pratama@email.com';
     final isVerified = user?.isVerified ?? true;
-    final points = CustomerDataService.instance.getRewardPoints();
-    final tier = CustomerDataService.instance.getMembershipTier();
+    final points = _points;
+    final tier = _tier;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -371,34 +377,38 @@ class _PengaturanTabState extends State<PengaturanTab> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF00B4D8),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Text(
-                    'GO',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 13,
+            Image.asset(
+              'assets/logo.png',
+              height: 28,
+              errorBuilder: (_, __, ___) => Row(
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00B4D8),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      'GO',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'GoTicket',
-                  style: GoogleFonts.inter(
-                    color: const Color(0xFF0F172A),
-                    fontWeight: FontWeight.w800,
-                    fontSize: 18,
+                  const SizedBox(width: 6),
+                  Text(
+                    'GoTicket',
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFF0F172A),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 18,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             UserAvatar(
               name: user?.fullName ?? 'Aditya Pratama',

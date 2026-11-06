@@ -5,6 +5,7 @@ import 'mock_data.dart';
 import 'supabase_service.dart';
 
 /// Service untuk mengelola promo & voucher diskon Go Ticket.
+/// Data diambil dari Supabase [kampanye_promo]. MockData HANYA saat offline.
 class PromoService {
   PromoService._();
   static final PromoService instance = PromoService._();
@@ -19,7 +20,8 @@ class PromoService {
             .table(SupabaseConfig.tableKampanyePromo)
             ?.select()
             .eq('status_promo', 'aktif');
-        if (res != null && (res as List).isNotEmpty) {
+        if (res != null) {
+          // Return data dari DB (meskipun kosong [])
           return (res as List).map((p) {
             final m = Map<String, dynamic>.from(p);
             return {
@@ -36,11 +38,14 @@ class PromoService {
             };
           }).toList();
         }
+        return [];
       } catch (e) {
         debugPrint('⚠️ [PromoService] getPromos error: $e');
+        return []; // Error → return kosong, bukan MockData
       }
     }
 
+    // Fallback Mock — HANYA kalau Supabase belum terkoneksi
     await Future.delayed(const Duration(milliseconds: 200));
     return List<Map<String, dynamic>>.from(MockData.promos);
   }
@@ -110,6 +115,7 @@ class PromoService {
         return true;
       } catch (e) {
         debugPrint('⚠️ [PromoService] createPromo error: $e');
+        return false;
       }
     }
 
@@ -132,6 +138,7 @@ class PromoService {
         return true;
       } catch (e) {
         debugPrint('⚠️ [PromoService] deletePromo error: $e');
+        return false;
       }
     }
 
@@ -139,4 +146,3 @@ class PromoService {
     return true;
   }
 }
-

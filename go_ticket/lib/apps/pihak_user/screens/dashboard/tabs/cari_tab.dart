@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:go_ticket/core/services/auth_service.dart';
 import 'package:go_ticket/core/services/hotel_service.dart';
+import 'package:go_ticket/core/services/supabase_service.dart';
 import 'package:go_ticket/core/utils/currency_formatter.dart';
 import 'package:go_ticket/core/widgets/user_avatar.dart';
 import '../../../router/customer_router.dart';
@@ -224,9 +225,11 @@ class _CariTabState extends State<CariTab> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _hotels = [
-            for (final h in _baseHotels) {...h, 'isFavorite': false}
-          ];
+          _hotels = SupabaseService.instance.isReady
+              ? []
+              : [
+                  for (final h in _baseHotels) {...h, 'isFavorite': false}
+                ];
           _isLoading = false;
         });
       }
