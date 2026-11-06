@@ -35,68 +35,6 @@ class _CariTabState extends State<CariTab> {
   String _searchQuery = '';
   _CariFilters _filters = const _CariFilters();
 
-  static final List<Map<String, dynamic>> _baseHotels = [
-    {
-      'name': 'The Grand Amora Resort & Spa',
-      'location': 'Petittenget, Seminyak',
-      'type': 'Resor • ⭐ 5',
-      'rating': '4.9',
-      'reviews': '428 ulasan',
-      'distance': '190m ke Pantai',
-      'originalPrice': 'Rp 1.200.000',
-      'discountedPrice': 'Rp 850.000',
-      'discount': 'Hemat 29%',
-      'features': ['Kolam Infinity', 'Spa Mewah', 'Bebas Batal'],
-      'tag': 'Paling Diminati',
-      'tagColor': Color(0xFF00B4D8),
-      'isFavorite': true,
-      'isFree': true,
-      'imageUrl':
-          'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=400',
-      'badgeText': null,
-    },
-    {
-      'name': 'Kayumanis Private Villa',
-      'location': 'Kayu Aya, Seminyak',
-      'type': null,
-      'rating': '4.8',
-      'reviews': '120 ulasan',
-      'distance': '1 Unit Tersisa',
-      'originalPrice': null,
-      'discountedPrice': 'Rp 1.650.000',
-      'discount': null,
-      'features': ['Private Pool', 'Floating Breakfast'],
-      'extras': ['Butler 24 Jam'],
-      'tag': 'Private Villa',
-      'tagColor': Color(0xFF7C3AED),
-      'isFavorite': false,
-      'isFree': false,
-      'imageUrl':
-          'https://images.unsplash.com/photo-1540541338287-41700207dee6?w=400',
-      'badgeText': 'Bintang 5',
-    },
-    {
-      'name': 'Seminyak Beach Breeze Hotel',
-      'location': 'Double Six, Seminyak',
-      'type': null,
-      'rating': '4.7',
-      'reviews': '89 ulasan',
-      'distance': 'Dekat Spot Surfing',
-      'originalPrice': null,
-      'discountedPrice': 'Rp 620.000',
-      'discount': null,
-      'features': ['Langsung ke Pasir', 'WiFi Kencang'],
-      'extras': ['Cafe Tepi Pantai'],
-      'tag': 'Akses Pantai',
-      'tagColor': Color(0xFF16A34A),
-      'isFavorite': false,
-      'isFree': false,
-      'imageUrl':
-          'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=400',
-      'badgeText': 'Bintang 4',
-    },
-  ];
-
   List<Map<String, dynamic>> _hotels = [];
   bool _isLoading = false;
   String _sort = 'Terpopuler';
@@ -225,11 +163,7 @@ class _CariTabState extends State<CariTab> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _hotels = SupabaseService.instance.isReady
-              ? []
-              : [
-                  for (final h in _baseHotels) {...h, 'isFavorite': false}
-                ];
+          _hotels = [];
           _isLoading = false;
         });
       }

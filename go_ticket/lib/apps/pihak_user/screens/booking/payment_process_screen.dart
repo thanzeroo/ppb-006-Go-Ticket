@@ -101,9 +101,9 @@ class _PaymentProcessScreenState extends State<PaymentProcessScreen> {
           : (user?.fullName ?? 'Tamu Go Ticket'),
       customerPhone:
           _args.phone.isNotEmpty ? _args.phone : user?.phoneNumber,
-      hotelId: '1',
+      hotelId: _args.hotelId.isNotEmpty ? _args.hotelId : '1',
       hotelName: _args.hotelName,
-      roomId: '1',
+      roomId: _args.roomId.isNotEmpty ? _args.roomId : '1',
       roomTypeName: _args.roomName,
       checkInDate: _args.checkIn,
       checkOutDate: _args.checkOut,

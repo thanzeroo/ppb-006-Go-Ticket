@@ -4,13 +4,12 @@ import '../config/supabase_config.dart';
 import '../models/booking_model.dart';
 import '../models/room_model.dart';
 import 'auth_service.dart';
-import 'customer_data_service.dart';
 import 'hotel_service.dart';
-import 'mock_data.dart';
 import 'supabase_service.dart';
 
 /// Service untuk transaksi pemesanan tiket / reservasi hotel.
-/// Terkoneksi dengan tabel [booking] di Supabase. MockData HANYA saat offline.
+/// Terkoneksi langsung dengan tabel [booking] di Supabase.
+/// Tidak ada mock data atau fallback dummy data.
 class BookingService {
   BookingService._();
   static final BookingService instance = BookingService._();
@@ -54,9 +53,6 @@ class BookingService {
       }
     }
 
-    // Fallback Mock — HANYA kalau Supabase belum terkoneksi
-    await Future.delayed(const Duration(milliseconds: 500));
-    MockData.bookings.insert(0, booking);
     return booking;
   }
 
@@ -67,19 +63,21 @@ class BookingService {
   /// Mengambil daftar pesanan milik customer yang login
   Future<List<BookingModel>> getMyBookings({BookingStatus? status}) async {
     final sb = SupabaseService.instance;
-    final currentUserId = sb.currentAuthUser?.id;
+    final user = AuthService.instance.currentUser;
+    final userId = user?.id ?? sb.currentAuthUser?.id;
 
     if (sb.isReady) {
       try {
-        var q = sb.table(SupabaseConfig.tableBooking)?.select(
-              '*, mitra_penginapan(nama_properti), tipe_kamar(nama_tipe), users(nama_lengkap)',
-            );
+        var q = sb.table(SupabaseConfig.tableBooking)?.select('*');
 
-        if (currentUserId != null && int.tryParse(currentUserId) != null) {
-          q = q?.eq('id_user', int.parse(currentUserId));
+        if (userId != null) {
+          final uid = int.tryParse(userId);
+          if (uid != null) {
+            q = q?.eq('id_user', uid);
+          }
         }
 
-        if (status != null) {
+        if (status != null && q != null) {
           final statusMap = {
             BookingStatus.confirmed: 'confirmed',
             BookingStatus.checkedIn: 'checked_in',
@@ -87,12 +85,11 @@ class BookingService {
             BookingStatus.cancelled: 'cancelled',
             BookingStatus.pendingPayment: 'pending',
           };
-          q = q?.eq('status_booking', statusMap[status] ?? status.apiValue);
+          q = q.eq('status_booking', statusMap[status] ?? status.apiValue);
         }
 
         final res = await q?.order('tgl_booking', ascending: false);
         if (res != null) {
-          // Return data dari DB (meskipun kosong [])
           return (res as List)
               .map((b) => BookingModel.fromJson(Map<String, dynamic>.from(b)))
               .toList();
@@ -100,29 +97,11 @@ class BookingService {
         return [];
       } catch (e) {
         debugPrint('⚠️ [BookingService] Supabase getMyBookings error: $e');
-        return []; // Error → return kosong
+        return [];
       }
     }
 
-    // Fallback Mock — HANYA kalau Supabase belum terkoneksi
-    await Future.delayed(const Duration(milliseconds: 300));
-    final currentUser = AuthService.instance.currentUser;
-    if (currentUser != null && CustomerDataService.instance.isFreshUser) {
-      var userList = MockData.bookings
-          .where((b) =>
-              b.customerId == currentUser.id || b.userId == currentUser.id)
-          .toList();
-      if (status != null) {
-        userList = userList.where((b) => b.status == status).toList();
-      }
-      return userList;
-    }
-
-    var list = List<BookingModel>.from(MockData.bookings);
-    if (status != null) {
-      list = list.where((b) => b.status == status).toList();
-    }
-    return list;
+    return [];
   }
 
   /// Mengambil daftar pesanan untuk Front Office Hotel Partner
@@ -135,11 +114,9 @@ class BookingService {
     if (sb.isReady) {
       try {
         final hId = int.tryParse(hotelId) ?? 1;
-        var q = sb.table(SupabaseConfig.tableBooking)?.select(
-              '*, mitra_penginapan(nama_properti), tipe_kamar(nama_tipe), users(nama_lengkap)',
-            ).eq('id_penginapan', hId);
+        var q = sb.table(SupabaseConfig.tableBooking)?.select('*').eq('id_penginapan', hId);
 
-        if (status != null) {
+        if (status != null && q != null) {
           final statusMap = {
             BookingStatus.confirmed: 'confirmed',
             BookingStatus.checkedIn: 'checked_in',
@@ -147,7 +124,7 @@ class BookingService {
             BookingStatus.cancelled: 'cancelled',
             BookingStatus.pendingPayment: 'pending',
           };
-          q = q?.eq('status_booking', statusMap[status] ?? status.apiValue);
+          q = q.eq('status_booking', statusMap[status] ?? status.apiValue);
         }
 
         final res = await q?.order('tgl_checkin', ascending: true);
@@ -163,13 +140,7 @@ class BookingService {
       }
     }
 
-    // Fallback Mock — HANYA kalau Supabase belum terkoneksi
-    await Future.delayed(const Duration(milliseconds: 300));
-    var list = MockData.bookings.where((b) => b.hotelId == hotelId).toList();
-    if (status != null) {
-      list = list.where((b) => b.status == status).toList();
-    }
-    return list.isNotEmpty ? list : MockData.bookings;
+    return [];
   }
 
   /// Detail pemesanan berdasarkan ID atau Kode Booking
@@ -178,9 +149,7 @@ class BookingService {
     if (sb.isReady) {
       try {
         final parsedId = int.tryParse(idOrCode);
-        var q = sb.table(SupabaseConfig.tableBooking)?.select(
-              '*, mitra_penginapan(nama_properti), tipe_kamar(nama_tipe), users(nama_lengkap)',
-            );
+        var q = sb.table(SupabaseConfig.tableBooking)?.select('*');
 
         if (parsedId != null) {
           q = q?.or('id_booking.eq.$parsedId,kode_booking.eq.$idOrCode');
@@ -193,20 +162,14 @@ class BookingService {
         if (res != null) {
           return BookingModel.fromJson(Map<String, dynamic>.from(res));
         }
-        return null; // Tidak ditemukan di DB
+        return null;
       } catch (e) {
         debugPrint('⚠️ [BookingService] Supabase getBookingById error: $e');
         return null;
       }
     }
 
-    try {
-      return MockData.bookings.firstWhere(
-        (b) => b.id == idOrCode || b.bookingCode == idOrCode,
-      );
-    } catch (_) {
-      return MockData.bookings.isNotEmpty ? MockData.bookings.first : null;
-    }
+    return null;
   }
 
   // ---------------------------------------------------------------------------
@@ -217,11 +180,6 @@ class BookingService {
   Future<bool> checkInGuest(String bookingId) async {
     final booking = await getBookingById(bookingId);
     if (booking == null) return false;
-
-    final updated = booking.copyWith(
-      status: BookingStatus.checkedIn,
-      checkedInAt: DateTime.now(),
-    );
 
     final sb = SupabaseService.instance;
     if (sb.isReady) {
@@ -250,10 +208,6 @@ class BookingService {
     await HotelService.instance
         .updateRoomStatus(booking.roomId, RoomStatus.occupied);
 
-    final idx = MockData.bookings.indexWhere((b) => b.id == booking.id);
-    if (idx != -1) {
-      MockData.bookings[idx] = updated;
-    }
     return true;
   }
 
@@ -261,11 +215,6 @@ class BookingService {
   Future<bool> checkOutGuest(String bookingId) async {
     final booking = await getBookingById(bookingId);
     if (booking == null) return false;
-
-    final updated = booking.copyWith(
-      status: BookingStatus.checkedOut,
-      checkedOutAt: DateTime.now(),
-    );
 
     final sb = SupabaseService.instance;
     if (sb.isReady) {
@@ -294,10 +243,6 @@ class BookingService {
     await HotelService.instance
         .updateRoomStatus(booking.roomId, RoomStatus.dirty);
 
-    final idx = MockData.bookings.indexWhere((b) => b.id == booking.id);
-    if (idx != -1) {
-      MockData.bookings[idx] = updated;
-    }
     return true;
   }
 
@@ -305,12 +250,6 @@ class BookingService {
   Future<bool> verifyPayment(String bookingId) async {
     final booking = await getBookingById(bookingId);
     if (booking == null) return false;
-
-    final updated = booking.copyWith(
-      status: BookingStatus.confirmed,
-      isPaid: true,
-      paidAt: DateTime.now(),
-    );
 
     final sb = SupabaseService.instance;
     if (sb.isReady) {
@@ -335,10 +274,6 @@ class BookingService {
       }
     }
 
-    final idx = MockData.bookings.indexWhere((b) => b.id == booking.id);
-    if (idx != -1) {
-      MockData.bookings[idx] = updated;
-    }
     return true;
   }
 
@@ -360,12 +295,6 @@ class BookingService {
       }
     }
 
-    final idx = MockData.bookings.indexWhere((b) => b.id == bookingId);
-    if (idx != -1) {
-      MockData.bookings[idx] = MockData.bookings[idx]
-          .copyWith(status: BookingStatus.cancelled);
-      return true;
-    }
     return false;
   }
 }

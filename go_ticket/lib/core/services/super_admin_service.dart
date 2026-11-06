@@ -3,11 +3,11 @@ import 'package:flutter/foundation.dart';
 import '../config/supabase_config.dart';
 import '../models/payout_model.dart';
 import '../models/user_model.dart';
-import 'mock_data.dart';
 import 'supabase_service.dart';
 
 /// Service untuk operasional Super Admin (Platform Owner).
-/// Data dari Supabase. MockData HANYA saat offline.
+/// Seluruh data bersumber langsung dari Supabase Database.
+/// Tidak ada mock data atau fallback dummy data.
 class SuperAdminService {
   SuperAdminService._();
   static final SuperAdminService instance = SuperAdminService._();
@@ -26,7 +26,7 @@ class SuperAdminService {
         final hotelsCount = (hotelsRes as List?)?.length ?? 0;
         final bookingsCount = (bookingsRes as List?)?.length ?? 0;
 
-        // Hitung total revenue dari booking yang completed
+        // Hitung total revenue dari booking yang completed / confirmed
         double totalRevenue = 0;
         if (bookingsRes != null) {
           for (final b in (bookingsRes as List)) {
@@ -46,24 +46,15 @@ class SuperAdminService {
         };
       } catch (e) {
         debugPrint('⚠️ [SuperAdminService] getPlatformStats error: $e');
-        return {
-          'totalUsers': 0,
-          'totalHotels': 0,
-          'totalBookings': 0,
-          'totalRevenue': 0,
-          'activePartners': 0,
-        };
       }
     }
 
-    // Fallback Mock — HANYA kalau Supabase belum terkoneksi
-    await Future.delayed(const Duration(milliseconds: 200));
     return {
-      'totalUsers': MockData.users.length,
-      'totalHotels': MockData.hotels.length,
-      'totalBookings': MockData.bookings.length,
-      'totalRevenue': 124500000,
-      'activePartners': 42,
+      'totalUsers': 0,
+      'totalHotels': 0,
+      'totalBookings': 0,
+      'totalRevenue': 0,
+      'activePartners': 0,
     };
   }
 
@@ -89,9 +80,7 @@ class SuperAdminService {
       }
     }
 
-    // Fallback Mock — HANYA kalau Supabase belum terkoneksi
-    await Future.delayed(const Duration(milliseconds: 200));
-    return List<UserModel>.from(MockData.users);
+    return [];
   }
 
   /// Mengaktifkan / memblokir akun user
@@ -113,11 +102,6 @@ class SuperAdminService {
       }
     }
 
-    final idx = MockData.users.indexWhere((u) => u.id == userId);
-    if (idx != -1) {
-      MockData.users[idx] = MockData.users[idx].copyWith(isActive: isActive);
-      return true;
-    }
     return false;
   }
 
@@ -143,9 +127,7 @@ class SuperAdminService {
       }
     }
 
-    // Fallback Mock — HANYA kalau Supabase belum terkoneksi
-    await Future.delayed(const Duration(milliseconds: 200));
-    return List<PayoutModel>.from(MockData.payouts);
+    return [];
   }
 
   /// Menyetujui atau menolak permohonan payout
@@ -183,15 +165,6 @@ class SuperAdminService {
       }
     }
 
-    final idx = MockData.payouts.indexWhere((p) => p.id == payoutId);
-    if (idx != -1) {
-      MockData.payouts[idx] = MockData.payouts[idx].copyWith(
-        status: newStatus,
-        processedAt: DateTime.now(),
-        referenceNumber: referenceNumber,
-      );
-      return true;
-    }
     return false;
   }
 }

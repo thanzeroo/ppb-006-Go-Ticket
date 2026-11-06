@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
 
 import '../config/supabase_config.dart';
-import 'mock_data.dart';
 import 'supabase_service.dart';
 
 /// Service untuk mengelola promo & voucher diskon Go Ticket.
-/// Data diambil dari Supabase [kampanye_promo]. MockData HANYA saat offline.
+/// Seluruh data bersumber langsung dari Supabase [kampanye_promo].
+/// Tidak ada mock data atau fallback dummy data.
 class PromoService {
   PromoService._();
   static final PromoService instance = PromoService._();
@@ -41,13 +41,11 @@ class PromoService {
         return [];
       } catch (e) {
         debugPrint('⚠️ [PromoService] getPromos error: $e');
-        return []; // Error → return kosong, bukan MockData
+        return [];
       }
     }
 
-    // Fallback Mock — HANYA kalau Supabase belum terkoneksi
-    await Future.delayed(const Duration(milliseconds: 200));
-    return List<Map<String, dynamic>>.from(MockData.promos);
+    return [];
   }
 
   /// Validasi kode promo dan hitung nominal diskon
@@ -119,8 +117,7 @@ class PromoService {
       }
     }
 
-    MockData.promos.add(promo);
-    return true;
+    return false;
   }
 
   /// Hapus promo (Super Admin)
@@ -142,7 +139,6 @@ class PromoService {
       }
     }
 
-    MockData.promos.removeWhere((p) => p['id'] == promoId);
-    return true;
+    return false;
   }
 }

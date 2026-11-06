@@ -3,12 +3,11 @@ import 'package:flutter/foundation.dart';
 import '../config/supabase_config.dart';
 import '../models/hotel_model.dart';
 import '../models/room_model.dart';
-import 'mock_data.dart';
 import 'supabase_service.dart';
 
 /// Service untuk mengelola data Hotel dan Kamar.
-/// Mengambil data dari Supabase Table [mitra_penginapan] & [tipe_kamar]
-/// dengan fallback ke [MockData] HANYA saat Supabase belum terkoneksi.
+/// Mengambil data murni dari Supabase Table [mitra_penginapan] & [tipe_kamar].
+/// Tidak ada mock data atau fallback dummy data.
 class HotelService {
   HotelService._();
   static final HotelService instance = HotelService._();
@@ -29,24 +28,26 @@ class HotelService {
 
     if (sb.isReady) {
       try {
-        var queryBuilder =
-            sb.table(SupabaseConfig.tableMitraPenginapan)?.select();
-        if (queryBuilder != null) {
-          if (status != null) {
-            final st = status == HotelStatus.active ? 'aktif' : status.apiValue;
-            queryBuilder = queryBuilder.eq('status_operasional', st);
-          }
-          if (city != null && city.isNotEmpty) {
-            queryBuilder = queryBuilder.ilike('kota_wilayah', '%$city%');
-          }
-          if (query != null && query.isNotEmpty) {
-            queryBuilder = queryBuilder.ilike('nama_properti', '%$query%');
-          }
+        var q = sb.table(SupabaseConfig.tableMitraPenginapan)?.select();
 
-          final response = await queryBuilder;
-          final list = (response as List)
-              .map((item) =>
-                  HotelModel.fromJson(Map<String, dynamic>.from(item)))
+        if (status != null && q != null) {
+          final val = status == HotelStatus.active ? 'aktif' : status.apiValue;
+          q = q.eq('status_operasional', val);
+        }
+
+        if (city != null && city.isNotEmpty && q != null) {
+          q = q.ilike('kota_wilayah', '%$city%');
+        }
+
+        if (query != null && query.isNotEmpty && q != null) {
+          q = q.ilike('nama_properti', '%$query%');
+        }
+
+        final res = await q;
+
+        if (res != null) {
+          final list = (res as List)
+              .map((h) => HotelModel.fromJson(Map<String, dynamic>.from(h)))
               .toList();
 
           // Sorting
@@ -61,39 +62,11 @@ class HotelService {
         }
       } catch (e) {
         debugPrint('⚠️ [HotelService] Supabase getHotels error: $e');
-        return []; // Error saat query → return kosong, bukan MockData
+        return [];
       }
     }
 
-    // Fallback Mock Data — HANYA kalau Supabase belum terkoneksi
-    await Future.delayed(const Duration(milliseconds: 300));
-    var results = List<HotelModel>.from(MockData.hotels);
-
-    if (status != null) {
-      results = results.where((h) => h.status == status).toList();
-    }
-    if (city != null && city.isNotEmpty) {
-      results = results
-          .where((h) => h.city.toLowerCase().contains(city.toLowerCase()))
-          .toList();
-    }
-    if (query != null && query.isNotEmpty) {
-      final q = query.toLowerCase();
-      results = results.where((h) {
-        return h.name.toLowerCase().contains(q) ||
-            h.address.toLowerCase().contains(q) ||
-            (h.shortDescription?.toLowerCase().contains(q) ?? false);
-      }).toList();
-    }
-
-    // Sorting
-    if (sortBy == 'Harga Terendah') {
-      results.sort((a, b) => a.pricePerNight.compareTo(b.pricePerNight));
-    } else if (sortBy == 'Rating Tertinggi') {
-      results.sort((a, b) => b.rating.compareTo(a.rating));
-    }
-
-    return results;
+    return [];
   }
 
   /// Mengambil hotel featured / rekomendasi untuk Beranda Tab
@@ -101,7 +74,7 @@ class HotelService {
     final all = await getHotels();
     if (all.isEmpty) return [];
     final featured = all.where((h) => h.isRecommended || h.isPopular).toList();
-    return featured.isNotEmpty ? featured : all;
+    return featured;
   }
 
   /// Detail hotel berdasarkan ID
@@ -120,19 +93,14 @@ class HotelService {
         if (res != null) {
           return HotelModel.fromJson(Map<String, dynamic>.from(res));
         }
-        return null; // Tidak ditemukan di DB
+        return null;
       } catch (e) {
         debugPrint('⚠️ [HotelService] Supabase getHotelById error: $e');
         return null;
       }
     }
 
-    // Fallback Mock — HANYA kalau Supabase belum terkoneksi
-    try {
-      return MockData.hotels.firstWhere((h) => h.id == hotelId);
-    } catch (_) {
-      return MockData.hotels.isNotEmpty ? MockData.hotels.first : null;
-    }
+    return null;
   }
 
   // ---------------------------------------------------------------------------
@@ -164,10 +132,7 @@ class HotelService {
       }
     }
 
-    // Fallback Mock — HANYA kalau Supabase belum terkoneksi
-    await Future.delayed(const Duration(milliseconds: 250));
-    final rooms = MockData.rooms.where((r) => r.hotelId == hotelId).toList();
-    return rooms.isNotEmpty ? rooms : MockData.rooms;
+    return [];
   }
 
   /// Menambah kamar baru (Admin Hotel)
@@ -197,8 +162,6 @@ class HotelService {
       }
     }
 
-    // Fallback Mock
-    MockData.rooms.add(room);
     return room;
   }
 
@@ -220,12 +183,6 @@ class HotelService {
       }
     }
 
-    // Fallback Mock
-    final index = MockData.rooms.indexWhere((r) => r.id == room.id);
-    if (index != -1) {
-      MockData.rooms[index] = room;
-      return true;
-    }
     return false;
   }
 
@@ -251,12 +208,6 @@ class HotelService {
       }
     }
 
-    final index = MockData.rooms.indexWhere((r) => r.id == roomId);
-    if (index != -1) {
-      MockData.rooms[index] =
-          MockData.rooms[index].copyWith(status: newStatus);
-      return true;
-    }
     return false;
   }
 
@@ -273,8 +224,7 @@ class HotelService {
       }
     }
 
-    MockData.rooms.removeWhere((r) => r.id == roomId);
-    return true;
+    return false;
   }
 
   // ---------------------------------------------------------------------------
@@ -303,11 +253,6 @@ class HotelService {
       }
     }
 
-    final idx = MockData.hotels.indexWhere((h) => h.id == hotelId);
-    if (idx != -1) {
-      MockData.hotels[idx] = MockData.hotels[idx].copyWith(status: status);
-      return true;
-    }
     return false;
   }
 }

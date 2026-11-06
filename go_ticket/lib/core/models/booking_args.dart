@@ -3,12 +3,14 @@ import '../utils/currency_formatter.dart';
 /// Data yang dibawa sepanjang alur pemesanan:
 /// Detail Hotel -> Pilih Kamar -> Checkout -> Pembayaran -> Sukses.
 class BookingArgs {
+  final String hotelId;
   final String hotelName;
   final String hotelType;
   final String location;
   final String imageUrl;
   final String rating;
 
+  final String roomId;
   final String roomName;
   final String roomImage;
   final int roomPrice; // per malam
@@ -28,11 +30,13 @@ class BookingArgs {
   final String paymentMethod;
 
   const BookingArgs({
+    this.hotelId = '',
     required this.hotelName,
     required this.hotelType,
     required this.location,
     required this.imageUrl,
     required this.rating,
+    this.roomId = '',
     required this.roomName,
     required this.roomImage,
     required this.roomPrice,
@@ -75,12 +79,14 @@ class BookingArgs {
           );
     final validPrice = parsedPrice > 0 ? parsedPrice : 850000;
     return BookingArgs(
-      hotelName: (m['name'] ?? 'The Grand Amora Resort & Spa').toString(),
-      hotelType: 'RESORT BINTANG 5',
-      location: (m['location'] ?? 'Seminyak, Bali').toString(),
-      imageUrl: (m['imageUrl'] ?? defaultImage).toString(),
-      rating: (m['rating'] ?? '4.9').toString(),
-      roomName: 'Deluxe Ocean View',
+      hotelId: (m['id'] ?? m['id_penginapan'] ?? '').toString(),
+      hotelName: (m['name'] ?? m['nama_properti'] ?? 'Penginapan').toString(),
+      hotelType: (m['type'] ?? 'HOTEL').toString(),
+      location: (m['location'] ?? m['alamat_lengkap'] ?? 'Indonesia').toString(),
+      imageUrl: (m['imageUrl'] ?? m['foto_utama'] ?? defaultImage).toString(),
+      rating: (m['rating'] ?? '5.0').toString(),
+      roomId: (m['id_tipe_kamar'] ?? m['roomId'] ?? '').toString(),
+      roomName: (m['roomName'] ?? m['nama_tipe'] ?? 'Standard Room').toString(),
       roomImage: defaultRoomImage,
       roomPrice: validPrice,
       originalPrice:
@@ -91,6 +97,13 @@ class BookingArgs {
   }
 
   BookingArgs copyWith({
+    String? hotelId,
+    String? hotelName,
+    String? hotelType,
+    String? location,
+    String? imageUrl,
+    String? rating,
+    String? roomId,
     String? roomName,
     String? roomImage,
     int? roomPrice,
@@ -107,11 +120,13 @@ class BookingArgs {
   }) {
     final nextRoomPrice = roomPrice ?? this.roomPrice;
     return BookingArgs(
-      hotelName: hotelName,
-      hotelType: hotelType,
-      location: location,
-      imageUrl: imageUrl,
-      rating: rating,
+      hotelId: hotelId ?? this.hotelId,
+      hotelName: hotelName ?? this.hotelName,
+      hotelType: hotelType ?? this.hotelType,
+      location: location ?? this.location,
+      imageUrl: imageUrl ?? this.imageUrl,
+      rating: rating ?? this.rating,
+      roomId: roomId ?? this.roomId,
       roomName: roomName ?? this.roomName,
       roomImage: roomImage ?? this.roomImage,
       roomPrice: nextRoomPrice > 0 ? nextRoomPrice : 850000,
@@ -128,13 +143,23 @@ class BookingArgs {
     );
   }
 
-  int get nights => checkOut.difference(checkIn).inDays;
+  int get nights {
+    final d = checkOut.difference(checkIn).inDays;
+    return d > 0 ? d : 1;
+  }
+
   int get subtotal => roomPrice * nights;
+  int get basePrice => subtotal;
+  int get serviceFee => (basePrice * 0.05).round();
+  int get tax => (basePrice * 0.10).round();
   int get discount {
     if (!promoApplied || subtotal <= 1) return 0;
-    return subtotal - 1 < 100000 ? subtotal - 1 : 100000;
+    return (subtotal * 0.15).round();
   }
-  int get total => subtotal - discount;
+  int get total => subtotal + serviceFee + tax - discount;
+  int get totalPrice => total;
+  int get originalTotalPrice =>
+      ((originalPrice ?? roomPrice) * nights) + serviceFee + tax;
 
   static const _m = [
     'Jan',
@@ -150,7 +175,7 @@ class BookingArgs {
     'Nov',
     'Des',
   ];
-  static String monthShort(int m) => _m[m - 1];
+  static String monthShort(int m) => (m >= 1 && m <= 12) ? _m[m - 1] : '';
 
   /// "24 - 26 Okt 2026"
   String get dateRange {
