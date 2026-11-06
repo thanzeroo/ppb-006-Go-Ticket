@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../pihak_user/screens/auth/terms_and_policy_screen.dart';
+import '../../../../../core/models/user_model.dart';
 import '../../../../../core/services/auth_service.dart';
 
 /// Tab 1: Overview Dashboard Front Office

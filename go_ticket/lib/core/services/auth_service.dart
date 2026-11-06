@@ -21,17 +21,24 @@ class AuthService {
   Future<bool> loadSavedSession() async {
     try {
       final token = await StorageHelper.getAccessToken();
-      final userData = await StorageHelper.getUserData();
+      final userJson = await StorageHelper.getCurrentUser();
+      final roleStr = await StorageHelper.getUserRole();
 
-      if (token != null && userData != null && userData['id'] != null) {
-        _currentUser = UserModel(
-          id: userData['id']!,
-          fullName: userData['fullName'] ?? 'Pengguna',
-          email: userData['email'],
-          phoneNumber: userData['phone'],
-          role: UserRole.fromValue(userData['role'] ?? 'customer'),
-          isVerified: userData['isVerified'] == 'true',
-        );
+      if (token != null && userJson != null) {
+        try {
+          final userData = json.decode(userJson) as Map<String, dynamic>;
+          _currentUser = UserModel(
+            id: userData['id']?.toString() ?? '',
+            fullName: userData['full_name'] ?? userData['fullName'] ?? 'Pengguna',
+            email: userData['email'],
+            phoneNumber: userData['phone_number'] ?? userData['phone'],
+            role: UserRoleExtension.fromApiString(roleStr ?? userData['role']?.toString() ?? 'customer'),
+            isVerified: userData['is_verified'] == true || userData['isVerified'] == 'true',
+          );
+        } catch (e) {
+          debugPrint('⚠️ Error parsing saved user: $e');
+          return false;
+        }
 
         // Validasi sinkronisasi profil terbaru dari Supabase jika koneksi aktif
         final sbService = SupabaseService.instance;

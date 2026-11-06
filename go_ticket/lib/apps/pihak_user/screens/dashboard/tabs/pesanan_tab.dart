@@ -556,7 +556,7 @@ class _PesananTabState extends State<PesananTab>
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
                       child: Image.network(
-                        b.hotelImageUrl,
+                        b.hotelImageUrl ?? '',
                         width: 80,
                         height: 70,
                         fit: BoxFit.cover,

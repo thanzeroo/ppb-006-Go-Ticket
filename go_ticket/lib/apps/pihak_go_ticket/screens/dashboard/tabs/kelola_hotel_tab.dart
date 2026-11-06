@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/models/hotel_model.dart';
-import '../../../../core/services/hotel_service.dart';
+import '../../../../../core/models/hotel_model.dart';
+import '../../../../../core/services/hotel_service.dart';
 import 'input_hotel_screen.dart';
 
 /// Tab 3: Kelola Hotel & Kamar Super Admin (100% Dinamis dari Supabase Database)
@@ -63,7 +63,7 @@ class _KelolaHotelTabState extends State<KelolaHotelTab> {
   @override
   Widget build(BuildContext context) {
     final totalHotels = _hotels.length;
-    final totalRooms = _hotels.fold<int>(0, (sum, h) => sum + h.totalRooms);
+    final totalRooms = _hotels.fold<int>(0, (sum, h) => sum + (h.totalRooms ?? 0));
 
     return RefreshIndicator(
       onRefresh: _loadHotels,

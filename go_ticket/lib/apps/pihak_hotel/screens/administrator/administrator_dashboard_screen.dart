@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/models/hotel_admin_model.dart';
+import '../../../../core/models/room_model.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/booking_service.dart';
 import '../../../../core/services/hotel_service.dart';
@@ -48,16 +49,16 @@ class _AdministratorDashboardScreenState
         return RoomTypeData(
           badge: r.typeName,
           name: r.typeName,
-          sub: 'Maks. ${r.maxGuests} Tamu • ${r.roomSizeM2?.toInt() ?? 24} m² • ${r.bedType ?? "King Bed"}',
-          totalUnit: r.totalUnits,
-          terjual: r.totalUnits - r.availableUnits,
-          occupancy: r.occupancyRate.round(),
+          sub: 'Maks. ${r.maxGuests} Tamu • ${r.areaM2?.toInt() ?? 24} m² • ${r.bedType ?? "King Bed"}',
+          totalUnit: 1,
+          terjual: r.status == RoomStatus.occupied ? 1 : 0,
+          occupancy: r.status == RoomStatus.occupied ? 100 : 0,
           weekdayPrice: CurrencyFormatter.toRupiah(r.pricePerNight),
           weekendPrice: CurrencyFormatter.toRupiah(r.weekendPrice ?? r.pricePerNight),
           weekendNote: 'Tarif Weekend',
-          amenities: r.amenities,
-          photoCount: 4,
-          imageUrl: r.thumbnailUrl ??
+          amenities: r.facilities,
+          photoCount: r.imageUrls.length,
+          imageUrl: r.mainImageUrl ??
               'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800&auto=format&fit=crop',
         );
       }).toList();

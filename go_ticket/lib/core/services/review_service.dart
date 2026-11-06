@@ -15,6 +15,7 @@ class ReviewService {
   Future<List<ReviewModel>> getReviewsByHotel(String hotelId) async {
     try {
       final client = SupabaseService.instance.client;
+      if (client == null) return [];
       final res = await client
           .from('reviews')
           .select()
@@ -44,6 +45,8 @@ class ReviewService {
   /// Simpan review baru ke DB.
   Future<void> addReview(ReviewModel review) async {
     final client = SupabaseService.instance.client;
+    if (client == null) return;
     await client.from('reviews').insert(review.toJson());
   }
 }
+

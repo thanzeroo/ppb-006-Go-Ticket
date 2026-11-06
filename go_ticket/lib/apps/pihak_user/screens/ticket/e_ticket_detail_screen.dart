@@ -368,7 +368,7 @@ class ETicketDetailScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.primarySurface,
+        color: AppColors.infoLight,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
       ),
@@ -411,9 +411,8 @@ class ETicketDetailScreen extends StatelessWidget {
   Widget _buildActions(BuildContext context) {
     return Column(
       children: [
-        GoTicketButton(
+        GoTicketOutlinedButton(
           label: 'Kembali ke Beranda',
-          variant: ButtonVariant.outline,
           onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
         ),
       ],

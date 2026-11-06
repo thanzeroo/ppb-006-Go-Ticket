@@ -281,7 +281,7 @@ class _PostCheckoutReviewScreenState extends State<PostCheckoutReviewScreen> {
               width: 80,
               height: 80,
               decoration: const BoxDecoration(
-                color: AppColors.statusConfirmedSurface,
+                color: AppColors.successLight,
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.check_rounded,

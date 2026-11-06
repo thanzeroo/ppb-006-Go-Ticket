@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../../core/services/promo_service.dart';
+import '../../../../../core/services/promo_service.dart';
 import 'tambah_promo_screen.dart';
 
 /// Tab 2: Manajemen Promo & Diskon (100% Dinamis dari Supabase Database)

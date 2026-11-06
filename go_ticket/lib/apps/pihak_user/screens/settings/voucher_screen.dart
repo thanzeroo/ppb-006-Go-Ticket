@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:go_ticket/core/services/promo_service.dart';
-import 'shared_widgets.dart';
+import 'package:go_ticket/core/widgets/gt_ui.dart';
 
 class _Voucher {
   final String badge;
