@@ -1,109 +1,178 @@
 import 'package:flutter/material.dart';
 
 import 'package:go_ticket/core/models/booking_args.dart';
+import 'package:go_ticket/core/models/review_model.dart';
+import 'package:go_ticket/core/services/review_service.dart';
 import 'package:go_ticket/core/widgets/gt_ui.dart';
 
 /// Ulasan hotel (Figma: "USER Page Ulasan Hotel").
-class HotelReviewsScreen extends StatelessWidget {
+/// Menampilkan data ulasan dinamis dari DB; jika kosong → empty state.
+class HotelReviewsScreen extends StatefulWidget {
   final dynamic arguments;
   const HotelReviewsScreen({super.key, this.arguments});
 
   @override
+  State<HotelReviewsScreen> createState() => _HotelReviewsScreenState();
+}
+
+class _HotelReviewsScreenState extends State<HotelReviewsScreen> {
+  late final BookingArgs _a;
+  List<ReviewModel> _reviews = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _a = BookingArgs.fromHotel(widget.arguments);
+    _loadReviews();
+  }
+
+  Future<void> _loadReviews() async {
+    final reviews =
+        await ReviewService.instance.getReviewsByHotel(_a.hotelId);
+    if (mounted) {
+      setState(() {
+        _reviews = reviews;
+        _loading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final a = BookingArgs.fromHotel(arguments);
-    const bars = [
-      ['Kebersihan', 4.9],
-      ['Kenyamanan', 5.0],
-      ['Pelayanan Staf', 4.8],
-      ['Lokasi', 4.9],
-      ['Fasilitas', 4.7],
-    ];
     return Scaffold(
       backgroundColor: GT.bg,
-      appBar: const GTAppBar(title: 'Hotel Reviews'),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
-        children: [
-          GTCard(
-            child: Row(children: [
-              const CircleAvatar(
-                  radius: 22,
-                  backgroundColor: GT.sky,
-                  child: Icon(Icons.apartment_rounded, color: GT.teal)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('PROPERTI AKTIF',
-                        style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: GT.teal)),
-                    Text(a.hotelName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w800, color: GT.ink)),
-                    Text(a.location,
-                        style: const TextStyle(
-                            fontSize: 11, color: GT.muted)),
-                  ],
-                ),
+      appBar: const GTAppBar(title: 'Ulasan Hotel'),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: GT.teal))
+          : _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    // ─── Hitung rata-rata dari data nyata ───────────────────────────────────
+    final count = _reviews.length;
+    final avg = count == 0
+        ? 0.0
+        : _reviews.fold<double>(0, (s, r) => s + r.overallRating) / count;
+    final avgStr = avg == 0 ? '–' : avg.toStringAsFixed(1);
+
+    // ─── Rata-rata per kategori ─────────────────────────────────────────────
+    double _catAvg(Iterable<int?> vals) {
+      final v = vals.whereType<int>().toList();
+      if (v.isEmpty) return 0;
+      return v.fold<int>(0, (s, x) => s + x) / v.length;
+    }
+
+    final catCleanliness = _catAvg(_reviews.map((r) => r.cleanlinessRating));
+    final catComfort =
+        _catAvg(_reviews.map((r) => r.valueRating)); // nilai/kenyamanan
+    final catService = _catAvg(_reviews.map((r) => r.serviceRating));
+    final catLocation = _catAvg(_reviews.map((r) => r.locationRating));
+    final catFacility = _catAvg(_reviews.map((r) => r.facilityRating));
+
+    final bars = [
+      ['Kebersihan', catCleanliness],
+      ['Kenyamanan', catComfort],
+      ['Pelayanan Staf', catService],
+      ['Lokasi', catLocation],
+      ['Fasilitas', catFacility],
+    ];
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+      children: [
+        // ── Info properti ──────────────────────────────────────────────────
+        GTCard(
+          child: Row(children: [
+            const CircleAvatar(
+                radius: 22,
+                backgroundColor: GT.sky,
+                child: Icon(Icons.apartment_rounded, color: GT.teal)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('PROPERTI AKTIF',
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: GT.teal)),
+                  Text(_a.hotelName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w800, color: GT.ink)),
+                  Text(_a.location,
+                      style:
+                          const TextStyle(fontSize: 11, color: GT.muted)),
+                ],
               ),
-              GTChip('Ganti', icon: Icons.swap_horiz_rounded, bg: GT.sky),
-            ]),
-          ),
-          GTCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: const [
-                            Text('4.9',
-                                style: TextStyle(
-                                    fontSize: 40,
-                                    fontWeight: FontWeight.w800,
-                                    color: GT.ink)),
-                            Text(' / 5.0',
-                                style: TextStyle(
-                                    fontSize: 16, color: GT.muted)),
-                          ],
-                        ),
-                        Row(children: [
-                          for (var i = 0; i < 5; i++)
-                            const Icon(Icons.star_rounded,
-                                color: GT.primary, size: 20),
-                        ]),
-                        const SizedBox(height: 4),
-                        const Text('1.280 Ulasan Terverifikasi',
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: GT.body)),
-                      ],
-                    ),
+            ),
+          ]),
+        ),
+
+        // ── Ringkasan rating ───────────────────────────────────────────────
+        GTCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(avgStr,
+                              style: const TextStyle(
+                                  fontSize: 40,
+                                  fontWeight: FontWeight.w800,
+                                  color: GT.ink)),
+                          const Text(' / 5.0',
+                              style: TextStyle(
+                                  fontSize: 16, color: GT.muted)),
+                        ],
+                      ),
+                      Row(children: [
+                        for (var i = 0; i < 5; i++)
+                          Icon(
+                            i < avg.round()
+                                ? Icons.star_rounded
+                                : Icons.star_outline_rounded,
+                            color: GT.primary,
+                            size: 20,
+                          ),
+                      ]),
+                      const SizedBox(height: 4),
+                      Text(
+                          count == 0
+                              ? 'Belum ada ulasan'
+                              : '$count Ulasan Terverifikasi',
+                          style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: GT.body)),
+                    ],
                   ),
+                ),
+                if (count > 0)
                   Container(
                     width: 130,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                         color: GT.soft,
                         borderRadius: BorderRadius.circular(16)),
-                    child: Column(children: const [
+                    child: const Column(children: [
                       CircleAvatar(
                           radius: 16,
                           backgroundColor: GT.sky,
                           child: Icon(Icons.verified_rounded,
                               size: 18, color: GT.teal)),
                       SizedBox(height: 6),
-                      Text('98% Tamu Suka & Merekomendasikan',
+                      Text('Ulasan dari tamu yang sudah menginap',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                               fontSize: 10,
@@ -111,101 +180,52 @@ class HotelReviewsScreen extends StatelessWidget {
                               color: GT.teal)),
                     ]),
                   ),
-                ]),
+              ]),
+              if (count > 0) ...[
                 const SizedBox(height: 14),
                 for (final b in bars)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Column(children: [
-                      Row(children: [
-                        Text(b[0] as String,
-                            style: const TextStyle(
-                                fontSize: 13, color: GT.body)),
-                        const Spacer(),
-                        Text((b[1] as double).toStringAsFixed(1),
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: GT.ink)),
-                      ]),
-                      const SizedBox(height: 4),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: LinearProgressIndicator(
-                          value: (b[1] as double) / 5,
-                          minHeight: 8,
-                          backgroundColor: GT.soft,
-                          color: GT.primary,
-                        ),
+                  if ((b[1] as double) > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _RatingBar(
+                        label: b[0] as String,
+                        value: (b[1] as double) / 5.0,
+                        score: (b[1] as double).toStringAsFixed(1),
                       ),
-                    ]),
-                  ),
+                    ),
               ],
-            ),
+            ],
           ),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(children: const [
-              GTChip('Semua (1.280)',
-                  icon: Icons.check, bg: GT.primary, fg: GT.ink),
-              SizedBox(width: 8),
-              GTChip('Dengan Foto (420)',
-                  icon: Icons.photo_camera_outlined, bg: Colors.white),
-              SizedBox(width: 8),
-              GTChip('Bintang 5',
-                  icon: Icons.star_rounded, bg: Colors.white),
-              SizedBox(width: 8),
-              GTChip('Bintang 4', icon: Icons.star_rounded, bg: Colors.white),
+        ),
+
+        const SizedBox(height: 4),
+
+        // ── Empty state ────────────────────────────────────────────────────
+        if (count == 0) ...[
+          const SizedBox(height: 40),
+          const Center(
+            child: Column(children: [
+              Icon(Icons.rate_review_outlined, size: 56, color: GT.muted),
+              SizedBox(height: 12),
+              Text('Belum Ada Ulasan',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: GT.ink)),
+              SizedBox(height: 6),
+              Text('Jadilah yang pertama memberikan ulasan\nsetelah menginap di hotel ini.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: GT.muted)),
             ]),
           ),
-          const SizedBox(height: 14),
-          const _ReviewItem(
-            ini: 'BS',
-            name: 'Budi Santoso',
-            badge: 'Tamu Terverifikasi (Booking via Go Ticket)',
-            stars: 5,
-            score: '5.0',
-            ago: '3 hari yang lalu',
-            stay: 'Menginap 2 malam di Deluxe Ocean View',
-            text:
-                'Pengalaman luar biasa! Kolam renang dengan pemandangan sunset '
-                'sangat magis. Resepsionis dan staf sangat ramah, check-in hanya '
-                'butuh tunjukkan QR Go Ticket.',
-            reply:
-                'Terima kasih Bpk. Budi, senang bisa melayani Anda! Kami tunggu '
-                'kedatangan Anda kembali di liburan berikutnya.',
-            helpful: 24,
-            hasPhotos: true,
-          ),
-          const _ReviewItem(
-            ini: 'JT',
-            name: 'Jessica Tan',
-            badge: 'Tamu Terverifikasi',
-            stars: 5,
-            score: '5.0',
-            ago: '1 minggu yang lalu',
-            stay: 'Staycation Pasangan • Suite King Garden',
-            text:
-                'Sarapan prasmanan lezat sekali, kasur super empuk dan bersih '
-                'tanpa cela. Pasti akan pesan lagi lewat Go Ticket!',
-            helpful: 18,
-          ),
-          const _ReviewItem(
-            ini: 'DA',
-            name: 'Dimas Arya',
-            badge: 'Tamu Terverifikasi',
-            stars: 4,
-            score: '4.8',
-            ago: '2 minggu yang lalu',
-            stay: 'Liburan Keluarga • Villa 2 Kamar dengan Kolam Privat',
-            text:
-                'Villa sangat luas dan nyaman untuk anak-anak. Layanan butler '
-                '24 jam sangat membantu saat butuh tambahan handuk.',
-            helpful: 9,
-          ),
+          const SizedBox(height: 40),
         ],
-      ),
-      bottomNavigationBar: GTBottomBar(
-        child: GTButton(
+
+        // ── Daftar ulasan dari DB ──────────────────────────────────────────
+        for (final r in _reviews) _buildReviewCard(r),
+
+        const SizedBox(height: 8),
+        GTButton(
           label: 'Tulis Ulasan Penginapan Saya',
           leading: Icons.star_rounded,
           onTap: () => ScaffoldMessenger.of(context).showSnackBar(
@@ -214,33 +234,17 @@ class HotelReviewsScreen extends StatelessWidget {
                     'Ulasan hanya bisa ditulis setelah selesai menginap')),
           ),
         ),
-      ),
+      ],
     );
   }
-}
 
-class _ReviewItem extends StatelessWidget {
-  final String ini, name, badge, score, ago, stay, text;
-  final String? reply;
-  final int stars;
-  final int helpful;
-  final bool hasPhotos;
-  const _ReviewItem({
-    required this.ini,
-    required this.name,
-    required this.badge,
-    required this.stars,
-    required this.score,
-    required this.ago,
-    required this.stay,
-    required this.text,
-    required this.helpful,
-    this.reply,
-    this.hasPhotos = false,
-  });
+  Widget _buildReviewCard(ReviewModel r) {
+    final starsInt = r.overallRating.round().clamp(1, 5);
+    final ago = _timeAgo(r.createdAt);
+    final stayInfo = r.roomTypeName != null
+        ? 'Menginap di ${r.roomTypeName}'
+        : 'Tamu Terverifikasi';
 
-  @override
-  Widget build(BuildContext context) {
     return GTCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -249,7 +253,7 @@ class _ReviewItem extends StatelessWidget {
             CircleAvatar(
                 radius: 20,
                 backgroundColor: GT.sky,
-                child: Text(ini,
+                child: Text(r.customerInitials,
                     style: const TextStyle(
                         fontWeight: FontWeight.w800, color: GT.ink))),
             const SizedBox(width: 10),
@@ -257,13 +261,13 @@ class _ReviewItem extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(name,
+                  Text(r.customerName,
                       style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
                           color: GT.ink)),
                   const SizedBox(height: 4),
-                  GTChip(badge,
+                  GTChip('Tamu Terverifikasi (Booking via Go Ticket)',
                       icon: Icons.verified_outlined, bg: GT.sky),
                 ],
               ),
@@ -272,10 +276,15 @@ class _ReviewItem extends StatelessWidget {
           const SizedBox(height: 10),
           Row(children: [
             for (var i = 0; i < 5; i++)
-              Icon(i < stars ? Icons.star_rounded : Icons.star_half_rounded,
-                  size: 17, color: GT.primary),
+              Icon(
+                i < starsInt
+                    ? Icons.star_rounded
+                    : Icons.star_outline_rounded,
+                size: 17,
+                color: GT.primary,
+              ),
             const SizedBox(width: 6),
-            Text(score,
+            Text(r.overallRating.toStringAsFixed(1),
                 style: const TextStyle(
                     fontWeight: FontWeight.w800, color: GT.ink)),
             const Spacer(),
@@ -283,68 +292,104 @@ class _ReviewItem extends StatelessWidget {
                 style: const TextStyle(fontSize: 11, color: GT.muted)),
           ]),
           const SizedBox(height: 6),
-          Text(stay,
+          Text(stayInfo,
               style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   color: GT.teal)),
-          const SizedBox(height: 8),
-          Text(text,
-              style: const TextStyle(
-                  fontSize: 13, height: 1.5, color: GT.body)),
-          if (hasPhotos) ...[
-            const SizedBox(height: 10),
-            Row(children: const [
-              Expanded(
-                  child: GTImage(
-                      'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=400',
-                      height: 90,
-                      radius: 12)),
-              SizedBox(width: 8),
-              Expanded(
-                  child: GTImage(
-                      'https://images.unsplash.com/photo-1540541338287-41700207dee6?w=400',
-                      height: 90,
-                      radius: 12)),
-            ]),
+          if (r.reviewText != null && r.reviewText!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(r.reviewText!,
+                style: const TextStyle(
+                    fontSize: 13, height: 1.5, color: GT.body)),
           ],
-          if (reply != null) ...[
+          if (r.photoUrls.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 90,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: r.photoUrls.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, i) =>
+                    GTImage(r.photoUrls[i], height: 90, radius: 12),
+              ),
+            ),
+          ],
+          if (r.hotelResponse != null && r.hotelResponse!.isNotEmpty) ...[
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                  color: GT.soft, borderRadius: BorderRadius.circular(12)),
+                  color: GT.soft,
+                  borderRadius: BorderRadius.circular(12)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Tanggapan dari Manajemen The Grand Amora',
+                  const Text('Tanggapan dari Manajemen Hotel',
                       style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                           color: GT.teal)),
                   const SizedBox(height: 4),
-                  Text(reply!,
+                  Text(r.hotelResponse!,
                       style: const TextStyle(
                           fontSize: 12, height: 1.4, color: GT.body)),
                 ],
               ),
             ),
           ],
-          const SizedBox(height: 10),
-          Row(children: [
-            GTChip('Membantu ($helpful)',
-                icon: Icons.thumb_up_alt_outlined, bg: GT.soft),
-            const Spacer(),
-            const Icon(Icons.share_outlined, size: 16, color: GT.muted),
-            const SizedBox(width: 4),
-            const Text('Bagikan',
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: GT.ink)),
-          ]),
         ],
       ),
     );
+  }
+
+  String _timeAgo(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inDays >= 30) return '${diff.inDays ~/ 30} bulan yang lalu';
+    if (diff.inDays >= 7) return '${diff.inDays ~/ 7} minggu yang lalu';
+    if (diff.inDays >= 1) return '${diff.inDays} hari yang lalu';
+    if (diff.inHours >= 1) return '${diff.inHours} jam yang lalu';
+    return 'Baru saja';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RATING BAR WIDGET
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _RatingBar extends StatelessWidget {
+  final String label;
+  final double value; // 0.0–1.0
+  final String score;
+
+  const _RatingBar(
+      {required this.label, required this.value, required this.score});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      SizedBox(
+        width: 110,
+        child: Text(label,
+            style:
+                const TextStyle(fontSize: 12, color: GT.body)),
+      ),
+      Expanded(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: value,
+            minHeight: 6,
+            backgroundColor: GT.soft,
+            valueColor: const AlwaysStoppedAnimation<Color>(GT.teal),
+          ),
+        ),
+      ),
+      const SizedBox(width: 8),
+      Text(score,
+          style: const TextStyle(
+              fontSize: 12, fontWeight: FontWeight.w700, color: GT.ink)),
+    ]);
   }
 }

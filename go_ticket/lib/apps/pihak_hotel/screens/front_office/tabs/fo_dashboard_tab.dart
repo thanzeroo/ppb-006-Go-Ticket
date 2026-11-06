@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../pihak_user/screens/auth/terms_and_policy_screen.dart';
+import '../../../../../core/models/user_model.dart';
+import '../../../../../core/services/auth_service.dart';
 
 /// Tab 1: Overview Dashboard Front Office
 class FoDashboardTab extends StatefulWidget {
@@ -29,12 +31,19 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
   }
 
   Widget _buildDashboardTab() {
+    final currentUser = AuthService.instance.currentUser;
+    final staffName = currentUser?.fullName ?? 'Staff FO';
+    final initials = staffName.trim().isNotEmpty
+        ? staffName.trim().split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase()
+        : 'FO';
+    final roleLabel = currentUser?.role.displayName ?? 'Front Office & Resepsionis';
+
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Card Profile User: Muhammad Farchan
+          // Header Card Profile User (Dinamis dari AuthService)
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -60,10 +69,10 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
                         shape: BoxShape.circle,
                       ),
                       alignment: Alignment.center,
-                      child: const Text(
-                        'M',
-                        style: TextStyle(
-                          fontSize: 22,
+                      child: Text(
+                        initials,
+                        style: const TextStyle(
+                          fontSize: 20,
                           fontWeight: FontWeight.w800,
                           color: Colors.white,
                         ),
@@ -90,17 +99,17 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        children: const [
+                        children: [
                           Text(
-                            'Muhammad Farchan',
-                            style: TextStyle(
+                            staffName,
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
                               color: Color(0xFF0F172A),
                             ),
                           ),
-                          SizedBox(width: 6),
-                          Icon(
+                          const SizedBox(width: 6),
+                          const Icon(
                             Icons.verified,
                             color: Color(0xFF0284C7),
                             size: 16,
@@ -108,9 +117,9 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
                         ],
                       ),
                       const SizedBox(height: 2),
-                      const Text(
-                        'Front Office & Resepsionis',
-                        style: TextStyle(
+                      Text(
+                        roleLabel,
+                        style: const TextStyle(
                           fontSize: 12,
                           color: Color(0xFF64748B),
                         ),

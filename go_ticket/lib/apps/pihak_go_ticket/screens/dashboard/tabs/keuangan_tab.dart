@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../../../../core/models/booking_model.dart';
+import '../../../../../core/services/booking_service.dart';
+import '../../../../../core/services/super_admin_service.dart';
+import '../../../../../core/utils/currency_formatter.dart';
+
 /// Tab 1: Laporan Keuangan & Transaksi (Image 4)
+/// 100% dinamis dari Supabase Database – tanpa data mockup.
 class KeuanganTab extends StatefulWidget {
   const KeuanganTab({super.key});
 
@@ -11,8 +17,44 @@ class KeuanganTab extends StatefulWidget {
 class _KeuanganTabState extends State<KeuanganTab> {
   int _selectedPeriod = 1; // 0 = Harian, 1 = Bulanan, 2 = Tahunan
 
+  Map<String, dynamic> _stats = {};
+  List<BookingModel> _recentBookings = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    try {
+      final stats = await SuperAdminService.instance.getPlatformStats();
+      final bookings = await BookingService.instance.getMyBookings();
+      if (mounted) {
+        setState(() {
+          _stats = stats;
+          _recentBookings = bookings.take(10).toList();
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _stats = {};
+          _recentBookings = [];
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(color: Color(0xFF00C2FF)));
+    }
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       children: [
@@ -73,22 +115,22 @@ class _KeuanganTabState extends State<KeuanganTab> {
         _buildNetRevenueHeroCard(),
         const SizedBox(height: 12),
 
-        // 5. Two Metric Cards (184 Transaksi Lunas & +18.4% MoM)
+        // 5. Two Metric Cards (Dinamis dari Database)
         Row(
           children: [
             Expanded(
               child: _buildMiniMetricCard(
                 icon: Icons.check_circle_outline_rounded,
-                value: '184',
-                label: 'Transaksi Lunas',
+                value: '${(_stats['totalBookings'] as num?)?.toInt() ?? 0}',
+                label: 'Total Booking',
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: _buildMiniMetricCard(
-                icon: Icons.trending_up_rounded,
-                value: '+18.4%',
-                label: 'Pertumbuhan MoM',
+                icon: Icons.people_outline_rounded,
+                value: '${(_stats['totalUsers'] as num?)?.toInt() ?? 0}',
+                label: 'Tamu Terdaftar',
               ),
             ),
           ],
@@ -227,6 +269,10 @@ class _KeuanganTabState extends State<KeuanganTab> {
   // Hero Card: PENDAPATAN BERSIH
   // ---------------------------------------------------------------------------
   Widget _buildNetRevenueHeroCard() {
+    final totalRev = (_stats['totalRevenue'] as num?)?.toDouble() ?? 0;
+    final netRev = totalRev * 0.9; // setelah fee 10%
+    final totalBooks = (_stats['totalBookings'] as num?)?.toInt() ?? 0;
+    final adr = totalBooks > 0 ? (totalRev / totalBooks).round() : 0;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -306,9 +352,9 @@ class _KeuanganTabState extends State<KeuanganTab> {
           const SizedBox(height: 6),
 
           // Big Amount
-          const Text(
-            'Rp 136.240.000',
-            style: TextStyle(
+          Text(
+            netRev > 0 ? CurrencyFormatter.toRupiah(netRev.round()) : 'Rp 0',
+            style: const TextStyle(
               fontSize: 27,
               fontWeight: FontWeight.w900,
               color: Colors.white,
@@ -358,7 +404,7 @@ class _KeuanganTabState extends State<KeuanganTab> {
                     ),
                     SizedBox(height: 3),
                     Text(
-                      'Rp 148.520.000',
+                      totalRev > 0 ? CurrencyFormatter.toRupiah(totalRev.round()) : 'Rp 0',
                       style: TextStyle(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w800,
@@ -371,7 +417,7 @@ class _KeuanganTabState extends State<KeuanganTab> {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+                  children: [
                     Text(
                       'Rata-rata ADR / Booking',
                       style: TextStyle(
@@ -381,7 +427,7 @@ class _KeuanganTabState extends State<KeuanganTab> {
                     ),
                     SizedBox(height: 3),
                     Text(
-                      'Rp 807.170',
+                      adr > 0 ? CurrencyFormatter.toRupiah(adr) : 'Rp 0',
                       style: TextStyle(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w800,
@@ -618,36 +664,9 @@ class _KeuanganTabState extends State<KeuanganTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // Transaksi Pembookingan
+  // Transaksi Pembookingan (100% Dinamis dari Database)
   // ---------------------------------------------------------------------------
   Widget _buildRecentTransactionsSection() {
-    final transactions = [
-      {
-        'id': '#TRX-99214',
-        'badge': 'Lunas (BCA VA)',
-        'room': 'Executive Suite',
-        'guest': 'Maya Anggraini',
-        'date': '26 Okt 2025 • 14:22 WIB',
-        'amount': 'Rp 2.450.000',
-      },
-      {
-        'id': '#TRX-99215',
-        'badge': 'Lunas (QRIS)',
-        'room': 'Deluxe Ocean View',
-        'guest': 'Dimas Raditya',
-        'date': '26 Okt 2025 • 11:05 WIB',
-        'amount': 'Rp 850.000',
-      },
-      {
-        'id': '#TRX-99210',
-        'badge': 'Lunas (Mandiri)',
-        'room': 'The Grand Amora',
-        'guest': 'Aditya Pratama',
-        'date': '24 Okt 2025 • 09:40 WIB',
-        'amount': 'Rp 1.700.000',
-      },
-    ];
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -680,12 +699,25 @@ class _KeuanganTabState extends State<KeuanganTab> {
           ],
         ),
         const SizedBox(height: 12),
-        ...transactions.map((tx) => _buildTransactionCard(tx)),
+        if (_recentBookings.isEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            alignment: Alignment.center,
+            child: const Text(
+              'Belum ada transaksi tercatat.',
+              style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+            ),
+          )
+        else
+          ..._recentBookings.map((b) => _buildBookingCard(b)),
       ],
     );
   }
 
-  Widget _buildTransactionCard(Map<String, String> tx) {
+  Widget _buildBookingCard(BookingModel b) {
+    final dateStr =
+        '${b.checkInDate.day}/${b.checkInDate.month}/${b.checkInDate.year}';
+    final badgeText = b.paymentMethod ?? b.status.displayName;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
@@ -708,7 +740,7 @@ class _KeuanganTabState extends State<KeuanganTab> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  tx['id']!,
+                  b.bookingCode,
                   style: const TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
@@ -723,7 +755,9 @@ class _KeuanganTabState extends State<KeuanganTab> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  tx['badge']!,
+                  badgeText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
@@ -739,16 +773,20 @@ class _KeuanganTabState extends State<KeuanganTab> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                tx['room']!,
-                style: const TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
+              Expanded(
+                child: Text(
+                  b.roomTypeName,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                  ),
                 ),
               ),
+              const SizedBox(width: 8),
               Text(
-                tx['amount']!,
+                CurrencyFormatter.toRupiah(b.totalAmount),
                 style: const TextStyle(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w900,
@@ -759,12 +797,12 @@ class _KeuanganTabState extends State<KeuanganTab> {
           ),
           const SizedBox(height: 4),
 
-          // Guest & Time
+          // Guest & Date
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                tx['guest']!,
+                b.customerName,
                 style: const TextStyle(
                   fontSize: 11,
                   color: Color(0xFF64748B),
@@ -773,7 +811,7 @@ class _KeuanganTabState extends State<KeuanganTab> {
               Row(
                 children: [
                   Text(
-                    tx['date']!,
+                    dateStr,
                     style: const TextStyle(
                       fontSize: 10.5,
                       color: Color(0xFF64748B),

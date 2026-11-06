@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/services/auth_service.dart';
 import 'tabs/fo_booking_tab.dart';
 import 'tabs/fo_check_in_tab.dart';
 import 'tabs/fo_check_out_tab.dart';
@@ -58,6 +59,12 @@ class _FoDashboardScreenState extends State<FoDashboardScreen> {
   // TOP APP BAR
   // ===========================================================================
   Widget _buildTopAppBar() {
+    final user = AuthService.instance.currentUser;
+    final initials = (user?.fullName ?? 'FO').trim().split(' ')
+        .map((w) => w.isNotEmpty ? w[0] : '')
+        .take(2)
+        .join()
+        .toUpperCase();
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
@@ -125,9 +132,9 @@ class _FoDashboardScreenState extends State<FoDashboardScreen> {
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
-                child: const Text(
-                  'MF',
-                  style: TextStyle(
+                child: Text(
+                  initials,
+                  style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,

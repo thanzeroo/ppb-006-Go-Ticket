@@ -3,10 +3,11 @@ import 'package:flutter/foundation.dart';
 import '../config/supabase_config.dart';
 import '../models/payout_model.dart';
 import '../models/user_model.dart';
-import 'mock_data.dart';
 import 'supabase_service.dart';
 
 /// Service untuk operasional Super Admin (Platform Owner).
+/// Seluruh data bersumber langsung dari Supabase Database.
+/// Tidak ada mock data atau fallback dummy data.
 class SuperAdminService {
   SuperAdminService._();
   static final SuperAdminService instance = SuperAdminService._();
@@ -17,31 +18,43 @@ class SuperAdminService {
 
     if (sb.isReady) {
       try {
-        final usersCount = await sb.table(SupabaseConfig.tableUsers)?.count();
-        final hotelsCount =
-            await sb.table(SupabaseConfig.tableMitraPenginapan)?.count();
-        final bookingsCount =
-            await sb.table(SupabaseConfig.tableBooking)?.count();
+        final usersRes = await sb.table(SupabaseConfig.tableUsers)?.select();
+        final hotelsRes = await sb.table(SupabaseConfig.tableMitraPenginapan)?.select();
+        final bookingsRes = await sb.table(SupabaseConfig.tableBooking)?.select();
+
+        final usersCount = (usersRes as List?)?.length ?? 0;
+        final hotelsCount = (hotelsRes as List?)?.length ?? 0;
+        final bookingsCount = (bookingsRes as List?)?.length ?? 0;
+
+        // Hitung total revenue dari booking yang completed / confirmed
+        double totalRevenue = 0;
+        if (bookingsRes != null) {
+          for (final b in (bookingsRes as List)) {
+            final m = Map<String, dynamic>.from(b);
+            if (m['status_booking'] == 'confirmed' || m['status_booking'] == 'completed') {
+              totalRevenue += (m['total_harga'] as num?)?.toDouble() ?? 0;
+            }
+          }
+        }
 
         return {
-          'totalUsers': usersCount ?? MockData.users.length,
-          'totalHotels': hotelsCount ?? MockData.hotels.length,
-          'totalBookings': bookingsCount ?? MockData.bookings.length,
-          'totalRevenue': 124500000,
-          'activePartners': hotelsCount ?? 20,
+          'totalUsers': usersCount,
+          'totalHotels': hotelsCount,
+          'totalBookings': bookingsCount,
+          'totalRevenue': totalRevenue.toInt(),
+          'activePartners': hotelsCount,
         };
       } catch (e) {
         debugPrint('⚠️ [SuperAdminService] getPlatformStats error: $e');
       }
     }
 
-    await Future.delayed(const Duration(milliseconds: 200));
     return {
-      'totalUsers': MockData.users.length,
-      'totalHotels': MockData.hotels.length,
-      'totalBookings': MockData.bookings.length,
-      'totalRevenue': 124500000,
-      'activePartners': 42,
+      'totalUsers': 0,
+      'totalHotels': 0,
+      'totalBookings': 0,
+      'totalRevenue': 0,
+      'activePartners': 0,
     };
   }
 
@@ -55,18 +68,19 @@ class SuperAdminService {
             .table(SupabaseConfig.tableUsers)
             ?.select()
             .order('created_at', ascending: false);
-        if (res != null && (res as List).isNotEmpty) {
-          return res
+        if (res != null) {
+          return (res as List)
               .map((u) => UserModel.fromJson(Map<String, dynamic>.from(u)))
               .toList();
         }
+        return [];
       } catch (e) {
         debugPrint('⚠️ [SuperAdminService] getAllUsers error: $e');
+        return [];
       }
     }
 
-    await Future.delayed(const Duration(milliseconds: 200));
-    return List<UserModel>.from(MockData.users);
+    return [];
   }
 
   /// Mengaktifkan / memblokir akun user
@@ -84,14 +98,10 @@ class SuperAdminService {
         }
       } catch (e) {
         debugPrint('⚠️ [SuperAdminService] toggleUserStatus error: $e');
+        return false;
       }
     }
 
-    final idx = MockData.users.indexWhere((u) => u.id == userId);
-    if (idx != -1) {
-      MockData.users[idx] = MockData.users[idx].copyWith(isActive: isActive);
-      return true;
-    }
     return false;
   }
 
@@ -105,18 +115,19 @@ class SuperAdminService {
             .table(SupabaseConfig.tableMonitoringDana)
             ?.select()
             .order('tgl_pengajuan', ascending: false);
-        if (res != null && (res as List).isNotEmpty) {
-          return res
+        if (res != null) {
+          return (res as List)
               .map((p) => PayoutModel.fromJson(Map<String, dynamic>.from(p)))
               .toList();
         }
+        return [];
       } catch (e) {
         debugPrint('⚠️ [SuperAdminService] getAllPayouts error: $e');
+        return [];
       }
     }
 
-    await Future.delayed(const Duration(milliseconds: 200));
-    return List<PayoutModel>.from(MockData.payouts);
+    return [];
   }
 
   /// Menyetujui atau menolak permohonan payout
@@ -150,19 +161,10 @@ class SuperAdminService {
         }
       } catch (e) {
         debugPrint('⚠️ [SuperAdminService] processPayout error: $e');
+        return false;
       }
     }
 
-    final idx = MockData.payouts.indexWhere((p) => p.id == payoutId);
-    if (idx != -1) {
-      MockData.payouts[idx] = MockData.payouts[idx].copyWith(
-        status: newStatus,
-        processedAt: DateTime.now(),
-        referenceNumber: referenceNumber,
-      );
-      return true;
-    }
     return false;
   }
 }
-

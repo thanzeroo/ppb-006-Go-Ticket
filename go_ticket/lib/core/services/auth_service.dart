@@ -1,83 +1,76 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../config/supabase_config.dart';
 import '../models/user_model.dart';
 import '../utils/storage_helper.dart';
-import 'mock_data.dart';
 import 'supabase_service.dart';
 
-/// Service autentikasi terpadu untuk semua peran di ekosistem Go Ticket.
-/// Mendukung Supabase Auth dengan fallback seamless ke local mock session.
+/// Service otentikasi sentral Go Ticket.
+/// Terhubung langsung dengan Supabase Auth & PostgreSQL.
+/// Tidak ada mock data atau fallback dummy user.
 class AuthService {
   AuthService._();
   static final AuthService instance = AuthService._();
 
   UserModel? _currentUser;
   UserModel? get currentUser => _currentUser;
+  bool get isLoggedIn => _currentUser != null;
 
-  bool get isAuthenticated => _currentUser != null;
-
-  // ---------------------------------------------------------------------------
-  // INISIALISASI SESI DARI LOCAL STORAGE
-  // ---------------------------------------------------------------------------
-  Future<UserModel?> loadSavedSession() async {
+  /// Memulihkan sesi login dari penyimpanan lokal (SharedPreferences / Secure Storage)
+  Future<bool> loadSavedSession() async {
     try {
       final token = await StorageHelper.getAccessToken();
+      final userJson = await StorageHelper.getCurrentUser();
       final roleStr = await StorageHelper.getUserRole();
-      final userName = await StorageHelper.getUserName();
-      final userEmail = await StorageHelper.getUserEmail();
-      final userPhone = await StorageHelper.getUserPhone();
-      final isVerified = await StorageHelper.getUserVerified();
 
-      if (token != null && token.isNotEmpty) {
-        final role = UserRoleExtension.fromApiString(roleStr ?? 'customer');
-        _currentUser = UserModel(
-          id: token,
-          fullName: (userName != null && userName.isNotEmpty)
-              ? userName
-              : 'Aditya Pratama',
-          email: (userEmail != null && userEmail.isNotEmpty)
-              ? userEmail
-              : 'aditya.pratama@email.com',
-          phoneNumber: userPhone,
-          role: role,
-          isVerified: isVerified,
-        );
-        return _currentUser;
-      }
-
-      // Cek sesi Supabase jika client aktif
-      final sbService = SupabaseService.instance;
-      if (sbService.isReady && sbService.currentAuthUser != null) {
-        final authUser = sbService.currentAuthUser!;
-        final profileRes = await sbService
-            .table(SupabaseConfig.tableUsers)
-            ?.select()
-            .eq('id', authUser.id)
-            .maybeSingle();
-
-        if (profileRes != null) {
-          _currentUser = UserModel.fromJson(profileRes);
-        } else {
+      if (token != null && userJson != null) {
+        try {
+          final userData = json.decode(userJson) as Map<String, dynamic>;
           _currentUser = UserModel(
-            id: authUser.id,
-            fullName: authUser.userMetadata?['full_name'] ?? 'Pengguna',
-            email: authUser.email,
-            phoneNumber: authUser.phone,
-            role: UserRole.customer,
-            isVerified: authUser.emailConfirmedAt != null,
+            id: userData['id']?.toString() ?? '',
+            fullName: userData['full_name'] ?? userData['fullName'] ?? 'Pengguna',
+            email: userData['email'],
+            phoneNumber: userData['phone_number'] ?? userData['phone'],
+            role: UserRoleExtension.fromApiString(roleStr ?? userData['role']?.toString() ?? 'customer'),
+            isVerified: userData['is_verified'] == true || userData['isVerified'] == 'true',
           );
+        } catch (e) {
+          debugPrint('⚠️ Error parsing saved user: $e');
+          return false;
         }
-        return _currentUser;
+
+        // Validasi sinkronisasi profil terbaru dari Supabase jika koneksi aktif
+        final sbService = SupabaseService.instance;
+        if (sbService.isReady && sbService.client != null) {
+          try {
+            final userIdNum = int.tryParse(_currentUser!.id);
+            if (userIdNum != null) {
+              final remoteUser = await sbService
+                  .table(SupabaseConfig.tableUsers)
+                  ?.select()
+                  .eq('id_user', userIdNum)
+                  .maybeSingle();
+
+              if (remoteUser != null) {
+                _currentUser = UserModel.fromJson(remoteUser);
+              }
+            }
+          } catch (e) {
+            debugPrint('⚠️ Sync session profile error: $e');
+          }
+        }
+
+        return true;
       }
     } catch (e) {
-      debugPrint('⚠️ [AuthService] Gagal memuat sesi tersimpan: $e');
+      debugPrint('⚠️ Gagal load saved session: $e');
     }
-    return null;
+    return false;
   }
 
   // ---------------------------------------------------------------------------
-  // 1. LOGIN & REGISTER CUSTOMER
+  // 1. LOGIN & REGISTER CUSTOMER (Pihak User)
   // ---------------------------------------------------------------------------
   Future<UserModel> loginCustomer({
     required String email,
@@ -100,6 +93,8 @@ class AuthService {
             await _saveUserSession(model, 'jwt-user-${model.id}');
             _currentUser = model;
             return model;
+          } else {
+            throw Exception('Password salah');
           }
         }
 
@@ -123,28 +118,12 @@ class AuthService {
           return model;
         }
       } catch (e) {
-        debugPrint('⚠️ Supabase user login error, fallback: $e');
+        debugPrint('⚠️ Supabase user login error: $e');
+        rethrow;
       }
     }
 
-    // Fallback Mock Validation
-    await Future.delayed(const Duration(milliseconds: 400));
-    final matched = MockData.users.firstWhere(
-      (u) =>
-          u.role == UserRole.customer &&
-          (u.email?.toLowerCase() == email.trim().toLowerCase()),
-      orElse: () => UserModel(
-        id: 'usr-customer-${DateTime.now().millisecondsSinceEpoch}',
-        fullName: email.split('@').first,
-        email: email.trim(),
-        role: UserRole.customer,
-        isVerified: true,
-      ),
-    );
-
-    await _saveUserSession(matched, 'mock-jwt-customer-token');
-    _currentUser = matched;
-    return matched;
+    throw Exception('Gagal login: Database Supabase tidak terhubung atau user tidak ditemukan');
   }
 
   Future<UserModel> registerCustomer({
@@ -163,37 +142,24 @@ class AuthService {
           'email': email.trim(),
           'password': password,
           'no_telepon': phone?.trim(),
-          'status_akun': 'menunggu_verifikasi',
+          'status_akun': 'aktif',
           'saldo_poin': 0.0,
           'tier_membership': 'Bronze',
         }).select().maybeSingle();
 
         if (res != null) {
-          final model = UserModel.fromJson(res).copyWith(isVerified: false);
+          final model = UserModel.fromJson(res).copyWith(isVerified: true);
           await _saveUserSession(model, 'jwt-user-${model.id}');
           _currentUser = model;
           return model;
         }
       } catch (e) {
         debugPrint('⚠️ Supabase register error: $e');
+        rethrow;
       }
     }
 
-    // Fallback Mock
-    await Future.delayed(const Duration(milliseconds: 500));
-    final newModel = UserModel(
-      id: 'usr-customer-${DateTime.now().millisecondsSinceEpoch}',
-      fullName: fullName.trim(),
-      email: email.trim(),
-      phoneNumber: phone?.trim(),
-      role: UserRole.customer,
-      isVerified: false,
-      createdAt: DateTime.now(),
-    );
-    MockData.users.add(newModel);
-    await _saveUserSession(newModel, 'mock-jwt-customer-token');
-    _currentUser = newModel;
-    return newModel;
+    throw Exception('Gagal registrasi: Database Supabase tidak terhubung');
   }
 
   // ---------------------------------------------------------------------------
@@ -223,35 +189,12 @@ class AuthService {
           return model;
         }
       } catch (e) {
-        debugPrint('⚠️ Supabase staff query gagal, fallback: $e');
+        debugPrint('⚠️ Supabase staff query gagal: $e');
+        rethrow;
       }
     }
 
-    // Fallback Mock
-    await Future.delayed(const Duration(milliseconds: 400));
-    final matched = MockData.users.firstWhere(
-      (u) =>
-          u.role == role &&
-          (u.id.toLowerCase() == staffIdOrEmail.toLowerCase() ||
-              u.email?.toLowerCase() == staffIdOrEmail.toLowerCase()),
-      orElse: () => UserModel(
-        id: staffIdOrEmail,
-        fullName: role == UserRole.adminHotel
-            ? 'Administrator Hotel'
-            : role == UserRole.maintenance
-                ? 'Teknisi Maintenance'
-                : 'Staff Front Office',
-        email: staffIdOrEmail.contains('@') ? staffIdOrEmail : null,
-        role: role,
-        managedHotelId: '1',
-        managedHotelName: 'Aruna Stay',
-        isVerified: true,
-      ),
-    );
-
-    await _saveUserSession(matched, 'mock-jwt-${role.apiValue}-token');
-    _currentUser = matched;
-    return matched;
+    throw Exception('Gagal login staff: Database tidak terhubung atau staf tidak ditemukan');
   }
 
   // ---------------------------------------------------------------------------
@@ -280,26 +223,12 @@ class AuthService {
           return adminUser;
         }
       } catch (e) {
-        debugPrint('⚠️ Supabase superadmin login gagal, fallback: $e');
+        debugPrint('⚠️ Supabase superadmin login gagal: $e');
+        rethrow;
       }
     }
 
-    // Fallback Mock
-    await Future.delayed(const Duration(milliseconds: 400));
-    final admin = MockData.users.firstWhere(
-      (u) => u.role == UserRole.superAdmin,
-      orElse: () => const UserModel(
-        id: '1',
-        fullName: 'Super Admin Master',
-        email: 'admin.master@goticket.id',
-        role: UserRole.superAdmin,
-        isVerified: true,
-      ),
-    );
-
-    await _saveUserSession(admin, 'mock-jwt-superadmin-token');
-    _currentUser = admin;
-    return admin;
+    throw Exception('Gagal login Super Admin: Akun tidak ditemukan di database');
   }
 
   // ---------------------------------------------------------------------------
@@ -396,4 +325,3 @@ class AuthService {
     );
   }
 }
-

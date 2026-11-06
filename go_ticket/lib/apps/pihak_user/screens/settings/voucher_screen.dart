@@ -1,22 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:go_ticket/core/services/promo_service.dart';
 import 'package:go_ticket/core/widgets/gt_ui.dart';
 
 class _Voucher {
   final String badge;
   final String tag;
-  final String tagKind; // 'red' | 'cyan' | 'grey'
+  final String tagKind;
   final String title;
   final String desc;
   final String valid;
   final String code;
   final String image;
+
   const _Voucher(this.badge, this.tag, this.tagKind, this.title, this.desc,
       this.valid, this.code, this.image);
 }
 
-/// Voucher & Promo Saya (Figma: "USER Page Voucher&PromoSaya").
 class VoucherScreen extends StatefulWidget {
   const VoucherScreen({super.key});
 
@@ -27,43 +28,54 @@ class VoucherScreen extends StatefulWidget {
 class _VoucherScreenState extends State<VoucherScreen> {
   final _code = TextEditingController();
   bool _history = false;
+  bool _isLoading = true;
+  List<_Voucher> _available = [];
+  final List<_Voucher> _used = [];
 
-  static const _img1 =
+  static const _defaultImg =
       'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=300';
-  static const _img2 =
-      'https://images.unsplash.com/photo-1540541338287-41700207dee6?w=300';
-  static const _img3 =
-      'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=300';
 
-  final List<_Voucher> _available = [
-    const _Voucher('DISKON 20% • SPESIAL MEMBER GOLD', 'Sisa 12 Hari', 'red',
-        'Diskon Resor & Villa Bali',
-        'Min. Transaksi Rp 1.000.000 • Maks. Rp 500.000',
-        'Berlaku s/d 30 Nov 2026', 'GOTICKET20', _img1),
-    const _Voucher('CASHBACK RP 150.000', 'Hotel Bintang 4 & 5', 'cyan',
-        'Cashback QRIS & Virtual Account',
-        'Berlaku untuk semua hotel bintang 4 & 5',
-        'Berlaku s/d 15 Des 2026', 'PAYCASH150', _img2),
-    const _Voucher('GRATIS SARAPAN & SPA', 'Khusus Pasangan', 'grey',
-        'Free Breakfast & Welcome Drink',
-        'The Grand Amora & Kayumanis Villa',
-        'Berlaku s/d 31 Des 2026', 'FREEMORNING', _img3),
-    const _Voucher('DISKON 10%', 'Weekend', 'cyan', 'STAYHEMAT Weekend',
-        'Diskon spesial menginap akhir pekan',
-        'Berlaku s/d 31 Des 2026', 'STAYHEMAT', _img1),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadVouchers();
+  }
 
-  final List<_Voucher> _used = [
-    const _Voucher('DISKON 15%', 'Sudah digunakan', 'grey', 'Promo Akhir Tahun',
-        'Digunakan pada pemesanan GT-772109', 'Digunakan 12 Sep 2026',
-        'AKHIRTAHUN15', _img2),
-    const _Voucher('CASHBACK RP 50.000', 'Sudah digunakan', 'grey',
-        'Cashback Pengguna Baru', 'Digunakan pada pemesanan GT-661084',
-        'Digunakan 22 Jul 2026', 'NEWUSER50', _img3),
-    const _Voucher('GRATIS UPGRADE KAMAR', 'Sudah digunakan', 'grey',
-        'Free Room Upgrade', 'Digunakan pada pemesanan GT-554101',
-        'Digunakan 01 Agu 2026', 'UPGRADEME', _img1),
-  ];
+  Future<void> _loadVouchers() async {
+    setState(() => _isLoading = true);
+    try {
+      final promos = await PromoService.instance.getPromos();
+      if (mounted) {
+        setState(() {
+          _available = promos.map((p) {
+            final code = p['code']?.toString() ?? '';
+            final title = p['title']?.toString() ?? 'Promo Spesial';
+            final desc = p['description']?.toString() ?? '';
+            final discount = p['discountPercent']?.toString() ?? '10';
+            final valid = p['expiredDate']?.toString() ?? '2026-12-31';
+            return _Voucher(
+              'DISKON $discount%',
+              'Aktif',
+              'cyan',
+              title,
+              desc,
+              'Berlaku s/d $valid',
+              code,
+              _defaultImg,
+            );
+          }).toList();
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _available = [];
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -75,22 +87,42 @@ class _VoucherScreenState extends State<VoucherScreen> {
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(m)));
 
-  void _claim() {
+  Future<void> _claim() async {
     final c = _code.text.trim().toUpperCase();
     if (c.isEmpty) return _snack('Masukkan kode promo terlebih dahulu');
     if (_available.any((v) => v.code == c)) {
       return _snack('Kode $c sudah ada di daftar voucher kamu');
     }
-    setState(() {
-      _available.insert(
-        0,
-        _Voucher('PROMO $c', 'Baru', 'cyan', 'Voucher $c',
-            'Potongan harga untuk pemesananmu', 'Berlaku s/d 31 Des 2026', c,
-            _img2),
+
+    try {
+      final promo = await PromoService.instance.validatePromo(
+        code: c,
+        bookingAmount: 500000,
       );
-      _code.clear();
-    });
-    _snack('Kode promo berhasil diklaim');
+      if (promo != null) {
+        setState(() {
+          _available.insert(
+            0,
+            _Voucher(
+              'PROMO KLAIM',
+              'Baru',
+              'cyan',
+              'Voucher $c',
+              'Potongan harga untuk pemesananmu',
+              'Berlaku Aktif',
+              c,
+              _defaultImg,
+            ),
+          );
+          _code.clear();
+        });
+        _snack('Kode promo berhasil diklaim');
+      } else {
+        _snack('Kode promo tidak ditemukan di database');
+      }
+    } catch (e) {
+      _snack('Kode promo tidak valid atau tidak aktif');
+    }
   }
 
   void _copy(String code) {
@@ -104,116 +136,86 @@ class _VoucherScreenState extends State<VoucherScreen> {
     return Scaffold(
       backgroundColor: GT.bg,
       appBar: const GTAppBar(title: 'Vouchers'),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
-        children: [
-          GTCard(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: const [
-                Icon(Icons.confirmation_number, color: GT.teal),
-                SizedBox(width: 8),
-                Text('Klaim Kode Promo',
-                    style: TextStyle(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w800,
-                        color: GT.ink)),
-              ]),
-              const SizedBox(height: 12),
-              Row(children: [
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                        color: GT.soft.withValues(alpha: 0.7),
-                        borderRadius: BorderRadius.circular(14)),
-                    child: TextField(
-                      controller: _code,
-                      textCapitalization: TextCapitalization.characters,
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        hintText: 'PUNYA KODE PROMO HOTEL?',
-                        hintStyle: TextStyle(fontSize: 12),
-                        contentPadding:
-                            EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+              children: [
+                GTCard(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: const [
+                          Icon(Icons.confirmation_number, color: GT.teal),
+                          SizedBox(width: 8),
+                          Text('Klaim Kode Promo',
+                              style: TextStyle(
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w800,
+                                  color: GT.ink)),
+                        ]),
+                        const SizedBox(height: 12),
+                        Row(children: [
+                          Expanded(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                  color: GT.soft.withValues(alpha: 0.7),
+                                  borderRadius: BorderRadius.circular(14)),
+                              child: TextField(
+                                controller: _code,
+                                textCapitalization: TextCapitalization.characters,
+                                decoration: const InputDecoration(
+                                  border: InputBorder.none,
+                                  hintText: 'PUNYA KODE PROMO HOTEL?',
+                                  hintStyle: TextStyle(fontSize: 12),
+                                  contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 16),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          GTButton(label: 'Terapkan', height: 50, onTap: _claim),
+                        ]),
+                      ]),
+                ),
+                Row(children: [
+                  Expanded(
+                    child: _tab('Voucher Tersedia',
+                        Icons.confirmation_number_outlined, _available.length,
+                        !_history, () => setState(() => _history = false)),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _tab('Riwayat Digunakan', Icons.history, _used.length,
+                        _history, () => setState(() => _history = true)),
+                  ),
+                ]),
+                const SizedBox(height: 12),
+                if (list.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 40),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          const Icon(Icons.confirmation_number_outlined,
+                              size: 48, color: GT.muted),
+                          const SizedBox(height: 12),
+                          Text(
+                            _history
+                                ? 'Belum ada riwayat voucher yang digunakan'
+                                : 'Belum ada promo voucher aktif saat ini',
+                            style: const TextStyle(
+                                fontSize: 13, color: GT.muted),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                GTButton(label: 'Terapkan', height: 50, onTap: _claim),
-              ]),
-            ]),
-          ),
-          Row(children: [
-            Expanded(
-              child: _tab('Voucher Tersedia', Icons.confirmation_number_outlined,
-                  _available.length, !_history,
-                  () => setState(() => _history = false)),
+                  )
+                else
+                  for (final v in list) _card(v),
+              ],
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _tab('Riwayat Digunakan', Icons.history, _used.length,
-                  _history, () => setState(() => _history = true)),
-            ),
-          ]),
-          const SizedBox(height: 12),
-          for (final v in list) _card(v),
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              gradient: const LinearGradient(
-                  colors: [GT.teal, GT.primary],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight),
-            ),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(14)),
-                child: const Text('POIN GO TICKET REWARDS',
-                    style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white)),
-              ),
-              const SizedBox(height: 10),
-              const Text('Kumpulkan poin reservasi di Go Ticket!',
-                  style: TextStyle(
-                      fontSize: 22,
-                      height: 1.2,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white)),
-              const SizedBox(height: 8),
-              const Text(
-                  'Tukarkan poin menginapmu dengan voucher diskon hingga menginap gratis di hotel favorit seluruh nusantara.',
-                  style: TextStyle(
-                      fontSize: 12, height: 1.4, color: Colors.white70)),
-              const SizedBox(height: 14),
-              Row(children: [
-                GestureDetector(
-                  onTap: () => _snack('Penukaran poin segera hadir'),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20)),
-                    child: const Text('Tukar Poin Saya  ›',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w800, color: GT.teal)),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Text('1.250 Poin Aktif',
-                    style: TextStyle(fontSize: 12, color: Colors.white)),
-              ]),
-            ]),
-          ),
-        ],
-      ),
     );
   }
 

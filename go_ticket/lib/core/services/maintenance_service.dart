@@ -4,10 +4,11 @@ import '../config/supabase_config.dart';
 import '../models/maintenance_ticket_model.dart';
 import '../models/room_model.dart';
 import 'hotel_service.dart';
-import 'mock_data.dart';
 import 'supabase_service.dart';
 
 /// Service untuk operasional pemeliharaan hotel (Kebersihan & Kerusakan).
+/// Seluruh data bersumber langsung dari Supabase Database.
+/// Tidak ada mock data atau fallback dummy data.
 class MaintenanceService {
   MaintenanceService._();
   static final MaintenanceService instance = MaintenanceService._();
@@ -44,18 +45,18 @@ class MaintenanceService {
               MaintenanceTicketModel.fromJson(Map<String, dynamic>.from(t))));
         }
 
-        if (results.isNotEmpty) return results;
+        // Return data dari DB (meskipun kosong)
+        return results;
       } catch (e) {
         debugPrint('⚠️ [MaintenanceService] getTickets error: $e');
+        return [];
       }
     }
 
-    // Fallback Mock
-    await Future.delayed(const Duration(milliseconds: 250));
-    return List<MaintenanceTicketModel>.from(MockData.maintenanceTickets);
+    return [];
   }
 
-  /// Membuat tiket laporan baru (contoh: Lapor Kerusakan atau Permintaan Kebersihan)
+  /// Membuat tiket laporan baru
   Future<MaintenanceTicketModel> createTicket(
     MaintenanceTicketModel ticket,
   ) async {
@@ -94,7 +95,6 @@ class MaintenanceService {
           .updateRoomStatus(ticket.roomId!, RoomStatus.maintenance);
     }
 
-    MockData.maintenanceTickets.insert(0, ticket);
     return ticket;
   }
 
@@ -129,29 +129,18 @@ class MaintenanceService {
               .table(SupabaseConfig.tableLaporanKerusakan)
               ?.update(data)
               .eq('id_tiket_kerusakan', parsedId);
+
+          if (newStatus == MaintenanceStatus.resolved) {
+            // Kamar siap kembali
+          }
+          return true;
         }
       } catch (e) {
         debugPrint('⚠️ [MaintenanceService] updateTicketStatus error: $e');
+        return false;
       }
     }
 
-    final idx =
-        MockData.maintenanceTickets.indexWhere((t) => t.id == ticketId);
-    if (idx != -1) {
-      final old = MockData.maintenanceTickets[idx];
-      MockData.maintenanceTickets[idx] = old.copyWith(
-        status: newStatus,
-        resolvedAt: newStatus == MaintenanceStatus.resolved ? DateTime.now() : null,
-        resolutionNotes: resolutionNotes ?? old.resolutionNotes,
-      );
-
-      if (newStatus == MaintenanceStatus.resolved && old.roomId != null) {
-        await HotelService.instance
-            .updateRoomStatus(old.roomId!, RoomStatus.available);
-      }
-      return true;
-    }
     return false;
   }
 }
-

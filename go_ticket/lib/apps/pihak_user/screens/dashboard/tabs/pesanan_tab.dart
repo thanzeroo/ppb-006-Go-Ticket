@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:go_ticket/core/models/booking_model.dart';
 import 'package:go_ticket/core/services/auth_service.dart';
-import 'package:go_ticket/core/services/customer_data_service.dart';
+import 'package:go_ticket/core/services/booking_service.dart';
+import 'package:go_ticket/core/utils/currency_formatter.dart';
 import 'package:go_ticket/core/widgets/user_avatar.dart';
 import '../../../router/customer_router.dart';
 import '../customer_dashboard_screen.dart';
 import 'saved_hotel_screen.dart';
 
-/// Tab Pesanan: Riwayat Tiket & Pesanan
+/// Tab Pesanan: Riwayat Tiket & Pesanan (Murni dari Database Supabase)
 class PesananTab extends StatefulWidget {
   const PesananTab({super.key});
 
@@ -68,6 +71,14 @@ class _PesananTabState extends State<PesananTab>
         fields.any((field) => field.toLowerCase().contains(query));
   }
 
+  static String _monthShort(int m) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+      'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+    ];
+    return (m >= 1 && m <= 12) ? months[m - 1] : '';
+  }
+
   @override
   Widget build(BuildContext context) {
     return PageView(
@@ -92,29 +103,64 @@ class _PesananTabState extends State<PesananTab>
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // MAIN PEMESANAN VIEW
+  // ---------------------------------------------------------------------------
   Widget _buildPemesananView() {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
-      body: Column(
-        children: [
-          _buildHeader(),
-          _buildTabBar(),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildAllOrders(),
-                _buildAllOrders(filterStatus: 'active'),
-                _buildAllOrders(filterStatus: 'selesai'),
-                _buildAllOrders(filterStatus: 'dibatalkan'),
-              ],
-            ),
+    return FutureBuilder<List<BookingModel>>(
+      future: BookingService.instance.getMyBookings(),
+      builder: (context, snapshot) {
+        final allBookings = snapshot.data ?? [];
+        final countActive = allBookings
+            .where((b) =>
+                b.status == BookingStatus.confirmed ||
+                b.status == BookingStatus.checkedIn ||
+                b.status == BookingStatus.pendingPayment)
+            .length;
+        final countCompleted = allBookings
+            .where((b) => b.status == BookingStatus.checkedOut)
+            .length;
+        final countCancelled = allBookings
+            .where((b) =>
+                b.status == BookingStatus.cancelled ||
+                b.status == BookingStatus.expired)
+            .length;
+        final countAll = allBookings.length;
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF5F7FA),
+          body: Column(
+            children: [
+              _buildHeader(),
+              _buildTabBar(
+                countAll: countAll,
+                countActive: countActive,
+                countCompleted: countCompleted,
+                countCancelled: countCancelled,
+              ),
+              Expanded(
+                child: snapshot.connectionState == ConnectionState.waiting
+                    ? const Center(child: CircularProgressIndicator())
+                    : TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildOrderList(allBookings, filterStatus: null),
+                          _buildOrderList(allBookings, filterStatus: 'active'),
+                          _buildOrderList(allBookings, filterStatus: 'selesai'),
+                          _buildOrderList(allBookings, filterStatus: 'dibatalkan'),
+                        ],
+                      ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // HEADER
+  // ---------------------------------------------------------------------------
   Widget _buildHeader() {
     return Container(
       color: Colors.white,
@@ -130,35 +176,38 @@ class _PesananTabState extends State<PesananTab>
                 children: [
                   Row(
                     children: [
-                      Image.asset('assets/logo.png', height: 28,
-                          errorBuilder: (_, __, ___) => Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF00B4D8),
-                                      borderRadius: BorderRadius.circular(5),
-                                    ),
-                                    child: const Text(
-                                      'GO',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 5),
-                                  Text(
-                                    'GoTicket',
-                                    style: GoogleFonts.inter(
-                                      color: const Color(0xFF111827),
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 15,
-                                    ),
-                                  ),
-                                ],
-                              )),
+                      Image.asset(
+                        'assets/logo.png',
+                        height: 28,
+                        errorBuilder: (_, __, ___) => Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00B4D8),
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              child: const Text(
+                                'GO',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              'GoTicket',
+                              style: GoogleFonts.inter(
+                                color: const Color(0xFF111827),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         'Pemesanan',
@@ -193,7 +242,7 @@ class _PesananTabState extends State<PesananTab>
                 ],
               ),
               const SizedBox(height: 12),
-              // Search
+              // Search Bar
               Container(
                 decoration: BoxDecoration(
                   color: const Color(0xFFF5F7FA),
@@ -237,7 +286,7 @@ class _PesananTabState extends State<PesananTab>
                 ),
               ),
               const SizedBox(height: 12),
-              // Pesanan Saya label
+              // Label Pesanan Saya
               Row(
                 children: [
                   const Icon(Icons.receipt_long,
@@ -246,20 +295,12 @@ class _PesananTabState extends State<PesananTab>
                   Text(
                     'Pesanan Saya',
                     style: GoogleFonts.inter(
-                      fontSize: 13,
-                      color: const Color(0xFF6B7280),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF111827),
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Riwayat Tiket & Pesanan',
-                style: GoogleFonts.inter(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF111827),
-                ),
               ),
               const SizedBox(height: 12),
             ],
@@ -270,10 +311,11 @@ class _PesananTabState extends State<PesananTab>
   }
 
   Widget _buildTopTab(String label, int index) {
-    final isSelected = index == 0;
-    return InkWell(
-      borderRadius: BorderRadius.circular(20),
+    final isSelected = PesananTab.subTabNotifier.value == index;
+    return GestureDetector(
       onTap: () {
+        if (PesananTab.subTabNotifier.value == index) return;
+        PesananTab.subTabNotifier.value = index;
         if (index == 0) return;
         _subPageController.animateToPage(
           1,
@@ -304,13 +346,15 @@ class _PesananTabState extends State<PesananTab>
     );
   }
 
-  Widget _buildTabBar() {
-    final isFresh = CustomerDataService.instance.isFreshUser;
-    final int countActive = isFresh ? 0 : 1;
-    final int countCompleted = isFresh ? 0 : 2;
-    final int countCancelled = isFresh ? 0 : 1;
-    final int countAll = countActive + countCompleted + countCancelled;
-
+  // ---------------------------------------------------------------------------
+  // TAB BAR DENGAN JUMLAH RIIL DARI DATABASE
+  // ---------------------------------------------------------------------------
+  Widget _buildTabBar({
+    required int countAll,
+    required int countActive,
+    required int countCompleted,
+    required int countCancelled,
+  }) {
     final tabs = [
       'Semua ($countAll)',
       'Aktif ($countActive)',
@@ -342,168 +386,98 @@ class _PesananTabState extends State<PesananTab>
     );
   }
 
-  Widget _buildAllOrders({String? filterStatus}) {
-    if (CustomerDataService.instance.isFreshUser) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFC8F0FA),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.receipt_long_outlined,
-                  color: Color(0xFF0077B6),
-                  size: 36,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Belum Ada Pesanan',
-                style: GoogleFonts.inter(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Anda belum memiliki pesanan hotel aktif maupun riwayat pemesanan. Mulai jelajahi dan booking hotel impian Anda sekarang!',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: const Color(0xFF64748B),
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () => CustomerDashboardScreen.tabNotifier.value = 1,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00B4D8),
-                  foregroundColor: Colors.white,
-                  shape: const StadiumBorder(),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  elevation: 0,
-                ),
-                child: Text(
-                  'Cari Penginapan Sekarang',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w700),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final children = <Widget>[];
-    if ((filterStatus == null || filterStatus == 'active') &&
-        _matchesBookingQuery(const [
-          'The Grand Amora Resort & Spa',
-          'Seminyak Bali',
-          'GT-884920',
-          'Deluxe Ocean View',
-          'Siap Check-In',
-        ])) {
-      children
-        ..add(_buildActiveBookingCard())
-        ..add(const SizedBox(height: 12));
-    }
-
-    final completedBookings = [
-      (
-        bookingId: 'GT-772109',
-        hotelName: 'Seminyak Beach Breeze Hotel',
-        location: 'Seminyak, Bali',
-        dates: '10 Sep - 12 Sep 2025  •  Rp 850.000',
-      ),
-      (
-        bookingId: 'GT-661084',
-        hotelName: 'Alila Ocean Suites',
-        location: 'Uluwatu, Bali',
-        dates: '22 Jul - 24 Jul 2025  •  Rp 2.900.000',
-      ),
-    ];
-    if (filterStatus == null || filterStatus == 'selesai') {
-      for (final booking in completedBookings) {
-        if (_matchesBookingQuery([
-          booking.bookingId,
-          booking.hotelName,
-          booking.location,
-          booking.dates,
-          'Selesai Menginap',
-        ])) {
-          children
-            ..add(
-              _buildCompletedBookingCard(
-                bookingId: booking.bookingId,
-                hotelName: booking.hotelName,
-                location: booking.location,
-                dates: booking.dates,
-                status: 'Selesai Menginap',
-                statusColor: const Color(0xFF6B7280),
-              ),
-            )
-            ..add(const SizedBox(height: 12));
-        }
+  // ---------------------------------------------------------------------------
+  // LIST PESANAN RIIL DARI DATABASE
+  // ---------------------------------------------------------------------------
+  Widget _buildOrderList(
+    List<BookingModel> allBookings, {
+    String? filterStatus,
+  }) {
+    final filtered = allBookings.where((b) {
+      if (filterStatus == 'active') {
+        return b.status == BookingStatus.confirmed ||
+            b.status == BookingStatus.checkedIn ||
+            b.status == BookingStatus.pendingPayment;
       }
+      if (filterStatus == 'selesai') {
+        return b.status == BookingStatus.checkedOut;
+      }
+      if (filterStatus == 'dibatalkan') {
+        return b.status == BookingStatus.cancelled ||
+            b.status == BookingStatus.expired;
+      }
+      return true;
+    }).where((b) {
+      return _matchesBookingQuery([
+        b.bookingCode,
+        b.hotelName,
+        b.hotelAddress ?? '',
+        b.roomTypeName,
+        b.status.displayName,
+      ]);
+    }).toList();
+
+    if (filtered.isEmpty) {
+      return _buildEmptyOrdersState();
     }
 
-    if ((filterStatus == null || filterStatus == 'dibatalkan') &&
-        _matchesBookingQuery(const [
-          'GT-554101',
-          'The Grand Amora Resort & Spa',
-          'Seminyak Bali',
-          'Dibatalkan Refund Selesai',
-          'Rp 1.200.000',
-        ])) {
-      children
-        ..add(_buildCancelledBookingCard())
-        ..add(const SizedBox(height: 12));
-    }
-
-    if (_searchQuery.trim().isEmpty) {
-      children.add(_buildBantuanCard());
-    } else if (children.isEmpty) {
-      children.add(
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
-          child: Text(
-            'Pesanan tidak ditemukan. Coba nama hotel, kota, atau ID booking lain.',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              color: const Color(0xFF6B7280),
-            ),
-          ),
-        ),
-      );
-    }
-    children.add(const SizedBox(height: 80));
-
-    return ListView(
+    return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      children: children,
+      itemCount: filtered.length + 1, // +1 untuk bantuan card
+      itemBuilder: (context, index) {
+        if (index == filtered.length) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 80),
+            child: _buildBantuanCard(),
+          );
+        }
+        final b = filtered[index];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _buildBookingCard(b),
+        );
+      },
     );
   }
 
-  Widget _buildActiveBookingCard() {
+  // ---------------------------------------------------------------------------
+  // CARD PESANAN 100% DINAMIS DARI MODEL
+  // ---------------------------------------------------------------------------
+  Widget _buildBookingCard(BookingModel b) {
+    final isCancelled = b.status == BookingStatus.cancelled ||
+        b.status == BookingStatus.expired;
+    final isCompleted = b.status == BookingStatus.checkedOut;
+    final dates =
+        '${b.checkInDate.day} ${_monthShort(b.checkInDate.month)} – ${b.checkOutDate.day} ${_monthShort(b.checkOutDate.month)} ${b.checkOutDate.year}';
+    final priceStr = CurrencyFormatter.toRupiah(b.totalAmount);
+    final paymentMethodStr = b.paymentMethod ?? 'QRIS';
+
+    Color headerBg = const Color(0xFFE0F7FA);
+    Color statusColor = const Color(0xFF0096C7);
+    Color dotColor = const Color(0xFF00B4D8);
+
+    if (isCompleted) {
+      headerBg = const Color(0xFFF3F4F6);
+      statusColor = const Color(0xFF6B7280);
+      dotColor = const Color(0xFF9CA3AF);
+    } else if (isCancelled) {
+      headerBg = const Color(0xFFFEE2E2);
+      statusColor = const Color(0xFFEF4444);
+      dotColor = const Color(0xFFEF4444);
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF00B4D8).withOpacity(0.4)),
+        border: Border.all(
+          color: isCancelled
+              ? const Color(0xFFEF4444).withOpacity(0.3)
+              : const Color(0xFF00B4D8).withOpacity(0.4),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -512,11 +486,11 @@ class _PesananTabState extends State<PesananTab>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
+          // Header Status & ID
           Container(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
             decoration: BoxDecoration(
-              color: const Color(0xFFE0F7FA),
+              color: headerBg,
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(16)),
             ),
@@ -528,33 +502,45 @@ class _PesananTabState extends State<PesananTab>
                     Container(
                       width: 8,
                       height: 8,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF00B4D8),
+                      decoration: BoxDecoration(
+                        color: dotColor,
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'Siap Check-In',
+                      b.status.displayName,
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: const Color(0xFF0096C7),
+                        color: statusColor,
                       ),
                     ),
                   ],
                 ),
-                Row(
-                  children: [
-                    Text(
-                      'ID: GT-884920',
-                      style: GoogleFonts.inter(
-                          fontSize: 12, color: const Color(0xFF6B7280)),
-                    ),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.copy_outlined,
-                        size: 14, color: Color(0xFF9CA3AF)),
-                  ],
+                InkWell(
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: b.bookingCode));
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('ID ${b.bookingCode} berhasil disalin!'),
+                        duration: const Duration(seconds: 1),
+                      ),
+                    );
+                  },
+                  child: Row(
+                    children: [
+                      Text(
+                        'ID: ${b.bookingCode}',
+                        style: GoogleFonts.inter(
+                            fontSize: 12, color: const Color(0xFF6B7280)),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.copy_outlined,
+                          size: 14, color: Color(0xFF9CA3AF)),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -570,7 +556,7 @@ class _PesananTabState extends State<PesananTab>
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
                       child: Image.network(
-                        'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=200',
+                        b.hotelImageUrl ?? '',
                         width: 80,
                         height: 70,
                         fit: BoxFit.cover,
@@ -578,7 +564,7 @@ class _PesananTabState extends State<PesananTab>
                           width: 80,
                           height: 70,
                           color: const Color(0xFFE5E7EB),
-                          child: const Icon(Icons.hotel),
+                          child: const Icon(Icons.hotel, color: Colors.grey),
                         ),
                       ),
                     ),
@@ -587,32 +573,33 @@ class _PesananTabState extends State<PesananTab>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.star,
-                                  color: Color(0xFFFBBC05), size: 13),
-                              Text(
-                                ' Bintang 5  •  Seminyak, Bali',
-                                style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    color: const Color(0xFF6B7280)),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 3),
                           Text(
-                            'The Grand Amora Resort &',
+                            b.hotelAddress ?? 'Indonesia',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: const Color(0xFF6B7280),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            b.hotelName,
                             style: GoogleFonts.inter(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                               color: const Color(0xFF111827),
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                           Text(
-                            'Deluxe Ocean View (1 Kamar • 2 Malam)',
+                            '${b.roomTypeName} (${b.totalRooms} Kamar • ${b.nights} Malam)',
                             style: GoogleFonts.inter(
                                 fontSize: 12,
                                 color: const Color(0xFF6B7280)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 4),
                           Row(
@@ -621,7 +608,7 @@ class _PesananTabState extends State<PesananTab>
                                   size: 12, color: Color(0xFF9CA3AF)),
                               const SizedBox(width: 4),
                               Text(
-                                '24 Okt – 26 Okt 2025',
+                                dates,
                                 style: GoogleFonts.inter(
                                     fontSize: 12,
                                     color: const Color(0xFF6B7280)),
@@ -629,23 +616,6 @@ class _PesananTabState extends State<PesananTab>
                             ],
                           ),
                         ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0FDF4),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFF86EFAC)),
-                      ),
-                      child: Text(
-                        '4.9',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF16A34A),
-                        ),
                       ),
                     ),
                   ],
@@ -662,7 +632,7 @@ class _PesananTabState extends State<PesananTab>
                     Row(
                       children: [
                         Text(
-                          'Rp 1.600.000',
+                          priceStr,
                           style: GoogleFonts.inter(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
@@ -674,15 +644,25 @@ class _PesananTabState extends State<PesananTab>
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF0FDF4),
+                            color: isCancelled
+                                ? const Color(0xFFFEE2E2)
+                                : const Color(0xFFF0FDF4),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFF86EFAC)),
+                            border: Border.all(
+                              color: isCancelled
+                                  ? const Color(0xFFFCA5A5)
+                                  : const Color(0xFF86EFAC),
+                            ),
                           ),
                           child: Text(
-                            '✓ Lunas (QRIS)',
+                            isCancelled
+                                ? 'Dibatalkan'
+                                : '✓ Lunas ($paymentMethodStr)',
                             style: GoogleFonts.inter(
                               fontSize: 11,
-                              color: const Color(0xFF16A34A),
+                              color: isCancelled
+                                  ? const Color(0xFFEF4444)
+                                  : const Color(0xFF16A34A),
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -691,349 +671,160 @@ class _PesananTabState extends State<PesananTab>
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () =>
-                        Navigator.pushNamed(context, CustomerRouter.eTicket),
-                    icon: const Icon(Icons.qr_code, size: 16),
-                    label: Text(
-                      'Lihat E-Tiket & QR',
-                      style: GoogleFonts.inter(
-                          fontSize: 13, fontWeight: FontWeight.w700),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00B4D8),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      elevation: 0,
-                      minimumSize: const Size(double.infinity, 0),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Petunjuk arah & kontak resepsionis dikirim ke WhatsApp'))),
-                    icon: const Icon(Icons.support_agent,
-                        color: Color(0xFF00B4D8), size: 16),
-                    label: Text(
-                      'Petunjuk & Resepsionis',
-                      style: GoogleFonts.inter(
-                          fontSize: 13,
-                          color: const Color(0xFF00B4D8),
-                          fontWeight: FontWeight.w600),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFF00B4D8)),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      minimumSize: const Size(double.infinity, 0),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCompletedBookingCard({
-    required String bookingId,
-    required String hotelName,
-    required String location,
-    required String dates,
-    required String status,
-    required Color statusColor,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    status,
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: statusColor,
-                    ),
-                  ),
-                ),
-                Text(
-                  bookingId,
-                  style: GoogleFonts.inter(
-                      fontSize: 12, color: const Color(0xFF9CA3AF)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Image.network(
-                    'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=200',
-                    width: 70,
-                    height: 60,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: 70,
-                      height: 60,
-                      color: const Color(0xFFE5E7EB),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        location,
-                        style: GoogleFonts.inter(
-                            fontSize: 11, color: const Color(0xFF6B7280)),
+                const SizedBox(height: 12),
+                // Action Buttons
+                if (!isCancelled && !isCompleted) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => Navigator.pushNamed(
+                        context,
+                        CustomerRouter.eTicket,
+                        arguments: b,
                       ),
-                      Text(
-                        hotelName,
+                      icon: const Icon(Icons.qr_code, size: 16),
+                      label: Text(
+                        'Lihat E-Tiket & QR',
                         style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF111827),
+                            fontSize: 13, fontWeight: FontWeight.w700),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00B4D8),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                ] else if (isCompleted) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => Navigator.pushNamed(
+                            context,
+                            CustomerRouter.postCheckoutReview,
+                            arguments: b,
+                          ),
+                          icon: const Icon(Icons.star_border,
+                              color: Color(0xFFF59E0B), size: 14),
+                          label: Text(
+                            'Beri Ulasan',
+                            style: GoogleFonts.inter(
+                                fontSize: 12, color: const Color(0xFFF59E0B)),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFFF59E0B)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            minimumSize: Size.zero,
+                          ),
                         ),
                       ),
-                      Text(
-                        dates,
-                        style: GoogleFonts.inter(
-                            fontSize: 12, color: const Color(0xFF6B7280)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () =>
+                              CustomerDashboardScreen.tabNotifier.value = 1,
+                          icon: const Icon(Icons.refresh,
+                              color: Color(0xFF00B4D8), size: 14),
+                          label: Text(
+                            'Pesan Lagi',
+                            style: GoogleFonts.inter(
+                                fontSize: 12, color: const Color(0xFF00B4D8)),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFF00B4D8)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            minimumSize: Size.zero,
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => Navigator.pushNamed(
-                        context, CustomerRouter.postCheckoutReview),
-                    icon: const Icon(Icons.star_border,
-                        color: Color(0xFFF59E0B), size: 14),
-                    label: Text(
-                      'Beri Ulasan',
-                      style: GoogleFonts.inter(
-                          fontSize: 12, color: const Color(0xFFF59E0B)),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFF59E0B)),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      minimumSize: Size.zero,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => Navigator.pushNamed(
-                        context, CustomerRouter.hotelDetail),
-                    icon: const Icon(Icons.refresh,
-                        color: Color(0xFF00B4D8), size: 14),
-                    label: Text(
-                      'Pesan Lagi',
-                      style: GoogleFonts.inter(
-                          fontSize: 12, color: const Color(0xFF00B4D8)),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFF00B4D8)),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      minimumSize: Size.zero,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Center(
-              child: TextButton.icon(
-                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Invoice PDF sedang disiapkan'))),
-                icon: const Icon(Icons.download_outlined,
-                    size: 13, color: Color(0xFF6B7280)),
-                label: Text(
-                  'Unduh Bukti Invoice Resmi (PDF)',
-                  style: GoogleFonts.inter(
-                      fontSize: 12, color: const Color(0xFF6B7280)),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCancelledBookingCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEE2E2),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    '🚫 Dibatalkan & Refund Selesai',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFFEF4444),
-                    ),
-                  ),
-                ),
-                Text(
-                  'GT-554101',
-                  style: GoogleFonts.inter(
-                      fontSize: 12, color: const Color(0xFF9CA3AF)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Image.network(
-                    'https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?w=200',
-                    width: 70,
-                    height: 60,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: 70,
-                      height: 60,
-                      color: const Color(0xFFE5E7EB),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Ubud, Bali',
+                ] else ...[
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Text(
+                        'Pesanan telah dibatalkan.',
                         style: GoogleFonts.inter(
-                            fontSize: 11, color: const Color(0xFF6B7280)),
-                      ),
-                      Text(
-                        'Ubud Forest Heritage',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF111827),
+                          fontSize: 12,
+                          color: const Color(0xFF9CA3AF),
                         ),
                       ),
-                      Text(
-                        '01 Agu - 02 Agu 2025',
-                        style: GoogleFonts.inter(
-                            fontSize: 12, color: const Color(0xFF6B7280)),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0FDF4),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF86EFAC)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.check_circle,
-                      color: Color(0xFF16A34A), size: 16),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      '♻ Refund 100% Berhasil\nRp 1.200.000 telah dikembalikan ke saldo GoPay\npada 28 Jul 2025.',
-                      style: GoogleFonts.inter(
-                          fontSize: 12, color: const Color(0xFF166534)),
                     ),
                   ),
                 ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // EMPTY STATE (Ketika Belum Ada Data di Database)
+  // ---------------------------------------------------------------------------
+  Widget _buildEmptyOrdersState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: const BoxDecoration(
+                color: Color(0xFFC8F0FA),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.receipt_long_outlined,
+                color: Color(0xFF0077B6),
+                size: 36,
               ),
             ),
-            const SizedBox(height: 8),
-            Center(
-              child: TextButton.icon(
-                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Refund 100% telah dikembalikan ke saldo GoPay'))),
-                icon: const Icon(Icons.info_outline,
-                    size: 14, color: Color(0xFF6B7280)),
-                label: Text(
-                  'Lihat Rincian Pembatalan',
-                  style: GoogleFonts.inter(
-                      fontSize: 12, color: const Color(0xFF6B7280)),
-                ),
+            const SizedBox(height: 16),
+            Text(
+              'Belum Ada Pesanan',
+              style: GoogleFonts.inter(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Anda belum memiliki pesanan hotel aktif maupun riwayat pemesanan. Mulai jelajahi dan booking hotel impian Anda sekarang!',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: const Color(0xFF64748B),
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () => CustomerDashboardScreen.tabNotifier.value = 1,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00B4D8),
+                foregroundColor: Colors.white,
+                shape: const StadiumBorder(),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                elevation: 0,
+              ),
+              child: Text(
+                'Cari Penginapan Sekarang',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w700),
               ),
             ),
           ],
@@ -1042,6 +833,9 @@ class _PesananTabState extends State<PesananTab>
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // BANTUAN CARD
+  // ---------------------------------------------------------------------------
   Widget _buildBantuanCard() {
     return Container(
       decoration: BoxDecoration(
@@ -1062,8 +856,8 @@ class _PesananTabState extends State<PesananTab>
                     color: const Color(0xFF00B4D8),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child:
-                      const Icon(Icons.headset_mic, color: Colors.white, size: 18),
+                  child: const Icon(Icons.headset_mic,
+                      color: Colors.white, size: 18),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -1094,7 +888,9 @@ class _PesananTabState extends State<PesananTab>
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Membuka WhatsApp resmi Go Ticket…'))),
+                        const SnackBar(
+                            content: Text(
+                                'Membuka WhatsApp resmi Go Ticket…'))),
                     icon: const Icon(Icons.chat, size: 14),
                     label: Text(
                       'WhatsApp 24 Jam',
@@ -1116,7 +912,8 @@ class _PesananTabState extends State<PesananTab>
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Pusat Bantuan segera hadir'))),
+                        const SnackBar(
+                            content: Text('Pusat Bantuan segera hadir'))),
                     icon: const Icon(Icons.support,
                         color: Color(0xFF00B4D8), size: 14),
                     label: Text(

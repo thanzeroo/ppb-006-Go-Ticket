@@ -184,8 +184,33 @@ class _StafTimTabState extends State<StafTimTab> {
         ),
 
         const SizedBox(height: 14),
-        // Staff List
-        ...widget.staff.map((s) => _buildStaffCard(s)),
+        if (widget.staff.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: adminCardBorder),
+            ),
+            child: Column(
+              children: const [
+                Icon(Icons.people_outline, size: 40, color: Color(0xFF94A3B8)),
+                SizedBox(height: 10),
+                Text(
+                  'Belum ada staf terdaftar di hotel ini',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Klik tombol Tambah Staf Baru untuk mendaftarkan akun Front Office atau Maintenance.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8)),
+                ),
+              ],
+            ),
+          )
+        else
+          ...widget.staff.map((s) => _buildStaffCard(s)),
 
         const SizedBox(height: 20),
       ],
