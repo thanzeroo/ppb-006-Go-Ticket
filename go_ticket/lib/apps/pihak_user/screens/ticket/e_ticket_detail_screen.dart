@@ -1,17 +1,14 @@
 // =============================================================================
 // FILE: lib/apps/customer/screens/ticket/e_ticket_detail_screen.dart
 // RESPONSIBILITY: Halaman E-Tiket digital yang ditunjukkan Customer saat
-// Check-in di hotel. Menampilkan:
-// - QR Code besar yang discan oleh Staff FO
-// - Detail booking (nama, hotel, kamar, tanggal)
-// - Status booking real-time
-// - Tombol download / share tiket
+// Check-in di hotel. Data riil dari database (BookingModel / BookingArgs).
 // =============================================================================
 
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/models/booking_args.dart';
+import '../../../../core/models/booking_model.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../core/widgets/custom_button.dart';
 
@@ -21,8 +18,76 @@ class ETicketDetailScreen extends StatelessWidget {
 
   const ETicketDetailScreen({super.key, this.arguments});
 
-  BookingArgs? get booking =>
-      arguments is BookingArgs ? (arguments as BookingArgs) : null;
+  String get hotelName {
+    if (arguments is BookingModel) return (arguments as BookingModel).hotelName;
+    if (arguments is BookingArgs) return (arguments as BookingArgs).hotelName;
+    if (arguments is Map) return arguments['hotelName']?.toString() ?? 'Hotel';
+    return 'Hotel';
+  }
+
+  String get hotelLocation {
+    if (arguments is BookingModel) {
+      return (arguments as BookingModel).hotelAddress ?? 'Indonesia';
+    }
+    if (arguments is BookingArgs) return (arguments as BookingArgs).location;
+    if (arguments is Map) return arguments['location']?.toString() ?? 'Indonesia';
+    return 'Indonesia';
+  }
+
+  String get guestName {
+    if (arguments is BookingModel) {
+      final b = arguments as BookingModel;
+      return b.customerName.isNotEmpty ? b.customerName : 'Tamu Go Ticket';
+    }
+    if (arguments is BookingArgs) {
+      final b = arguments as BookingArgs;
+      return b.guestName.isNotEmpty ? b.guestName : 'Tamu Go Ticket';
+    }
+    return 'Tamu Go Ticket';
+  }
+
+  String get bookingCode {
+    if (arguments is BookingModel) return (arguments as BookingModel).bookingCode;
+    if (arguments is BookingArgs) {
+      return 'GT-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+    }
+    return 'GT-RESERVASI';
+  }
+
+  String get roomName {
+    if (arguments is BookingModel) return (arguments as BookingModel).roomTypeName;
+    if (arguments is BookingArgs) return (arguments as BookingArgs).roomName;
+    return 'Standard Room';
+  }
+
+  String get dateRange {
+    if (arguments is BookingModel) {
+      final b = arguments as BookingModel;
+      return '${b.checkInDate.day}/${b.checkInDate.month}/${b.checkInDate.year} – ${b.checkOutDate.day}/${b.checkOutDate.month}/${b.checkOutDate.year}';
+    }
+    if (arguments is BookingArgs) return (arguments as BookingArgs).dateRange;
+    return '-';
+  }
+
+  String get guestCount {
+    if (arguments is BookingModel) {
+      final b = arguments as BookingModel;
+      return '${b.guestCount} Tamu (${b.totalNights} Malam)';
+    }
+    if (arguments is BookingArgs) {
+      final b = arguments as BookingArgs;
+      return '${b.adults} Dewasa${b.children > 0 ? ', ${b.children} Anak' : ''}';
+    }
+    return '2 Tamu';
+  }
+
+  String get qrData {
+    if (arguments is BookingModel) {
+      final b = arguments as BookingModel;
+      return b.qrCodeData ?? '${b.bookingCode}-CHECKIN';
+    }
+    return '$bookingCode-CHECKIN';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,12 +98,12 @@ class ETicketDetailScreen extends StatelessWidget {
         actions: [
           IconButton(
             onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Tautan E-Tiket disalin'))),
+                const SnackBar(content: Text('Tautan E-Tiket disalin'))),
             icon: const Icon(Icons.share_outlined),
           ),
           IconButton(
             onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('E-Tiket sedang diunduh'))),
+                const SnackBar(content: Text('E-Tiket sedang diunduh'))),
             icon: const Icon(Icons.download_outlined),
           ),
         ],
@@ -123,14 +188,14 @@ class ETicketDetailScreen extends StatelessWidget {
                     color: AppColors.white, size: 32),
                 const SizedBox(height: 8),
                 Text(
-                  booking?.hotelName ?? 'Grand Hotel Example',
+                  hotelName,
                   textAlign: TextAlign.center,
                   style: AppTextStyles.headlineSmall
                       .copyWith(color: AppColors.white),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  booking?.location ?? 'Jakarta Pusat, DKI Jakarta',
+                  hotelLocation,
                   textAlign: TextAlign.center,
                   style: AppTextStyles.bodySmall
                       .copyWith(color: AppColors.white.withValues(alpha: 0.8)),
@@ -175,25 +240,23 @@ class ETicketDetailScreen extends StatelessWidget {
               children: [
                 _buildTicketRow(
                   'Nama Tamu',
-                  (booking?.guestName.isNotEmpty ?? false)
-                      ? booking!.guestName
-                      : 'Budi Santoso',
+                  guestName,
                 ),
                 _buildTicketRow(
                   'Kode Booking',
-                  'GT-${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}-001',
+                  bookingCode,
                 ),
                 _buildTicketRow(
                   'Tipe Kamar',
-                  booking?.roomName ?? 'Standard Room',
+                  roomName,
                 ),
                 _buildTicketRow(
                   'Jadwal Menginap',
-                  booking?.dateRange ?? '05 Okt - 08 Okt 2026',
+                  dateRange,
                 ),
                 _buildTicketRow(
                   'Jumlah Tamu',
-                  '${booking?.adults ?? 2} Dewasa${(booking?.children ?? 0) > 0 ? ', ${booking!.children} Anak' : ''}',
+                  guestCount,
                 ),
               ],
             ),
@@ -204,14 +267,14 @@ class ETicketDetailScreen extends StatelessWidget {
   }
 
   Widget _buildCircleClip({required bool isLeft}) {
-    return Transform.translate(
-      offset: Offset(isLeft ? -12 : 12, 0),
-      child: Container(
-        width: 24,
-        height: 24,
-        decoration: const BoxDecoration(
-          color: AppColors.backgroundLight,
-          shape: BoxShape.circle,
+    return Container(
+      width: 16,
+      height: 32,
+      decoration: BoxDecoration(
+        color: AppColors.backgroundLight,
+        borderRadius: BorderRadius.horizontal(
+          left: isLeft ? Radius.zero : const Radius.circular(16),
+          right: isLeft ? const Radius.circular(16) : Radius.zero,
         ),
       ),
     );
@@ -223,8 +286,17 @@ class ETicketDetailScreen extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: AppTextStyles.bodySmall),
-          Text(value, style: AppTextStyles.labelMedium),
+          Text(label,
+              style:
+                  AppTextStyles.bodyMedium.copyWith(color: AppColors.grey600)),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: AppTextStyles.labelLarge
+                  .copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
         ],
       ),
     );
@@ -232,63 +304,73 @@ class ETicketDetailScreen extends StatelessWidget {
 
   Widget _buildQrCodeSection() {
     return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(24),
       child: Column(
         children: [
-          Text('Tunjukkan QR ini saat Check-in',
-              style: AppTextStyles.labelMedium),
-          const SizedBox(height: 16),
-
-          // QR Code placeholder — ganti dengan QrImageView dari package qr_flutter
+          Text('Tunjukkan QR Code ini saat Check-in',
+              style: AppTextStyles.titleMedium),
+          const SizedBox(height: 6),
+          Text('Staff FO akan memindai untuk validasi reservasi',
+              style:
+                  AppTextStyles.bodySmall.copyWith(color: AppColors.grey600)),
+          const SizedBox(height: 20),
           Container(
-            width: 200,
-            height: 200,
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.grey100,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.grey200),
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.grey300, width: 2),
             ),
-            child: const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.qr_code_2_rounded,
-                      size: 100, color: AppColors.grey800),
-                  SizedBox(height: 8),
-                  Text('QR Code', style: TextStyle(color: AppColors.grey400)),
-                ],
-              ),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.qr_code_2_rounded,
+                  size: 160,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  bookingCode,
+                  style: AppTextStyles.labelMedium.copyWith(
+                    fontFamily: 'monospace',
+                    letterSpacing: 2,
+                    color: AppColors.grey600,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
-          Text('GT-20261005-001',
-              style: AppTextStyles.titleMedium.copyWith(
-                letterSpacing: 2,
-                color: AppColors.primary,
-              )),
         ],
       ),
     );
   }
 
   Widget _buildCheckinInstructions() {
+    final instructions = [
+      'Waktu check-in standar mulai pukul 14:00 waktu setempat.',
+      'Siapkan KTP/Paspor asli yang sesuai dengan nama pada tiket.',
+      'Deposit dapat diperlukan saat check-in sesuai kebijakan hotel.',
+      'Hubungi Front Office jika Anda tiba lebih lambat dari jadwal.',
+    ];
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.info.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
+        color: AppColors.primarySurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -296,30 +378,27 @@ class ETicketDetailScreen extends StatelessWidget {
           Row(
             children: [
               const Icon(Icons.info_outline_rounded,
-                  size: 18, color: AppColors.info),
+                  size: 18, color: AppColors.primary),
               const SizedBox(width: 8),
-              Text('Panduan Check-in',
-                  style: AppTextStyles.labelMedium
-                      .copyWith(color: AppColors.info)),
+              Text('Petunjuk Check-in',
+                  style: AppTextStyles.titleSmall
+                      .copyWith(color: AppColors.primary)),
             ],
           ),
-          const SizedBox(height: 10),
-          ...[
-            'Datang ke hotel pada jam check-in (14.00)',
-            'Tunjukkan QR Code di atas kepada Staff Front Office',
-            'Staff akan memindai QR untuk verifikasi',
-            'Bawa dokumen identitas (KTP/Paspor)',
-          ].map((step) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
+          const SizedBox(height: 12),
+          ...instructions.map((inst) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('• ', style: TextStyle(color: AppColors.info)),
+                    const Text('• ',
+                        style: TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold)),
                     Expanded(
-                      child: Text(step,
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.info,
-                          )),
+                      child: Text(inst,
+                          style: AppTextStyles.bodySmall
+                              .copyWith(color: AppColors.grey700)),
                     ),
                   ],
                 ),
@@ -332,17 +411,10 @@ class ETicketDetailScreen extends StatelessWidget {
   Widget _buildActions(BuildContext context) {
     return Column(
       children: [
-        GoTicketOutlinedButton(
-          label: 'Unduh E-Tiket (PDF)',
-          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('E-Tiket PDF sedang diunduh'))),
-          icon: Icons.picture_as_pdf_outlined,
-        ),
-        const SizedBox(height: 12),
-        GoTicketTextButton(
+        GoTicketButton(
           label: 'Kembali ke Beranda',
+          variant: ButtonVariant.outline,
           onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
-          icon: Icons.home_outlined,
         ),
       ],
     );

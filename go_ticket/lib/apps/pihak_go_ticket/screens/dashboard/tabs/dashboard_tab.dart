@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/models/hotel_model.dart';
+import '../../../../core/services/hotel_service.dart';
+import '../../../../core/services/super_admin_service.dart';
+import '../../../../core/utils/currency_formatter.dart';
+
 /// Tab 0: HQ Command Center (Dashboard Nasional & Ekosistem Mitra)
-/// Sesuai dengan desain visual pada Gambar 1.
+/// Sesuai dengan data real-time database Supabase.
 class DashboardTab extends StatefulWidget {
   final Function(int)? onNavigateTab;
 
@@ -19,6 +24,39 @@ class _DashboardTabState extends State<DashboardTab> {
     'Bulan Ini (MTD)',
     'Tahun Ini (YTD)',
   ];
+
+  Map<String, dynamic> _stats = {};
+  List<HotelModel> _hotels = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDashboardData();
+  }
+
+  Future<void> _loadDashboardData() async {
+    setState(() => _isLoading = true);
+    try {
+      final s = await SuperAdminService.instance.getPlatformStats();
+      final h = await HotelService.instance.getHotels();
+      if (mounted) {
+        setState(() {
+          _stats = s;
+          _hotels = h;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _stats = {};
+          _hotels = [];
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -326,9 +364,16 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // 5. Key Metrics 2x2 Grid
+  // 5. Key Metrics 2x2 Grid (100% Dinamis dari Database)
   // ---------------------------------------------------------------------------
   Widget _buildMetricsGrid() {
+    final totalRev = (_stats['totalRevenue'] as num?)?.toDouble() ?? 0;
+    final totalHotels = (_stats['totalHotels'] as num?)?.toInt() ?? 0;
+    final totalUsers = (_stats['totalUsers'] as num?)?.toInt() ?? 0;
+
+    final gmvStr = CurrencyFormatter.toRupiah(totalRev.round());
+    final komisiStr = CurrencyFormatter.toRupiah((totalRev * 0.1).round());
+
     return Column(
       children: [
         Row(
@@ -336,24 +381,24 @@ class _DashboardTabState extends State<DashboardTab> {
             Expanded(
               child: _buildMetricCard(
                 title: 'GMV Platform',
-                value: 'Rp 42,85 M',
+                value: gmvStr,
                 icon: Icons.account_balance_wallet_outlined,
-                badgeText: '↗ +18.4%',
+                badgeText: 'Database',
                 badgeBg: const Color(0xFFDCFCE7),
                 badgeFg: const Color(0xFF15803D),
-                subText: 'MoM',
+                subText: 'Realtime',
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: _buildMetricCard(
                 title: 'Komisi (10%)',
-                value: 'Rp 4,28 M',
+                value: komisiStr,
                 icon: Icons.receipt_long_outlined,
-                badgeText: '104% Target',
+                badgeText: 'Net Revenue',
                 badgeBg: const Color(0xFFCFFAFE),
                 badgeFg: const Color(0xFF0891B2),
-                subText: 'Tercapai',
+                subText: 'Tercatat',
               ),
             ),
           ],
@@ -364,33 +409,20 @@ class _DashboardTabState extends State<DashboardTab> {
             Expanded(
               child: _buildMetricCard(
                 title: 'Mitra Hotel',
-                value: '1.420',
+                value: '$totalHotels',
                 unit: 'Unit',
                 icon: Icons.apartment_rounded,
-                customSub: RichText(
-                  text: const TextSpan(
-                    style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                    children: [
-                      TextSpan(
-                        text: '48 ',
-                        style: TextStyle(
-                          color: Color(0xFF0284C7),
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      TextSpan(text: 'dalam verifikasi'),
-                    ],
-                  ),
-                ),
+                subText: 'Terdaftar di DB',
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: _buildMetricCard(
-                title: 'Tamu Aktif',
-                value: '842,1rb',
+                title: 'Tamu Terdaftar',
+                value: '$totalUsers',
+                unit: 'User',
                 icon: Icons.people_outline_rounded,
-                subText: '34,2 rb trsk bln ini',
+                subText: 'Akun Pengguna',
               ),
             ),
           ],
@@ -658,43 +690,23 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // 7. Sebaran Hotel Populer
+  // 7. Sebaran Hotel Populer (Dinamis dari Database)
   // ---------------------------------------------------------------------------
   Widget _buildPopularHotelsSection() {
-    final list = [
-      {
-        'title': 'Bali & Nusa Tenggara',
-        'count': '480 Hotel Rekanan',
-        'occupancy': '88%',
-        'image':
-            'https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=200&auto=format&fit=crop',
-        'verified': true,
-      },
-      {
-        'title': 'Jabodetabek Urban',
-        'count': '390 Hotel Rekanan',
-        'occupancy': '82%',
-        'image':
-            'https://images.unsplash.com/photo-1555899434-94d1368aa7af?w=200&auto=format&fit=crop',
-        'verified': false,
-      },
-      {
-        'title': 'Yogyakarta & Jateng',
-        'count': '210 Hotel Rekanan',
-        'occupancy': '85%',
-        'image':
-            'https://images.unsplash.com/photo-1596401057633-54a8fe8ef647?w=200&auto=format&fit=crop',
-        'verified': false,
-      },
-      {
-        'title': 'Surabaya & Jatim',
-        'count': '180 Hotel Rekanan',
-        'occupancy': '79%',
-        'image':
-            'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=200&auto=format&fit=crop',
-        'verified': false,
-      },
-    ];
+    if (_hotels.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final list = _hotels.map((h) {
+      return {
+        'title': h.name,
+        'count': '${h.totalRooms} Kamar Terdaftar',
+        'occupancy': '⭐ ${h.rating.toStringAsFixed(1)}',
+        'image': h.thumbnailUrl ??
+            (h.photoUrls.isNotEmpty ? h.photoUrls.first : 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=200'),
+        'verified': h.status == HotelStatus.active,
+      };
+    }).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -706,7 +718,7 @@ class _DashboardTabState extends State<DashboardTab> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: const [
                 Text(
-                  'Sebaran Hotel Populer',
+                  'Sebaran Hotel Terdaftar',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w900,
@@ -715,28 +727,13 @@ class _DashboardTabState extends State<DashboardTab> {
                 ),
                 SizedBox(height: 2),
                 Text(
-                  'Klaster destinasi dengan okupansi tertinggi',
+                  'Daftar mitra properti aktif di database',
                   style: TextStyle(
                     fontSize: 11,
                     color: Color(0xFF64748B),
                   ),
                 ),
               ],
-            ),
-            GestureDetector(
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Membuka Peta Okupansi Nasional...')),
-                );
-              },
-              child: const Text(
-                'Lihat Peta',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0284C7),
-                ),
-              ),
             ),
           ],
         ),

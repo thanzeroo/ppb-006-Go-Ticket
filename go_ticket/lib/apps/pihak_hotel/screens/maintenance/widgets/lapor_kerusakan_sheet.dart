@@ -146,7 +146,7 @@ import 'package:flutter/material.dart';
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: const [
-                                  Text('Kamar #304 - Deluxe Ocean View (Lt. 3)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                                  Text('Pilih Kamar...', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
                                   Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF0284C7)),
                                 ],
                               ),

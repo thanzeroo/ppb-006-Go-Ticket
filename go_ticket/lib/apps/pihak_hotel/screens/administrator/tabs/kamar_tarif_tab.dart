@@ -89,8 +89,33 @@ class _KamarTarifTabState extends State<KamarTarifTab> {
         ),
 
         const SizedBox(height: 16),
-        // Room Cards
-        ...widget.rooms.map((r) => _buildRoomCard(r)),
+        if (widget.rooms.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: adminCardBorder),
+            ),
+            child: Column(
+              children: const [
+                Icon(Icons.meeting_room_outlined, size: 40, color: Color(0xFF94A3B8)),
+                SizedBox(height: 10),
+                Text(
+                  'Belum ada tipe kamar yang terdaftar',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Klik tombol Tambah Tipe Kamar Baru di atas untuk mulai membuat kamar hotel.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8)),
+                ),
+              ],
+            ),
+          )
+        else
+          ...widget.rooms.map((r) => _buildRoomCard(r)),
 
         const SizedBox(height: 20),
       ],

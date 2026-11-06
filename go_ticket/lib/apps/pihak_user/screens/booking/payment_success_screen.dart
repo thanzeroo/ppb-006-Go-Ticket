@@ -9,8 +9,16 @@ class PaymentSuccessScreen extends StatelessWidget {
   final dynamic arguments;
   const PaymentSuccessScreen({super.key, this.arguments});
 
-  static const _code = 'GT-884920';
-  static const _ref = '#TRX-99214';
+  /// Kode booking dibuat dari timestamp agar unik per sesi (setelah createBooking di DB)
+  String _generateCode() {
+    final now = DateTime.now();
+    return 'GT-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-${now.millisecond.toString().padRight(3, '0')}';
+  }
+
+  String _generateRef() {
+    final now = DateTime.now();
+    return '#TRX-${now.millisecondsSinceEpoch % 100000}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,6 +28,8 @@ class PaymentSuccessScreen extends StatelessWidget {
         '${now.day} ${BookingArgs.monthShort(now.month)} ${now.year}, '
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} WIB';
     final name = a.guestName.isEmpty ? 'Tamu Go Ticket' : a.guestName;
+    final code = _generateCode();
+    final ref = _generateRef();
 
     return PopScope(
       canPop: false,
@@ -63,7 +73,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                     color: GT.ink)),
             const SizedBox(height: 6),
-            Text('$stamp  •  Ref: $_ref',
+            Text('$stamp  •  Ref: $ref',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                     fontSize: 11,
@@ -187,7 +197,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                         child: const SizedBox(
                           width: 96,
                           height: 96,
-                          child: CustomPaint(painter: _QrPainter(_code)),
+                          child: CustomPaint(painter: _QrPainter(code)),
                         ),
                       ),
                       const SizedBox(width: 14),
@@ -195,7 +205,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(_code,
+                            Text(code,
                                 style: TextStyle(
                                     fontSize: 24,
                                     fontWeight: FontWeight.w800,

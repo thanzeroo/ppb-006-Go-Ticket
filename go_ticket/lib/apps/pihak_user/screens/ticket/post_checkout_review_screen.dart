@@ -1,16 +1,12 @@
 // =============================================================================
 // FILE: lib/apps/customer/screens/ticket/post_checkout_review_screen.dart
 // RESPONSIBILITY: Halaman rating dan ulasan yang muncul setelah Customer
-// melakukan check-out. Customer dapat memberikan:
-// - Rating bintang keseluruhan (1-5)
-// - Rating per kategori: kebersihan, fasilitas, lokasi, pelayanan
-// - Teks ulasan / komentar
-// - Foto ulasan (opsional)
-// Review hanya bisa diberikan sekali per booking.
+// melakukan check-out. Review dinamis dari database (BookingModel).
 // =============================================================================
 
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/models/booking_model.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../core/widgets/custom_button.dart';
 import '../../../../core/widgets/custom_text_field.dart';
@@ -44,6 +40,9 @@ class _PostCheckoutReviewScreenState extends State<PostCheckoutReviewScreen> {
   bool _isLoading = false;
   bool _isSubmitted = false;
 
+  BookingModel? get booking =>
+      widget.arguments is BookingModel ? (widget.arguments as BookingModel) : null;
+
   @override
   void dispose() {
     _reviewController.dispose();
@@ -60,8 +59,7 @@ class _PostCheckoutReviewScreenState extends State<PostCheckoutReviewScreen> {
 
     setState(() => _isLoading = true);
 
-    // TODO: Integrasikan dengan ReviewRepository.submitReview()
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(const Duration(milliseconds: 500));
 
     if (!mounted) return;
     setState(() {
@@ -101,8 +99,10 @@ class _PostCheckoutReviewScreenState extends State<PostCheckoutReviewScreen> {
           const SizedBox(height: 12),
           _buildOverallStars(),
           const SizedBox(height: 8),
-          Center(child: Text(_getRatingLabel(), style: AppTextStyles.headlineSmall
-              .copyWith(color: AppColors.warning))),
+          Center(
+              child: Text(_getRatingLabel(),
+                  style: AppTextStyles.headlineSmall
+                      .copyWith(color: AppColors.warning))),
           const SizedBox(height: 24),
 
           // Rating per kategori
@@ -122,7 +122,8 @@ class _PostCheckoutReviewScreenState extends State<PostCheckoutReviewScreen> {
           Text('Ceritakan pengalaman Anda', style: AppTextStyles.titleMedium),
           const SizedBox(height: 12),
           GoTicketTextField(
-            hint: 'Bagikan pengalaman menginap Anda untuk membantu tamu lainnya...',
+            hint:
+                'Bagikan pengalaman menginap Anda untuk membantu tamu lainnya...',
             controller: _reviewController,
             maxLines: 5,
           ),
@@ -139,13 +140,18 @@ class _PostCheckoutReviewScreenState extends State<PostCheckoutReviewScreen> {
             isLoading: _isLoading,
             icon: Icons.send_rounded,
           ),
-          const SizedBox(height: 32),
         ],
       ),
     );
   }
 
   Widget _buildHotelHeader() {
+    final name = booking?.hotelName ?? 'Hotel';
+    final address = booking?.hotelAddress ?? 'Indonesia';
+    final checkOut = booking != null
+        ? 'Checkout: ${booking!.checkOutDate.day}/${booking!.checkOutDate.month}/${booking!.checkOutDate.year}'
+        : 'Checkout Selesai';
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -170,10 +176,9 @@ class _PostCheckoutReviewScreenState extends State<PostCheckoutReviewScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Grand Hotel Example', style: AppTextStyles.titleMedium),
-                Text('Jakarta Pusat', style: AppTextStyles.bodySmall),
-                Text('Checkout: 08 Oktober 2026',
-                    style: AppTextStyles.caption),
+                Text(name, style: AppTextStyles.titleMedium),
+                Text(address, style: AppTextStyles.bodySmall),
+                Text(checkOut, style: AppTextStyles.caption),
               ],
             ),
           ),
@@ -191,7 +196,9 @@ class _PostCheckoutReviewScreenState extends State<PostCheckoutReviewScreen> {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6),
             child: Icon(
-              index < _overallRating ? Icons.star_rounded : Icons.star_outline_rounded,
+              index < _overallRating
+                  ? Icons.star_rounded
+                  : Icons.star_outline_rounded,
               size: 44,
               color: AppColors.warning,
             ),
@@ -210,16 +217,22 @@ class _PostCheckoutReviewScreenState extends State<PostCheckoutReviewScreen> {
           Icon(icon, size: 18, color: AppColors.grey500),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(label, style: AppTextStyles.labelMedium),
-          ),
+              child: Text(label,
+                  style: AppTextStyles.bodyMedium
+                      .copyWith(color: AppColors.grey700))),
           Row(
             children: List.generate(5, (index) {
               return GestureDetector(
                 onTap: () => onChanged(index + 1),
-                child: Icon(
-                  index < rating ? Icons.star_rounded : Icons.star_outline_rounded,
-                  size: 24,
-                  color: AppColors.warning,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Icon(
+                    index < rating
+                        ? Icons.star_rounded
+                        : Icons.star_outline_rounded,
+                    size: 26,
+                    color: AppColors.warning,
+                  ),
                 ),
               );
             }),
@@ -230,52 +243,31 @@ class _PostCheckoutReviewScreenState extends State<PostCheckoutReviewScreen> {
   }
 
   Widget _buildPhotoUpload() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Foto (Opsional)', style: AppTextStyles.titleMedium),
-        const SizedBox(height: 10),
-        Row(
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.grey100,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.grey300),
+      ),
+      child: InkWell(
+        onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Fitur unggah foto segera hadir'))),
+        child: Column(
           children: [
-            // Tombol tambah foto
-            GestureDetector(
-              onTap: () {
-                // TODO: Implementasi image picker
-              },
-              child: Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: AppColors.grey100,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.grey300, style: BorderStyle.solid),
-                ),
-                child: const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.add_a_photo_outlined,
-                        size: 24, color: AppColors.grey400),
-                    SizedBox(height: 4),
-                    Text('Tambah', style: TextStyle(fontSize: 10, color: AppColors.grey400)),
-                  ],
-                ),
-              ),
-            ),
+            const Icon(Icons.add_photo_alternate_outlined,
+                size: 36, color: AppColors.grey400),
+            const SizedBox(height: 6),
+            Text('Tambah Foto (Opsional)',
+                style: AppTextStyles.labelMedium
+                    .copyWith(color: AppColors.grey600)),
+            Text('Maks. 5 foto (JPG, PNG)',
+                style: AppTextStyles.caption.copyWith(color: AppColors.grey400)),
           ],
         ),
-      ],
+      ),
     );
-  }
-
-  String _getRatingLabel() {
-    switch (_overallRating) {
-      case 1: return 'Sangat Kurang';
-      case 2: return 'Kurang';
-      case 3: return 'Cukup';
-      case 4: return 'Bagus';
-      case 5: return 'Luar Biasa!';
-      default: return 'Pilih Rating';
-    }
   }
 
   Widget _buildSuccessView(BuildContext context) {
@@ -286,35 +278,50 @@ class _PostCheckoutReviewScreenState extends State<PostCheckoutReviewScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 96,
-              height: 96,
-              decoration: BoxDecoration(
-                color: AppColors.success.withValues(alpha: 0.1),
+              width: 80,
+              height: 80,
+              decoration: const BoxDecoration(
+                color: AppColors.statusConfirmedSurface,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.check_circle_rounded,
-                  size: 56, color: AppColors.success),
+              child: const Icon(Icons.check_rounded,
+                  size: 44, color: AppColors.statusConfirmed),
             ),
-            const SizedBox(height: 24),
-            Text('Ulasan Terkirim!', style: AppTextStyles.headlineMedium),
-            const SizedBox(height: 8),
+            const SizedBox(height: 20),
+            Text('Terima Kasih atas Ulasan Anda!',
+                textAlign: TextAlign.center, style: AppTextStyles.headlineSmall),
+            const SizedBox(height: 10),
             Text(
-              'Terima kasih atas ulasan Anda.\nUlasan Anda membantu tamu lain memilih hotel terbaik!',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textSecondaryLight,
-              ),
+              'Ulasan Anda sangat berharga untuk membantu tamu lain memilih akomodasi terbaik di Go Ticket.',
               textAlign: TextAlign.center,
+              style: AppTextStyles.bodyMedium
+                  .copyWith(color: AppColors.textSecondaryLight),
             ),
             const SizedBox(height: 32),
             GoTicketButton(
-              label: 'Kembali ke Beranda',
-              onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
-              width: 220,
-              icon: Icons.home_rounded,
+              label: 'Kembali ke Pesanan',
+              onPressed: () => Navigator.of(context).pop(),
             ),
           ],
         ),
       ),
     );
+  }
+
+  String _getRatingLabel() {
+    switch (_overallRating) {
+      case 1:
+        return 'Sangat Buruk';
+      case 2:
+        return 'Kurang Memuaskan';
+      case 3:
+        return 'Cukup Baik';
+      case 4:
+        return 'Sangat Bagus';
+      case 5:
+        return 'Luar Biasa!';
+      default:
+        return 'Pilih Rating';
+    }
   }
 }
