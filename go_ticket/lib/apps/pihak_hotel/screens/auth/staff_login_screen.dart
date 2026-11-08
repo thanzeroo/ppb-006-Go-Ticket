@@ -114,6 +114,7 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
+      debugPrint('❌ [StaffLoginScreen] Error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Login gagal: $e')),
       );

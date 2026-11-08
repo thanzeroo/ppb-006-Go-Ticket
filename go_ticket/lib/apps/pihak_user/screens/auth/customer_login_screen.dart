@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/widgets/auth_logo_header.dart';
@@ -49,39 +50,21 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     super.dispose();
   }
 
-  /// Proses login / register nyata terhubung ke AuthService
+  /// Proses login nyata terhubung ke AuthService
   Future<void> _submit() async {
-    final formKey = _tabIndex == 0 ? _loginFormKey : _registerFormKey;
-    if (!(formKey.currentState?.validate() ?? false)) return;
-
-    if (_tabIndex == 1 && !_agreeTerms) {
-      _showSnack('Anda harus menyetujui Syarat & Ketentuan terlebih dahulu');
+    if (_tabIndex == 1) {
+      await _submitRegister();
       return;
     }
 
+    if (!(_loginFormKey.currentState?.validate() ?? false)) return;
+
     setState(() => _isLoading = true);
     try {
-      if (_tabIndex == 0) {
-        // Login Customer
-        await AuthService.instance.loginCustomer(
-          email: _emailLoginController.text.trim(),
-          password: _passwordLoginController.text,
-        );
-      } else {
-        // Register Customer
-        final regEmail = _emailRegisterController.text.trim();
-        await AuthService.instance.registerCustomer(
-          fullName: _nameController.text.trim(),
-          email: regEmail,
-          password: _passwordRegisterController.text,
-          phone: _phoneController.text.trim(),
-        );
-
-        if (mounted) {
-          setState(() => _isLoading = false);
-          await _showVerificationDialog(regEmail);
-        }
-      }
+      await AuthService.instance.loginCustomer(
+        email: _emailLoginController.text.trim(),
+        password: _passwordLoginController.text,
+      );
 
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -90,9 +73,25 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         CustomerRouter.dashboard,
         (_) => false,
       );
+    } on PostgrestException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      debugPrint(
+        '❌ [CustomerAuthScreen] PostgrestException: code=${e.code}, message=${e.message}, details=${e.details}',
+      );
+      final detailsStr = e.details != null && e.details.toString().isNotEmpty
+          ? ' (${e.details})'
+          : '';
+      _showSnack('Gagal login: ${e.message}$detailsStr');
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      debugPrint('❌ [CustomerAuthScreen] AuthException: ${e.message}');
+      _showSnack('Gagal login: ${e.message}');
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
+      debugPrint('❌ [CustomerAuthScreen] Error: $e');
       _showSnack(e.toString().replaceAll('Exception: ', ''));
     }
   }
@@ -103,148 +102,6 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
       ..showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  Future<void> _showVerificationDialog(String email) async {
-    final otpController = TextEditingController(text: '1234');
-    bool isVerifying = false;
-
-    await showModalBottomSheet<void>(
-      context: context,
-      isDismissible: false,
-      enableDrag: false,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) {
-          return Padding(
-            padding: EdgeInsets.only(
-              left: 24,
-              right: 24,
-              top: 24,
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE0F7FA),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.mark_email_read_outlined,
-                    color: Color(0xFF00B4D8),
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Verifikasi Akun Anda',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF111827),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Kami telah mengirimkan 4-digit kode verifikasi ke email:\n$email',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF6B7280),
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: otpController,
-                  textAlign: TextAlign.center,
-                  keyboardType: TextInputType.number,
-                  maxLength: 4,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    letterSpacing: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF00B4D8),
-                  ),
-                  decoration: InputDecoration(
-                    counterText: '',
-                    filled: true,
-                    fillColor: const Color(0xFFF3F4F6),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                        color: Color(0xFF00B4D8),
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00B4D8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                    onPressed: isVerifying
-                        ? null
-                        : () async {
-                            setModalState(() => isVerifying = true);
-                            await Future.delayed(
-                                const Duration(milliseconds: 400));
-                            await AuthService.instance
-                                .verifyAccount(otpCode: otpController.text);
-                            if (ctx.mounted) Navigator.pop(ctx);
-                          },
-                    child: isVerifying
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text(
-                            'Verifikasi & Lanjutkan',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15,
-                            ),
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text(
-                    'Lewati untuk sekarang',
-                    style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   Future<void> _openTerms() async {
     final agreed = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => const TermsScreen()),
@@ -252,17 +109,69 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     if (agreed == true && mounted) setState(() => _agreeTerms = true);
   }
 
-  void _submitRegister() {
-    Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => const TermsScreen()),
-    ).then((agreed) {
-      if (!mounted) return;
-      if (agreed == true) {
-        setState(() {
-          _tabIndex = 0;
-        });
+  Future<void> _submitRegister() async {
+    // 1. Validasi form registrasi
+    if (!(_registerFormKey.currentState?.validate() ?? false)) return;
+
+    // 2. Persetujuan Syarat & Ketentuan: tampilkan TermsScreen bila belum disetujui
+    if (!_agreeTerms) {
+      final agreed = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(builder: (_) => const TermsScreen()),
+      );
+      if (agreed != true) {
+        if (mounted) {
+          _showSnack('Anda harus menyetujui Syarat & Ketentuan terlebih dahulu');
+        }
+        return;
       }
-    });
+      if (mounted) {
+        setState(() => _agreeTerms = true);
+      }
+    }
+
+    // 3. Panggil registerCustomer ke Supabase
+    setState(() => _isLoading = true);
+    try {
+      final regEmail = _emailRegisterController.text.trim();
+      await AuthService.instance.registerCustomer(
+        fullName: _nameController.text.trim(),
+        email: regEmail,
+        password: _passwordRegisterController.text,
+        phone: _phoneController.text.trim(),
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _tabIndex = 0; // Pindah ke tab Login
+        _emailLoginController.text = regEmail;
+        _passwordLoginController.clear();
+      });
+
+      _showSnack('Pendaftaran berhasil! Silakan masuk dengan akun baru Anda.');
+    } on PostgrestException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      debugPrint(
+        '❌ [Supabase Register Error] PostgrestException: code=${e.code}, message=${e.message}, details=${e.details}, hint=${e.hint}',
+      );
+      final detailsStr = e.details != null && e.details.toString().isNotEmpty
+          ? ' (${e.details})'
+          : '';
+      _showSnack('Gagal mendaftar: ${e.message}$detailsStr');
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      debugPrint(
+        '❌ [Supabase Register Error] AuthException: message=${e.message}, code=${e.code}',
+      );
+      _showSnack('Gagal mendaftar: ${e.message}');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      debugPrint('❌ [Register Error] $e');
+      _showSnack('Gagal mendaftar: ${e.toString().replaceAll('Exception: ', '')}');
+    }
   }
 
   void _showForgotPassword() {

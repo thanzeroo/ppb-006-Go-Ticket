@@ -194,7 +194,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                         decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(12)),
-                        child: const SizedBox(
+                        child: SizedBox(
                           width: 96,
                           height: 96,
                           child: CustomPaint(painter: _QrPainter(code)),

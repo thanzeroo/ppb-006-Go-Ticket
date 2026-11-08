@@ -394,7 +394,7 @@ class _KeuanganTabState extends State<KeuanganTab> {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+                  children: [
                     Text(
                       'Total Pendapatan Kotor',
                       style: TextStyle(

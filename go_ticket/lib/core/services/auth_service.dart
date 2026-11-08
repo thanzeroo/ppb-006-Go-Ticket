@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/supabase_config.dart';
 import '../models/user_model.dart';
@@ -117,8 +118,14 @@ class AuthService {
           _currentUser = model;
           return model;
         }
+      } on PostgrestException catch (e) {
+        debugPrint('❌ [SUPABASE USER LOGIN ERROR] PostgrestException -> message: ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}');
+        rethrow;
+      } on AuthException catch (e) {
+        debugPrint('❌ [SUPABASE USER LOGIN ERROR] AuthException -> message: ${e.message}, statusCode: ${e.statusCode}, code: ${e.code}');
+        rethrow;
       } catch (e) {
-        debugPrint('⚠️ Supabase user login error: $e');
+        debugPrint('⚠️ [SUPABASE USER LOGIN ERROR] General Exception: $e');
         rethrow;
       }
     }
@@ -153,8 +160,14 @@ class AuthService {
           _currentUser = model;
           return model;
         }
+      } on PostgrestException catch (e) {
+        debugPrint('❌ [SUPABASE REGISTER ERROR] PostgrestException -> message: ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}');
+        rethrow;
+      } on AuthException catch (e) {
+        debugPrint('❌ [SUPABASE REGISTER ERROR] AuthException -> message: ${e.message}, statusCode: ${e.statusCode}, code: ${e.code}');
+        rethrow;
       } catch (e) {
-        debugPrint('⚠️ Supabase register error: $e');
+        debugPrint('⚠️ [SUPABASE REGISTER ERROR] General Exception: $e');
         rethrow;
       }
     }
@@ -188,8 +201,14 @@ class AuthService {
           _currentUser = model;
           return model;
         }
+      } on PostgrestException catch (e) {
+        debugPrint('❌ [SUPABASE STAFF LOGIN ERROR] PostgrestException -> message: ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}');
+        rethrow;
+      } on AuthException catch (e) {
+        debugPrint('❌ [SUPABASE STAFF LOGIN ERROR] AuthException -> message: ${e.message}, statusCode: ${e.statusCode}, code: ${e.code}');
+        rethrow;
       } catch (e) {
-        debugPrint('⚠️ Supabase staff query gagal: $e');
+        debugPrint('⚠️ [SUPABASE STAFF LOGIN ERROR] General Exception: $e');
         rethrow;
       }
     }
@@ -222,8 +241,11 @@ class AuthService {
           _currentUser = adminUser;
           return adminUser;
         }
+      } on PostgrestException catch (e) {
+        debugPrint('❌ [SUPABASE SUPERADMIN LOGIN ERROR] PostgrestException -> message: ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}');
+        rethrow;
       } catch (e) {
-        debugPrint('⚠️ Supabase superadmin login gagal: $e');
+        debugPrint('⚠️ [SUPABASE SUPERADMIN LOGIN ERROR] General Exception: $e');
         rethrow;
       }
     }
