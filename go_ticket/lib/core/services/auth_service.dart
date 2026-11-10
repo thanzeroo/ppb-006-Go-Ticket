@@ -71,7 +71,7 @@ class AuthService {
   }
 
   // ---------------------------------------------------------------------------
-  // 1. LOGIN & REGISTER CUSTOMER (Pihak User)
+  // 1. LOGIN & REGISTER CUSTOMER (Pihak User) - SUPABASE AUTH
   // ---------------------------------------------------------------------------
   Future<UserModel> loginCustomer({
     required String email,
@@ -81,48 +81,50 @@ class AuthService {
 
     if (sbService.isReady && sbService.client != null) {
       try {
-        // Cek tabel 'users' di Supabase
-        final userRes = await sbService
-            .table(SupabaseConfig.tableUsers)
-            ?.select()
-            .eq('email', email.trim())
-            .maybeSingle();
-
-        if (userRes != null) {
-          if (userRes['password'] == password || userRes['password'] == 'DummyPass123!') {
-            final model = UserModel.fromJson(userRes);
-            await _saveUserSession(model, 'jwt-user-${model.id}');
-            _currentUser = model;
-            return model;
-          } else {
-            throw Exception('Password salah');
-          }
-        }
-
-        // Cek via Supabase Auth jika menggunakan auth bawaan
-        final response = await sbService.client!.auth.signInWithPassword(
+        // 1. Login resmi via Supabase Auth
+        final authResponse = await sbService.client!.auth.signInWithPassword(
           email: email.trim(),
           password: password,
         );
-        final user = response.user;
-        if (user != null) {
-          final model = UserModel(
-            id: user.id,
-            fullName: user.userMetadata?['full_name'] ?? email.split('@')[0],
-            email: user.email,
-            phoneNumber: user.phone,
-            role: UserRole.customer,
-            isVerified: true,
+
+        final authUser = authResponse.user;
+        if (authUser == null) {
+          throw Exception(
+            'Gagal login: Pengguna tidak valid dari sesi Supabase Auth',
           );
-          await _saveUserSession(model, response.session?.accessToken ?? user.id);
-          _currentUser = model;
-          return model;
         }
-      } on PostgrestException catch (e) {
-        debugPrint('❌ [SUPABASE USER LOGIN ERROR] PostgrestException -> message: ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}');
-        rethrow;
+
+        // 2. Query baris profil dari tabel 'users' berdasarkan email sesi aktif
+        final sessionEmail = (authUser.email ?? email).trim();
+        final userRes = await sbService
+            .table(SupabaseConfig.tableUsers)
+            ?.select()
+            .eq('email', sessionEmail)
+            .maybeSingle();
+
+        // 3. Jika baris profil tidak ada, signOut lalu lempar exception
+        if (userRes == null) {
+          await sbService.client!.auth.signOut();
+          throw Exception('Akun belum memiliki profil');
+        }
+
+        // 4. Bangun UserModel dari baris profil (id tetap id_user integer)
+        final model = UserModel.fromJson(userRes);
+        await _saveUserSession(
+          model,
+          authResponse.session?.accessToken ?? 'jwt-user-${model.id}',
+        );
+        _currentUser = model;
+        return model;
       } on AuthException catch (e) {
-        debugPrint('❌ [SUPABASE USER LOGIN ERROR] AuthException -> message: ${e.message}, statusCode: ${e.statusCode}, code: ${e.code}');
+        debugPrint(
+          '❌ [SUPABASE USER LOGIN ERROR] AuthException -> message: ${e.message}, statusCode: ${e.statusCode}, code: ${e.code}',
+        );
+        rethrow;
+      } on PostgrestException catch (e) {
+        debugPrint(
+          '❌ [SUPABASE USER LOGIN ERROR] PostgrestException -> message: ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}',
+        );
         rethrow;
       } catch (e) {
         debugPrint('⚠️ [SUPABASE USER LOGIN ERROR] General Exception: $e');
@@ -130,7 +132,7 @@ class AuthService {
       }
     }
 
-    throw Exception('Gagal login: Database Supabase tidak terhubung atau user tidak ditemukan');
+    throw Exception('Gagal login: Database Supabase tidak terhubung');
   }
 
   Future<UserModel> registerCustomer({
@@ -143,11 +145,25 @@ class AuthService {
 
     if (sbService.isReady && sbService.client != null) {
       try {
-        // Insert ke tabel 'users'
+        // 1. Daftarkan akun ke Supabase Auth
+        final authResponse = await sbService.client!.auth.signUp(
+          email: email.trim(),
+          password: password,
+          data: {'full_name': fullName.trim()},
+        );
+
+        final authUser = authResponse.user;
+        if (authUser == null) {
+          throw Exception('Gagal membuat akun di Supabase Auth');
+        }
+
+        // 2. Insert profil ke tabel 'users'
+        // Kolom 'password' NOT NULL di skema PostgreSQL, sehingga dikirim string kosong ('')
+        // karena proteksi password telah ditangani secara penuh oleh Supabase Auth.
         final res = await sbService.table(SupabaseConfig.tableUsers)?.insert({
           'nama_lengkap': fullName.trim(),
           'email': email.trim(),
-          'password': password,
+          'password': '',
           'no_telepon': phone?.trim(),
           'status_akun': 'aktif',
           'saldo_poin': 0.0,
@@ -156,15 +172,24 @@ class AuthService {
 
         if (res != null) {
           final model = UserModel.fromJson(res).copyWith(isVerified: true);
-          await _saveUserSession(model, 'jwt-user-${model.id}');
+          await _saveUserSession(
+            model,
+            authResponse.session?.accessToken ?? 'jwt-user-${model.id}',
+          );
           _currentUser = model;
           return model;
+        } else {
+          throw Exception('Gagal menyimpan profil pengguna ke database');
         }
-      } on PostgrestException catch (e) {
-        debugPrint('❌ [SUPABASE REGISTER ERROR] PostgrestException -> message: ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}');
-        rethrow;
       } on AuthException catch (e) {
-        debugPrint('❌ [SUPABASE REGISTER ERROR] AuthException -> message: ${e.message}, statusCode: ${e.statusCode}, code: ${e.code}');
+        debugPrint(
+          '❌ [SUPABASE REGISTER ERROR] AuthException -> message: ${e.message}, statusCode: ${e.statusCode}, code: ${e.code}',
+        );
+        rethrow;
+      } on PostgrestException catch (e) {
+        debugPrint(
+          '❌ [SUPABASE REGISTER ERROR] PostgrestException -> message: ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}',
+        );
         rethrow;
       } catch (e) {
         debugPrint('⚠️ [SUPABASE REGISTER ERROR] General Exception: $e');

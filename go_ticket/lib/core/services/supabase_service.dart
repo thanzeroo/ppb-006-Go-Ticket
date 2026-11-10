@@ -27,7 +27,7 @@ class SupabaseService {
   Future<void> initialize() async {
     if (!SupabaseConfig.isConfigured) {
       debugPrint(
-        'ℹ️ [SupabaseService] Belum dikonfigurasi. Menggunakan Fallback Mock Engine.',
+        '❌ [SupabaseService] Konfigurasi Supabase tidak lengkap. Pastikan SUPABASE_URL dan SUPABASE_ANON_KEY diisi di file .env.',
       );
       return;
     }

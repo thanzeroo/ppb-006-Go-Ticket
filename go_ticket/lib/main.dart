@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'apps/pihak_go_ticket/screens/splash/admin_splash_screen.dart';
@@ -10,6 +11,30 @@ import 'core/services/supabase_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 1. Muat file .env sebelum inisialisasi Supabase
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint('❌ [ENV ERROR] File .env tidak ditemukan atau gagal dimuat: $e');
+  }
+
+  // 2. Validasi keberadaan SUPABASE_URL dan SUPABASE_ANON_KEY
+  final supabaseUrl = dotenv.env['SUPABASE_URL']?.trim() ?? '';
+  final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY']?.trim() ?? '';
+
+  if (supabaseUrl.isEmpty) {
+    debugPrint('❌ [ENV ERROR] SUPABASE_URL kosong atau tidak terdefinisi di file .env');
+  }
+  if (supabaseAnonKey.isEmpty) {
+    debugPrint('❌ [ENV ERROR] SUPABASE_ANON_KEY kosong atau tidak terdefinisi di file .env');
+  }
+
+  // 3. Log hanya Project URL saat startup (JANGAN log anon key)
+  if (supabaseUrl.isNotEmpty) {
+    debugPrint('🚀 [Startup] Menghubungkan ke Supabase Project URL: $supabaseUrl');
+  }
+
   await SupabaseService.instance.initialize();
   await AuthService.instance.loadSavedSession();
   runApp(const GoTicketApp());
