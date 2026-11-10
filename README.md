@@ -31,7 +31,7 @@ Project ini menggunakan pendekatan struktur monorepo untuk mengorganisir fronten
    ```bash
    cp .env.example .env
    ```
-4. Ubah Nilai SUPABASE_URL DAN SUPABASE_ANON_KE (Minta Ke tim)
+4. Ubah Nilai SUPABASE_URL DAN SUPABASE_ANON_KEY (Minta Ke tim)
 5. Jalankan aplikasi:
    ```bash
    flutter run
