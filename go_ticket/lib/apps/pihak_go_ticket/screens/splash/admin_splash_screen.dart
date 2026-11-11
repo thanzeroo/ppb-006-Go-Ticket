@@ -2,7 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/services/auth_service.dart';
 import '../auth/admin_login_screen.dart';
+import '../dashboard/admin_dashboard_screen.dart';
 
 /// Splash/Loading Screen untuk Pihak Go Ticket (Super Admin).
 class AdminSplashScreen extends StatefulWidget {
@@ -38,7 +40,22 @@ class _AdminSplashScreenState extends State<AdminSplashScreen>
     );
     _animController.forward();
 
-    _timer = Timer(const Duration(milliseconds: 1800), () {
+    _timer = Timer(const Duration(milliseconds: 1800), () async {
+      if (!mounted) return;
+      try {
+        final user = await AuthService.instance.validateSuperAdminSession();
+        if (!mounted) return;
+        if (user != null) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
+          );
+          return;
+        }
+      } catch (e) {
+        debugPrint('⚠️ [AdminSplashScreen] Auto-redirect failed: $e');
+      }
+
       if (!mounted) return;
       Navigator.pushReplacement(
         context,

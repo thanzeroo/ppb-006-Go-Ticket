@@ -167,13 +167,12 @@ class UserModel {
   factory UserModel.fromJson(Map<String, dynamic> json) {
     UserRole parseRole(dynamic val) {
       if (val == null) return UserRole.customer;
-      final s = val.toString().toLowerCase();
-      if (s.contains('front office') || s == 'staff_fo') return UserRole.staffFo;
-      if (s.contains('maintenance') || s.contains('housekeeping') || s == 'maintenance') {
-        return UserRole.maintenance;
-      }
-      if (s.contains('admin') && !s.contains('super')) return UserRole.adminHotel;
-      if (s.contains('super')) return UserRole.superAdmin;
+      final s = val.toString().toLowerCase().trim().replaceAll(' ', '_').replaceAll('-', '_');
+      if (s == 'front_office' || s == 'staff_fo') return UserRole.staffFo;
+      if (s == 'maintenance' || s == 'housekeeping') return UserRole.maintenance;
+      if (s == 'administrator' || s == 'admin_hotel') return UserRole.adminHotel;
+      if (s == 'super_admin' || s == 'superadmin') return UserRole.superAdmin;
+      if (s == 'customer') return UserRole.customer;
       return UserRoleExtension.fromApiString(s);
     }
 

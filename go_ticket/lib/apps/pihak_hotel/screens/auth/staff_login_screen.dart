@@ -25,17 +25,17 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
   int _selectedStaffRole = 0;
 
   // Controllers untuk Staf
-  final _staffIdController = TextEditingController(text: 'STF-2025-084');
-  final _staffPasswordController = TextEditingController(text: 'HotelStaffPass@2025');
+  final _staffIdController = TextEditingController();
+  final _staffPasswordController = TextEditingController();
 
   // Controllers untuk Administrator
-  final _adminIdController = TextEditingController(text: 'admin@grandamora.hotel');
-  final _adminPasswordController = TextEditingController(text: 'SuperAdminPass@2025');
+  final _adminIdController = TextEditingController();
+  final _adminPasswordController = TextEditingController();
 
   // PIN 6 digit untuk Admin
   final List<TextEditingController> _pinControllers = List.generate(
     6,
-    (index) => TextEditingController(text: index == 0 ? '7' : index == 1 ? '2' : index == 2 ? '9' : ''),
+    (_) => TextEditingController(),
   );
   final List<FocusNode> _pinFocusNodes = List.generate(6, (_) => FocusNode());
 
@@ -69,54 +69,60 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
   Future<void> _submitLogin() async {
     setState(() => _isLoading = true);
     try {
-      final UserRole role;
-      final String idOrEmail;
+      final UserRole expectedRole;
+      final String identifier;
       final String password;
 
       if (_selectedRoleIndex == 0) {
-        idOrEmail = _staffIdController.text.trim();
+        identifier = _staffIdController.text.trim();
         password = _staffPasswordController.text;
-        role = _selectedStaffRole == 0 ? UserRole.staffFo : UserRole.maintenance;
+        expectedRole = _selectedStaffRole == 0 ? UserRole.staffFo : UserRole.maintenance;
       } else {
-        idOrEmail = _adminIdController.text.trim();
+        identifier = _adminIdController.text.trim();
         password = _adminPasswordController.text;
-        role = UserRole.adminHotel;
+        expectedRole = UserRole.adminHotel;
       }
 
-      await AuthService.instance.loginHotelStaff(
-        staffIdOrEmail: idOrEmail,
+      final loggedInUser = await AuthService.instance.loginHotelStaff(
+        identifier: identifier,
         password: password,
-        role: role,
+        expectedRole: expectedRole,
         shift: _selectedShift,
       );
 
       if (!mounted) return;
       setState(() => _isLoading = false);
 
-      if (_selectedRoleIndex == 0) {
-        if (_selectedStaffRole == 0) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const FoDashboardScreen()),
-          );
-        } else {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const MaintenanceDashboardScreen()),
-          );
-        }
-      } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const AdministratorDashboardScreen()),
-        );
+      // Navigasi pasca-login HARUS memakai role dari database, bukan pilihan toggle di UI
+      final Widget targetScreen;
+      switch (loggedInUser.role) {
+        case UserRole.staffFo:
+          targetScreen = const FoDashboardScreen();
+          break;
+        case UserRole.maintenance:
+          targetScreen = const MaintenanceDashboardScreen();
+          break;
+        case UserRole.adminHotel:
+          targetScreen = const AdministratorDashboardScreen();
+          break;
+        default:
+          throw Exception('Role akun (${loggedInUser.role.displayName}) belum memiliki portal');
       }
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => targetScreen),
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
       debugPrint('❌ [StaffLoginScreen] Error: $e');
+      final errorMsg = e.toString().replaceFirst('Exception: ', '');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login gagal: $e')),
+        SnackBar(
+          content: Text(errorMsg),
+          backgroundColor: Colors.red.shade700,
+        ),
       );
     }
   }
@@ -590,13 +596,6 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
       onTap: () {
         setState(() {
           _selectedStaffRole = index;
-          if (index == 0) {
-            _staffIdController.text = 'STF-2025-084';
-            _staffPasswordController.text = 'HotelStaffPass@2025';
-          } else {
-            _staffIdController.text = 'MTC-2025-012';
-            _staffPasswordController.text = 'HotelMaintenancePass@2025';
-          }
         });
       },
       borderRadius: BorderRadius.circular(12),

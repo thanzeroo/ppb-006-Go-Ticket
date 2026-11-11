@@ -2,7 +2,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/models/user_model.dart';
+import '../../../../core/services/auth_service.dart';
+import '../administrator/administrator_dashboard_screen.dart';
 import '../auth/staff_login_screen.dart';
+import '../front_office/fo_dashboard_screen.dart';
+import '../maintenance/maintenance_dashboard_screen.dart';
 
 /// Splash/Loading Screen untuk Pihak Hotel dengan logo Go Ticket Hotel.
 class HotelSplashScreen extends StatefulWidget {
@@ -38,7 +43,38 @@ class _HotelSplashScreenState extends State<HotelSplashScreen>
     );
     _animController.forward();
 
-    _timer = Timer(const Duration(milliseconds: 1800), () {
+    _timer = Timer(const Duration(milliseconds: 1800), () async {
+      if (!mounted) return;
+      try {
+        final user = await AuthService.instance.validateHotelStaffSession();
+        if (!mounted) return;
+        if (user != null) {
+          Widget? destination;
+          switch (user.role) {
+            case UserRole.staffFo:
+              destination = const FoDashboardScreen();
+              break;
+            case UserRole.maintenance:
+              destination = const MaintenanceDashboardScreen();
+              break;
+            case UserRole.adminHotel:
+              destination = const AdministratorDashboardScreen();
+              break;
+            default:
+              destination = null;
+          }
+          if (destination != null) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => destination!),
+            );
+            return;
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ [HotelSplashScreen] Auto-redirect failed: $e');
+      }
+
       if (!mounted) return;
       Navigator.pushReplacement(
         context,

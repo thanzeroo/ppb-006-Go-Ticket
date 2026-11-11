@@ -18,56 +18,238 @@ class AuthService {
   UserModel? get currentUser => _currentUser;
   bool get isLoggedIn => _currentUser != null;
 
-  /// Memulihkan sesi login dari penyimpanan lokal (SharedPreferences / Secure Storage)
+  /// Helper untuk menerjemahkan AuthException menjadi pesan ramah Bahasa Indonesia
+  static String friendlyAuthErrorMessage(AuthException e) {
+    final msg = e.message.toLowerCase();
+    final code = e.code?.toLowerCase() ?? '';
+    if (code == 'invalid_credentials' ||
+        msg.contains('invalid login credentials') ||
+        msg.contains('invalid grant') ||
+        msg.contains('invalid credentials')) {
+      return 'Email atau kata sandi salah';
+    }
+    if (msg.contains('network') ||
+        msg.contains('connection') ||
+        msg.contains('socket') ||
+        msg.contains('failed host lookup') ||
+        msg.contains('timeout')) {
+      return 'Koneksi jaringan bermasalah. Periksa koneksi internet Anda.';
+    }
+    if (msg.contains('user not found')) {
+      return 'Akun tidak ditemukan';
+    }
+    if (msg.contains('email not confirmed')) {
+      return 'Email belum dikonfirmasi. Periksa kotak masuk email Anda.';
+    }
+    return e.message;
+  }
+
+  /// Helper untuk mengecek apakah status karyawan ditolak (non-aktif)
+  static bool isStaffStatusRejected(dynamic status) {
+    if (status == null) return false;
+    final s = status
+        .toString()
+        .toLowerCase()
+        .replaceAll(' ', '')
+        .replaceAll('-', '')
+        .replaceAll('_', '')
+        .trim();
+    if (s.isEmpty) return false;
+    const rejectedList = [
+      'nonaktif',
+      'inactive',
+      'resign',
+      'suspended',
+      'diberhentikan',
+    ];
+    return rejectedList.contains(s);
+  }
+
+  /// Helper normalisasi role jabatan hotel
+  static UserRole? parseNormalizedHotelRole(dynamic raw) {
+    if (raw == null) return null;
+    final s = raw
+        .toString()
+        .toLowerCase()
+        .trim()
+        .replaceAll(' ', '_')
+        .replaceAll('-', '_');
+    if (s == 'administrator' || s == 'admin_hotel') {
+      return UserRole.adminHotel;
+    }
+    if (s == 'front_office' || s == 'staff_fo') {
+      return UserRole.staffFo;
+    }
+    if (s == 'maintenance' || s == 'housekeeping') {
+      return UserRole.maintenance;
+    }
+    return null;
+  }
+
+  /// Memulihkan sesi login dari sesi aktif Supabase Auth
   Future<bool> loadSavedSession() async {
     try {
-      final token = await StorageHelper.getAccessToken();
+      final sbService = SupabaseService.instance;
+      if (!sbService.isReady || sbService.client == null) {
+        _currentUser = null;
+        return false;
+      }
+
+      final session = sbService.client!.auth.currentSession;
+      if (session == null || session.isExpired) {
+        await StorageHelper.clearAuthData();
+        _currentUser = null;
+        return false;
+      }
+
       final userJson = await StorageHelper.getCurrentUser();
       final roleStr = await StorageHelper.getUserRole();
 
-      if (token != null && userJson != null) {
+      if (userJson != null) {
         try {
           final userData = json.decode(userJson) as Map<String, dynamic>;
           _currentUser = UserModel(
             id: userData['id']?.toString() ?? '',
-            fullName: userData['full_name'] ?? userData['fullName'] ?? 'Pengguna',
+            fullName:
+                userData['full_name'] ?? userData['fullName'] ?? 'Pengguna',
             email: userData['email'],
             phoneNumber: userData['phone_number'] ?? userData['phone'],
-            role: UserRoleExtension.fromApiString(roleStr ?? userData['role']?.toString() ?? 'customer'),
-            isVerified: userData['is_verified'] == true || userData['isVerified'] == 'true',
+            role: UserRoleExtension.fromApiString(
+              roleStr ?? userData['role']?.toString() ?? 'customer',
+            ),
+            isVerified: userData['is_verified'] == true ||
+                userData['isVerified'] == 'true',
+            managedHotelId: userData['managed_hotel_id']?.toString() ??
+                userData['id_penginapan']?.toString(),
+            managedHotelName: userData['managed_hotel_name'],
           );
         } catch (e) {
           debugPrint('⚠️ Error parsing saved user: $e');
-          return false;
         }
-
-        // Validasi sinkronisasi profil terbaru dari Supabase jika koneksi aktif
-        final sbService = SupabaseService.instance;
-        if (sbService.isReady && sbService.client != null) {
-          try {
-            final userIdNum = int.tryParse(_currentUser!.id);
-            if (userIdNum != null) {
-              final remoteUser = await sbService
-                  .table(SupabaseConfig.tableUsers)
-                  ?.select()
-                  .eq('id_user', userIdNum)
-                  .maybeSingle();
-
-              if (remoteUser != null) {
-                _currentUser = UserModel.fromJson(remoteUser);
-              }
-            }
-          } catch (e) {
-            debugPrint('⚠️ Sync session profile error: $e');
-          }
-        }
-
-        return true;
       }
+
+      return _currentUser != null;
     } catch (e) {
       debugPrint('⚠️ Gagal load saved session: $e');
+      _currentUser = null;
     }
     return false;
+  }
+
+  /// Validasi sesi aktif untuk Portal Customer
+  Future<UserModel?> validateCustomerSession() async {
+    try {
+      final sbService = SupabaseService.instance;
+      if (!sbService.isReady || sbService.client == null) return null;
+
+      final session = sbService.client!.auth.currentSession;
+      if (session == null || session.isExpired) return null;
+
+      final email = session.user.email?.toLowerCase().trim();
+      if (email == null || email.isEmpty) return null;
+
+      final userRes = await sbService
+          .table(SupabaseConfig.tableUsers)
+          ?.select()
+          .eq('email', email)
+          .maybeSingle();
+
+      if (userRes == null) return null;
+
+      final statusAkun =
+          userRes['status_akun']?.toString().trim().toLowerCase();
+      if (statusAkun != null &&
+          statusAkun.isNotEmpty &&
+          statusAkun != 'aktif') {
+        await sbService.client!.auth.signOut();
+        await StorageHelper.clearAuthData();
+        _currentUser = null;
+        return null;
+      }
+
+      final model = UserModel.fromJson(userRes);
+      _currentUser = model;
+      await _saveUserSession(model);
+      return model;
+    } catch (e) {
+      debugPrint('⚠️ [validateCustomerSession] error: $e');
+      return null;
+    }
+  }
+
+  /// Validasi sesi aktif untuk Portal Hotel
+  Future<UserModel?> validateHotelStaffSession() async {
+    try {
+      final sbService = SupabaseService.instance;
+      if (!sbService.isReady || sbService.client == null) return null;
+
+      final session = sbService.client!.auth.currentSession;
+      if (session == null || session.isExpired) return null;
+
+      final email = session.user.email?.toLowerCase().trim();
+      if (email == null || email.isEmpty) return null;
+
+      final staffRes = await sbService
+          .table(SupabaseConfig.tableStafHotel)
+          ?.select()
+          .eq('email', email)
+          .maybeSingle();
+
+      if (staffRes == null) return null;
+
+      if (isStaffStatusRejected(staffRes['status_karyawan'])) {
+        await sbService.client!.auth.signOut();
+        await StorageHelper.clearAuthData();
+        _currentUser = null;
+        return null;
+      }
+
+      final role = parseNormalizedHotelRole(staffRes['role_jabatan']);
+      if (role == null) {
+        await sbService.client!.auth.signOut();
+        await StorageHelper.clearAuthData();
+        _currentUser = null;
+        return null;
+      }
+
+      final model = UserModel.fromJson(staffRes);
+      _currentUser = model;
+      await _saveUserSession(model);
+      return model;
+    } catch (e) {
+      debugPrint('⚠️ [validateHotelStaffSession] error: $e');
+      return null;
+    }
+  }
+
+  /// Validasi sesi aktif untuk Portal Super Admin
+  Future<UserModel?> validateSuperAdminSession() async {
+    try {
+      final sbService = SupabaseService.instance;
+      if (!sbService.isReady || sbService.client == null) return null;
+
+      final session = sbService.client!.auth.currentSession;
+      if (session == null || session.isExpired) return null;
+
+      final email = session.user.email?.toLowerCase().trim();
+      if (email == null || email.isEmpty) return null;
+
+      final adminRes = await sbService
+          .table(SupabaseConfig.tableSuperAdmin)
+          ?.select()
+          .eq('email_admin', email)
+          .maybeSingle();
+
+      if (adminRes == null) return null;
+
+      final adminUser = UserModel.fromJson(adminRes);
+      _currentUser = adminUser;
+      await _saveUserSession(adminUser);
+      return adminUser;
+    } catch (e) {
+      debugPrint('⚠️ [validateSuperAdminSession] error: $e');
+      return null;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -81,9 +263,10 @@ class AuthService {
 
     if (sbService.isReady && sbService.client != null) {
       try {
+        final cleanEmail = email.trim().toLowerCase();
         // 1. Login resmi via Supabase Auth
         final authResponse = await sbService.client!.auth.signInWithPassword(
-          email: email.trim(),
+          email: cleanEmail,
           password: password,
         );
 
@@ -95,7 +278,7 @@ class AuthService {
         }
 
         // 2. Query baris profil dari tabel 'users' berdasarkan email sesi aktif
-        final sessionEmail = (authUser.email ?? email).trim();
+        final sessionEmail = (authUser.email ?? cleanEmail).trim().toLowerCase();
         final userRes = await sbService
             .table(SupabaseConfig.tableUsers)
             ?.select()
@@ -108,19 +291,24 @@ class AuthService {
           throw Exception('Akun belum memiliki profil');
         }
 
-        // 4. Bangun UserModel dari baris profil (id tetap id_user integer)
+        // 4. Validasi status_akun: jika tidak null dan bukan 'aktif', tolak login
+        final statusAkun =
+            userRes['status_akun']?.toString().trim().toLowerCase();
+        if (statusAkun != null &&
+            statusAkun.isNotEmpty &&
+            statusAkun != 'aktif') {
+          await sbService.client!.auth.signOut();
+          throw Exception('Akun Anda diblokir');
+        }
+
+        // 5. Bangun UserModel dari baris profil (id tetap id_user integer)
         final model = UserModel.fromJson(userRes);
-        await _saveUserSession(
-          model,
-          authResponse.session?.accessToken ?? 'jwt-user-${model.id}',
-        );
+        await _saveUserSession(model);
         _currentUser = model;
         return model;
       } on AuthException catch (e) {
-        debugPrint(
-          '❌ [SUPABASE USER LOGIN ERROR] AuthException -> message: ${e.message}, statusCode: ${e.statusCode}, code: ${e.code}',
-        );
-        rethrow;
+        debugPrint('❌ [Customer AuthException] ${e.message}');
+        throw Exception(friendlyAuthErrorMessage(e));
       } on PostgrestException catch (e) {
         debugPrint(
           '❌ [SUPABASE USER LOGIN ERROR] PostgrestException -> message: ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}',
@@ -145,9 +333,10 @@ class AuthService {
 
     if (sbService.isReady && sbService.client != null) {
       try {
+        final cleanEmail = email.trim().toLowerCase();
         // 1. Daftarkan akun ke Supabase Auth
         final authResponse = await sbService.client!.auth.signUp(
-          email: email.trim(),
+          email: cleanEmail,
           password: password,
           data: {'full_name': fullName.trim()},
         );
@@ -162,7 +351,7 @@ class AuthService {
         // karena proteksi password telah ditangani secara penuh oleh Supabase Auth.
         final res = await sbService.table(SupabaseConfig.tableUsers)?.insert({
           'nama_lengkap': fullName.trim(),
-          'email': email.trim(),
+          'email': cleanEmail,
           'password': '',
           'no_telepon': phone?.trim(),
           'status_akun': 'aktif',
@@ -172,20 +361,15 @@ class AuthService {
 
         if (res != null) {
           final model = UserModel.fromJson(res).copyWith(isVerified: true);
-          await _saveUserSession(
-            model,
-            authResponse.session?.accessToken ?? 'jwt-user-${model.id}',
-          );
+          await _saveUserSession(model);
           _currentUser = model;
           return model;
         } else {
           throw Exception('Gagal menyimpan profil pengguna ke database');
         }
       } on AuthException catch (e) {
-        debugPrint(
-          '❌ [SUPABASE REGISTER ERROR] AuthException -> message: ${e.message}, statusCode: ${e.statusCode}, code: ${e.code}',
-        );
-        rethrow;
+        debugPrint('❌ [SUPABASE REGISTER ERROR] AuthException: ${e.message}');
+        throw Exception(friendlyAuthErrorMessage(e));
       } on PostgrestException catch (e) {
         debugPrint(
           '❌ [SUPABASE REGISTER ERROR] PostgrestException -> message: ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}',
@@ -201,81 +385,195 @@ class AuthService {
   }
 
   // ---------------------------------------------------------------------------
-  // 2. LOGIN PIHAK HOTEL (Staff FO, Maintenance, Administrator)
+  // 2. LOGIN PIHAK HOTEL (Staff FO, Maintenance, Administrator) - SUPABASE AUTH
   // ---------------------------------------------------------------------------
   Future<UserModel> loginHotelStaff({
-    required String staffIdOrEmail,
+    required String identifier,
     required String password,
-    required UserRole role,
+    required UserRole expectedRole,
     int shift = 0,
   }) async {
-    final sbService = SupabaseService.instance;
-
-    if (sbService.isReady && sbService.client != null) {
-      try {
-        // Cek login via tabel 'staf_hotel'
-        final staffQuery = await sbService
-            .table(SupabaseConfig.tableStafHotel)
-            ?.select()
-            .or('id_staf.eq.$staffIdOrEmail,email.eq.$staffIdOrEmail')
-            .maybeSingle();
-
-        if (staffQuery != null) {
-          final model = UserModel.fromJson(staffQuery);
-          await _saveUserSession(model, 'staf-token-${model.id}');
-          _currentUser = model;
-          return model;
-        }
-      } on PostgrestException catch (e) {
-        debugPrint('❌ [SUPABASE STAFF LOGIN ERROR] PostgrestException -> message: ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}');
-        rethrow;
-      } on AuthException catch (e) {
-        debugPrint('❌ [SUPABASE STAFF LOGIN ERROR] AuthException -> message: ${e.message}, statusCode: ${e.statusCode}, code: ${e.code}');
-        rethrow;
-      } catch (e) {
-        debugPrint('⚠️ [SUPABASE STAFF LOGIN ERROR] General Exception: $e');
-        rethrow;
-      }
+    final cleanIdentifier = identifier.trim();
+    if (cleanIdentifier.isEmpty) {
+      throw Exception('ID Petugas atau kata sandi salah');
     }
 
-    throw Exception('Gagal login staff: Database tidak terhubung atau staf tidak ditemukan');
+    final sbService = SupabaseService.instance;
+    if (!sbService.isReady || sbService.client == null) {
+      throw Exception('Database Supabase tidak terhubung');
+    }
+
+    try {
+      // 1. Resolusi ID Petugas / NIK / Email menjadi email akun via RPC
+      dynamic resolvedEmail;
+      try {
+        resolvedEmail = await sbService.client!.rpc(
+          'resolve_staff_login',
+          params: {'p_identifier': cleanIdentifier},
+        );
+      } on PostgrestException catch (e) {
+        debugPrint(
+          '❌ [resolve_staff_login PostgrestException] ${e.message} (code: ${e.code})',
+        );
+        throw Exception('ID Petugas atau kata sandi salah');
+      }
+
+      final String? emailResult = resolvedEmail?.toString().trim().toLowerCase();
+      if (emailResult == null || emailResult.isEmpty) {
+        throw Exception('ID Petugas atau kata sandi salah');
+      }
+
+      // 2. Login via Supabase Auth menggunakan email hasil resolusi
+      final authRes = await sbService.client!.auth.signInWithPassword(
+        email: emailResult,
+        password: password,
+      );
+
+      final authUser = authRes.user;
+      if (authUser == null) {
+        throw Exception('Gagal login: Sesi tidak valid dari Supabase Auth');
+      }
+
+      // 3. Query data staf_hotel
+      final sessionEmail = (authUser.email ?? emailResult).trim().toLowerCase();
+      final staffRes = await sbService
+          .table(SupabaseConfig.tableStafHotel)
+          ?.select()
+          .eq('email', sessionEmail)
+          .maybeSingle();
+
+      if (staffRes == null) {
+        await sbService.client!.auth.signOut();
+        throw Exception('Akun belum terdaftar sebagai staf hotel');
+      }
+
+      // 4. Validasi status karyawan
+      if (isStaffStatusRejected(staffRes['status_karyawan'])) {
+        await sbService.client!.auth.signOut();
+        throw Exception('Akun staf berstatus non-aktif');
+      }
+
+      // 5. Normalisasi role_jabatan
+      final actualRole = parseNormalizedHotelRole(staffRes['role_jabatan']);
+      if (actualRole == null) {
+        await sbService.client!.auth.signOut();
+        throw Exception('Role belum memiliki portal');
+      }
+
+      // 6. Validasi tab portal yang diminta
+      final String portalName;
+      switch (expectedRole) {
+        case UserRole.adminHotel:
+          portalName = 'Administrator';
+          break;
+        case UserRole.staffFo:
+          portalName = 'Staf Front Office';
+          break;
+        case UserRole.maintenance:
+          portalName = 'Maintenance';
+          break;
+        default:
+          portalName = expectedRole.displayName;
+      }
+
+      if (actualRole != expectedRole) {
+        await sbService.client!.auth.signOut();
+        throw Exception('Akun ini bukan akun $portalName');
+      }
+
+      // 7. Bangun UserModel (id tetap id_staf, managedHotelId dari id_penginapan)
+      final model = UserModel.fromJson(staffRes);
+      _currentUser = model;
+      await _saveUserSession(model);
+      return model;
+    } on AuthException catch (e) {
+      debugPrint('❌ [HotelStaff AuthException] ${e.message}');
+      final msg = e.message.toLowerCase();
+      final code = e.code?.toLowerCase() ?? '';
+      if (code == 'invalid_credentials' ||
+          msg.contains('invalid login credentials') ||
+          msg.contains('invalid grant') ||
+          msg.contains('invalid credentials')) {
+        throw Exception('ID Petugas atau kata sandi salah');
+      }
+      throw Exception(friendlyAuthErrorMessage(e));
+    } on PostgrestException catch (e) {
+      debugPrint('❌ [HotelStaff PostgrestException] ${e.message}');
+      rethrow;
+    } catch (e) {
+      debugPrint('⚠️ [HotelStaff General Exception] $e');
+      rethrow;
+    }
   }
 
   // ---------------------------------------------------------------------------
-  // 3. LOGIN SUPER ADMIN (Platform Owner)
+  // 3. LOGIN SUPER ADMIN (Platform Owner) - SUPABASE AUTH
   // ---------------------------------------------------------------------------
   Future<UserModel> loginSuperAdmin({
     required String email,
     required String password,
-    required String pin2FA,
+    String? pin2FA,
   }) async {
-    final sbService = SupabaseService.instance;
+    // TODO: Validasi 2FA/PIN setelah secret_2fa dikonfigurasi
 
-    if (sbService.isReady && sbService.client != null) {
-      try {
-        // Cek tabel 'super_admin'
-        final adminRes = await sbService
-            .table(SupabaseConfig.tableSuperAdmin)
-            ?.select()
-            .eq('email_admin', email.trim())
-            .maybeSingle();
-
-        if (adminRes != null) {
-          final adminUser = UserModel.fromJson(adminRes);
-          await _saveUserSession(adminUser, 'admin-token-${adminUser.id}');
-          _currentUser = adminUser;
-          return adminUser;
-        }
-      } on PostgrestException catch (e) {
-        debugPrint('❌ [SUPABASE SUPERADMIN LOGIN ERROR] PostgrestException -> message: ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}');
-        rethrow;
-      } catch (e) {
-        debugPrint('⚠️ [SUPABASE SUPERADMIN LOGIN ERROR] General Exception: $e');
-        rethrow;
-      }
+    if (!email.contains('@')) {
+      throw Exception('Masukkan email akun Anda');
     }
 
-    throw Exception('Gagal login Super Admin: Akun tidak ditemukan di database');
+    final sbService = SupabaseService.instance;
+    if (!sbService.isReady || sbService.client == null) {
+      throw Exception('Database Supabase tidak terhubung');
+    }
+
+    try {
+      final cleanEmail = email.trim().toLowerCase();
+      // 1. Login via Supabase Auth
+      final authResponse = await sbService.client!.auth.signInWithPassword(
+        email: cleanEmail,
+        password: password,
+      );
+
+      final authUser = authResponse.user;
+      if (authUser == null) {
+        throw Exception('Gagal login: Sesi tidak valid dari Supabase Auth');
+      }
+
+      // 2. Query super_admin
+      final sessionEmail = (authUser.email ?? cleanEmail).trim().toLowerCase();
+      final adminRes = await sbService
+          .table(SupabaseConfig.tableSuperAdmin)
+          ?.select()
+          .eq('email_admin', sessionEmail)
+          .maybeSingle();
+
+      if (adminRes == null) {
+        await sbService.client!.auth.signOut();
+        throw Exception('Bukan akun super admin');
+      }
+
+      // 3. Update kolom last_login jika diizinkan (abaikan error secara diam-diam)
+      try {
+        await sbService
+            .table(SupabaseConfig.tableSuperAdmin)
+            ?.update({'last_login': DateTime.now().toIso8601String()})
+            .eq('email_admin', sessionEmail);
+      } catch (_) {}
+
+      // 4. Bangun UserModel
+      final adminUser = UserModel.fromJson(adminRes);
+      _currentUser = adminUser;
+      await _saveUserSession(adminUser);
+      return adminUser;
+    } on AuthException catch (e) {
+      debugPrint('❌ [SuperAdmin AuthException] ${e.message}');
+      throw Exception(friendlyAuthErrorMessage(e));
+    } on PostgrestException catch (e) {
+      debugPrint('❌ [SuperAdmin PostgrestException] ${e.message}');
+      rethrow;
+    } catch (e) {
+      debugPrint('⚠️ [SuperAdmin General Exception] $e');
+      rethrow;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -301,7 +599,7 @@ class AuthService {
       }
     }
 
-    await _saveUserSession(updated, 'jwt-user-${updated.id}');
+    await _saveUserSession(updated);
     return true;
   }
 
@@ -338,7 +636,7 @@ class AuthService {
       }
     }
 
-    await _saveUserSession(updated, 'jwt-user-${updated.id}');
+    await _saveUserSession(updated);
     return updated;
   }
 
@@ -360,8 +658,7 @@ class AuthService {
   // ---------------------------------------------------------------------------
   // PRIVATE STORAGE SYNC
   // ---------------------------------------------------------------------------
-  Future<void> _saveUserSession(UserModel user, String token) async {
-    await StorageHelper.saveTokens(accessToken: token, refreshToken: token);
+  Future<void> _saveUserSession(UserModel user) async {
     await StorageHelper.saveUserData(
       userId: user.id,
       fullName: user.fullName,

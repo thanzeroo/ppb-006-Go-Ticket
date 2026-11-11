@@ -14,23 +14,13 @@ class AdminLoginScreen extends StatefulWidget {
 }
 
 class _AdminLoginScreenState extends State<AdminLoginScreen> {
-  final _emailController = TextEditingController(text: 'admin.master@goticket.id');
-  final _passwordController = TextEditingController(text: 'SuperSecret2025!');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   // PIN 6 digit untuk 2FA
   final List<TextEditingController> _pinControllers = List.generate(
     6,
-    (index) => TextEditingController(
-      text: index == 0
-          ? '8'
-          : index == 1
-              ? '3'
-              : index == 2
-                  ? '9'
-                  : index == 3
-                      ? '2'
-                      : '',
-    ),
+    (_) => TextEditingController(),
   );
   final List<FocusNode> _pinFocusNodes = List.generate(6, (_) => FocusNode());
 
@@ -71,8 +61,13 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
+      debugPrint('❌ [AdminLoginScreen] Error: $e');
+      final errorMsg = e.toString().replaceFirst('Exception: ', '');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login Admin gagal: $e')),
+        SnackBar(
+          content: Text(errorMsg),
+          backgroundColor: Colors.red.shade700,
+        ),
       );
     }
   }
