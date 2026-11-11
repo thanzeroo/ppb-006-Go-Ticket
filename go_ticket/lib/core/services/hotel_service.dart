@@ -31,8 +31,11 @@ class HotelService {
         var q = sb.table(SupabaseConfig.tableMitraPenginapan)?.select();
 
         if (status != null && q != null) {
-          final val = status == HotelStatus.active ? 'aktif' : status.apiValue;
-          q = q.eq('status_operasional', val);
+          if (status == HotelStatus.active) {
+            q = q.ilike('status_operasional', '%aktif%');
+          } else {
+            q = q.ilike('status_operasional', '%${status.apiValue}%');
+          }
         }
 
         if (city != null && city.isNotEmpty && q != null) {
@@ -230,6 +233,123 @@ class HotelService {
   // ---------------------------------------------------------------------------
   // 3. HOTEL ADMIN / SUPER ADMIN ACTIONS
   // ---------------------------------------------------------------------------
+
+  /// Menambahkan Mitra Penginapan baru ke database Supabase (Pihak Go Ticket / Super Admin)
+  Future<HotelModel> createHotel({
+    required String name,
+    required String address,
+    required String city,
+    String? ptName,
+    String? npwp,
+    String? nib,
+    String? phone,
+    String? whatsapp,
+    String? checkInTime,
+    String? checkOutTime,
+    double? deposit,
+    String? cancellationPolicy,
+    List<String>? facilities,
+    // Spesifikasi kamar awal
+    String? roomName,
+    int? roomCapacity,
+    double? roomSizeM2,
+    String? bedType,
+    double? weekdayPrice,
+    double? weekendPrice,
+    List<String>? roomAmenities,
+  }) async {
+    final sb = SupabaseService.instance;
+    if (!sb.isReady || sb.client == null) {
+      throw Exception('Koneksi Supabase belum siap');
+    }
+
+    // 1. Insert ke tabel mitra_penginapan
+    final hotelRow = <String, dynamic>{
+      'nama_properti': name.trim(),
+      'nama_pt': ptName?.trim().isNotEmpty == true ? ptName!.trim() : null,
+      'npwp_perusahaan': npwp?.trim().isNotEmpty == true ? npwp!.trim() : null,
+      'nib_perusahaan': nib?.trim().isNotEmpty == true ? nib!.trim() : null,
+      'alamat_lengkap': address.trim(),
+      'kota_wilayah': city.trim(),
+      'no_telepon': phone?.trim().isNotEmpty == true ? phone!.trim() : null,
+      'whatsapp': whatsapp?.trim().isNotEmpty == true ? whatsapp!.trim() : null,
+      'waktu_checkin': checkInTime ?? '14:00:00',
+      'waktu_checkout': checkOutTime ?? '12:00:00',
+      'deposit_nominal': deposit ?? 0.0,
+      'kebijakan_batal': cancellationPolicy ?? 'Bebas Pembatalan (H-3)',
+      'status_operasional': 'Aktif',
+      'saldo_escrow': 0.0,
+      'persentase_komisi': 10.0,
+    };
+
+    final insertedHotel = await sb
+        .table(SupabaseConfig.tableMitraPenginapan)
+        ?.insert(hotelRow)
+        .select()
+        .single();
+
+    if (insertedHotel == null) {
+      throw Exception('Gagal menyimpan hotel ke database Supabase');
+    }
+
+    final int newHotelId =
+        int.tryParse(insertedHotel['id_penginapan'].toString()) ?? 0;
+
+    // 2. Insert tipe kamar awal jika diisi
+    if (newHotelId > 0 && roomName != null && roomName.trim().isNotEmpty) {
+      try {
+        final rName = roomName.trim();
+        final basePrice = weekdayPrice ?? 500000.0;
+        final wkndPrice = weekendPrice ?? (basePrice * 1.2);
+        final uniqueRoomTypeId =
+            '${newHotelId}_${DateTime.now().millisecondsSinceEpoch % 100000}';
+        final roomAmenitiesStr =
+            roomAmenities != null && roomAmenities.isNotEmpty
+                ? roomAmenities.join(', ')
+                : 'AC, WiFi, Kamar Mandi Dalam';
+
+        final roomTypeRow = <String, dynamic>{
+          'id_tipe_kamar': uniqueRoomTypeId,
+          'id_penginapan': newHotelId,
+          'nama_tipe': rName,
+          'kapasitas_tamu': roomCapacity ?? 2,
+          'luas_m2': roomSizeM2 ?? 30.0,
+          'tipe_bed': bedType ?? '1 King Bed',
+          'harga_dasar': basePrice,
+          'harga_weekend': wkndPrice,
+          'total_unit': 5,
+          'fasilitas_kamar': roomAmenitiesStr,
+        };
+
+        await sb.table(SupabaseConfig.tableTipeKamar)?.insert(roomTypeRow);
+
+        // 3. Insert unit fisik kamar di tabel kamar
+        final unitKamar = [
+          {
+            'id_kamar': '${uniqueRoomTypeId}_101',
+            'id_tipe_kamar': uniqueRoomTypeId,
+            'id_penginapan': newHotelId,
+            'nomor_kamar': '101',
+            'lantai': '1',
+            'status_kamar': 'Tersedia',
+          },
+          {
+            'id_kamar': '${uniqueRoomTypeId}_102',
+            'id_tipe_kamar': uniqueRoomTypeId,
+            'id_penginapan': newHotelId,
+            'nomor_kamar': '102',
+            'lantai': '1',
+            'status_kamar': 'Tersedia',
+          },
+        ];
+        await sb.table(SupabaseConfig.tableKamar)?.insert(unitKamar);
+      } catch (e) {
+        debugPrint('⚠️ [HotelService] Gagal menambahkan kamar awal: $e');
+      }
+    }
+
+    return HotelModel.fromJson(Map<String, dynamic>.from(insertedHotel));
+  }
 
   /// Mengubah status verifikasi hotel (Approve / Reject oleh Super Admin)
   Future<bool> updateHotelStatus(String hotelId, HotelStatus status) async {

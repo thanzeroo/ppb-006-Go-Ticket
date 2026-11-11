@@ -62,11 +62,14 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
       if (!mounted) return;
       setState(() => _isLoading = false);
       debugPrint('❌ [AdminLoginScreen] Error: $e');
-      final errorMsg = e.toString().replaceFirst('Exception: ', '');
+      String msg = e.toString().replaceFirst('Exception: ', '');
+      if (msg.toLowerCase().contains('invalid login credentials')) {
+        msg = 'Email atau kata sandi salah';
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(errorMsg),
-          backgroundColor: Colors.red.shade700,
+          content: Text(msg),
+          backgroundColor: const Color(0xFFEF4444),
         ),
       );
     }
@@ -99,9 +102,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Top Badge Status
-              _buildTopBadge(),
-              const SizedBox(height: 18),
 
               // Logo Box dengan Cyan Glow
               _buildLogoHeader(),
@@ -158,17 +158,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
               // Pill Button Hubungi Tim Teknis & Keamanan Server
               _buildSupportButton(),
               const SizedBox(height: 12),
-
-              // Footer IP Otoritas
-              const Text(
-                'IP Otoritas: 180.252.164.20 (Jakarta Gateway Secured)',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 10.5,
-                  color: Color(0xFF64748B),
-                ),
-              ),
-              const SizedBox(height: 12),
             ],
           ),
         ),
@@ -179,40 +168,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   // ---------------------------------------------------------------------------
   // WIDGETS
   // ---------------------------------------------------------------------------
-
-  /// Top Badge Status: PORTAL SENTRAL SUPER ADMIN • TINGKAT OTORISASI LEVEL 1
-  Widget _buildTopBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEBF0FE),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: const BoxDecoration(
-              color: Color(0xFF00C2FF),
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 8),
-          const Text(
-            'PORTAL SENTRAL SUPER ADMIN • TINGKAT OTORISASI LEVEL 1',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1E40AF),
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   /// Logo Box dengan Cyan Glow
   Widget _buildLogoHeader() {
@@ -267,7 +222,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         const SizedBox(height: 6),
         _buildInputField(
           controller: _emailController,
-          hint: 'admin.master@goticket.id',
+          hint: 'superadmin@gmail.com',
           icon: Icons.shield_outlined,
         ),
         const SizedBox(height: 16),
@@ -313,7 +268,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         const SizedBox(height: 6),
         _buildInputField(
           controller: _passwordController,
-          hint: 'SuperSecret2025!',
+          hint: '12345678',
           icon: Icons.lock_outline_rounded,
           obscureText: _obscurePassword,
           suffixIcon: IconButton(

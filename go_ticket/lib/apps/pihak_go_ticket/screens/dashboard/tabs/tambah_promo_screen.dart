@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../../core/services/promo_service.dart';
+
 /// Form Tambah Promo (6 Sections)
 /// Sesuai dengan desain visual pada Gambar 2 (Tambah Promo).
 class TambahPromoScreen extends StatefulWidget {
@@ -11,6 +13,8 @@ class TambahPromoScreen extends StatefulWidget {
 }
 
 class _TambahPromoScreenState extends State<TambahPromoScreen> {
+  bool _isSubmitting = false;
+
   // Section 1: Identitas & Kode Promo
   final _promoNameController = TextEditingController(
     text: 'Flash Sale Liburan Akhir Pekan (Weekend Getaway)',
@@ -28,8 +32,10 @@ class _TambahPromoScreenState extends State<TambahPromoScreen> {
 
   // Section 3: Masa Berlaku
   int _periodTab = 0; // 0 = Periode Booking, 1 = Periode Stay
-  final _startDateController = TextEditingController(text: '28 Okt 2025');
-  final _endDateController = TextEditingController(text: '10 Nov 2025');
+  DateTime? _selectedStartDate;
+  DateTime? _selectedEndDate;
+  final _startDateController = TextEditingController();
+  final _endDateController = TextEditingController();
   int _applicableDays = 0; // 0 = All Days, 1 = Weekday, 2 = Weekend
 
   // Section 4: Kuota & Batas Klaim
@@ -45,6 +51,134 @@ class _TambahPromoScreenState extends State<TambahPromoScreen> {
   bool _publicDiscovery = true;
   bool _secretCode = false;
   int _coFunding = 0; // 0 = 100% Hotel, 1 = 50:50
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedStartDate = DateTime.now();
+    _selectedEndDate = DateTime.now().add(const Duration(days: 30));
+    _startDateController.text =
+        '${_selectedStartDate!.day} ${_monthName(_selectedStartDate!.month)} ${_selectedStartDate!.year}';
+    _endDateController.text =
+        '${_selectedEndDate!.day} ${_monthName(_selectedEndDate!.month)} ${_selectedEndDate!.year}';
+  }
+
+  String _monthName(int month) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Agu',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des'
+    ];
+    if (month >= 1 && month <= 12) return months[month - 1];
+    return '';
+  }
+
+  Future<void> _submitPromo() async {
+    final name = _promoNameController.text.trim();
+    final code = _promoCodeController.text.trim();
+
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nama kampanye promo wajib diisi'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (code.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kode promo wajib diisi'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final discountValStr =
+        _discountValueController.text.replaceAll(RegExp(r'[^0-9.]'), '');
+    final discountVal = double.tryParse(discountValStr) ?? 0.0;
+    if (discountVal <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Besaran diskon harus lebih dari 0'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final maxDiscStr =
+          _maxDiscountController.text.replaceAll(RegExp(r'[^0-9.]'), '');
+      final maxDisc = double.tryParse(maxDiscStr) ?? 0.0;
+
+      final minTxStr =
+          _minTxController.text.replaceAll(RegExp(r'[^0-9.]'), '');
+      final minTx = double.tryParse(minTxStr) ?? 0.0;
+
+      final quotaStr =
+          _totalQuotaController.text.replaceAll(RegExp(r'[^0-9]'), '');
+      final totalQuota = int.tryParse(quotaStr) ?? 100;
+
+      final discountTypeStr = _discountType == 1 ? 'Nominal' : 'Persen';
+      final isPublic = _publicDiscovery && !_secretCode;
+
+      final created = await PromoService.instance.createPromo(
+        code: code,
+        name: name,
+        discountValue: discountVal,
+        discountType: discountTypeStr,
+        maxDiscount: maxDisc > 0 ? maxDisc : null,
+        minTransaction: minTx > 0 ? minTx : null,
+        totalQuota: totalQuota,
+        seasonCategory: _applicableDays == 2 ? 'Weekend Escape' : 'Spesial',
+        startDate: _selectedStartDate ?? DateTime.now(),
+        endDate:
+            _selectedEndDate ?? DateTime.now().add(const Duration(days: 30)),
+        isPublic: isPublic,
+        status: 'Aktif',
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Voucher Promo "${created['kode_promo'] ?? code}" berhasil disimpan ke database!',
+            ),
+            backgroundColor: const Color(0xFF00758F),
+          ),
+        );
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal menyimpan voucher: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -179,20 +313,32 @@ class _TambahPromoScreenState extends State<TambahPromoScreen> {
           Row(
             children: [
               ElevatedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Draft promo berhasil disimpan!')),
-                  );
-                },
-                icon: const Icon(Icons.check_rounded, size: 14, color: Colors.white),
-                label: const Text(
-                  'Simpan',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white),
+                onPressed: _isSubmitting ? null : _submitPromo,
+                icon: _isSubmitting
+                    ? const SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Icon(Icons.check_rounded,
+                        size: 14, color: Colors.white),
+                label: Text(
+                  _isSubmitting ? 'Menyimpan...' : 'Simpan',
+                  style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF00C2FF),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  disabledBackgroundColor: const Color(0xFF94A3B8),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   elevation: 0,
                   minimumSize: Size.zero,
                 ),
@@ -397,18 +543,25 @@ class _TambahPromoScreenState extends State<TambahPromoScreen> {
             children: [
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Text(
-                    _promoCodeController.text,
+                  child: TextField(
+                    controller: _promoCodeController,
+                    textCapitalization: TextCapitalization.characters,
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w900,
                       color: Color(0xFF0F172A),
                       letterSpacing: 1.2,
+                    ),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(vertical: 6),
                     ),
                   ),
                 ),
@@ -858,11 +1011,29 @@ class _TambahPromoScreenState extends State<TambahPromoScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Mulai Promo', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                    const Text('Mulai Promo',
+                        style: TextStyle(
+                            fontSize: 10, color: Color(0xFF64748B))),
                     const SizedBox(height: 4),
                     _buildInputBox(
                       controller: _startDateController,
                       suffixIcon: Icons.calendar_today_outlined,
+                      readOnly: true,
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _selectedStartDate ?? DateTime.now(),
+                          firstDate: DateTime(2024),
+                          lastDate: DateTime(2030),
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            _selectedStartDate = picked;
+                            _startDateController.text =
+                                '${picked.day} ${_monthName(picked.month)} ${picked.year}';
+                          });
+                        }
+                      },
                     ),
                   ],
                 ),
@@ -872,11 +1043,30 @@ class _TambahPromoScreenState extends State<TambahPromoScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Berakhir Promo', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                    const Text('Berakhir Promo',
+                        style: TextStyle(
+                            fontSize: 10, color: Color(0xFF64748B))),
                     const SizedBox(height: 4),
                     _buildInputBox(
                       controller: _endDateController,
                       suffixIcon: Icons.calendar_today_outlined,
+                      readOnly: true,
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _selectedEndDate ??
+                              DateTime.now().add(const Duration(days: 30)),
+                          firstDate: DateTime(2024),
+                          lastDate: DateTime(2030),
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            _selectedEndDate = picked;
+                            _endDateController.text =
+                                '${picked.day} ${_monthName(picked.month)} ${picked.year}';
+                          });
+                        }
+                      },
                     ),
                   ],
                 ),
@@ -1447,37 +1637,40 @@ class _TambahPromoScreenState extends State<TambahPromoScreen> {
         width: double.infinity,
         height: 46,
         child: ElevatedButton(
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Voucher Promo berhasil diterbitkan dan aktif di platform!'),
-                backgroundColor: Color(0xFF00758F),
-              ),
-            );
-            Navigator.pop(context);
-          },
+          onPressed: _isSubmitting ? null : _submitPromo,
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF00758F),
+            disabledBackgroundColor: const Color(0xFF94A3B8),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(24),
             ),
             elevation: 0,
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              Text(
-                'Terbitkan Promo',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
+          child: _isSubmitting
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2.5,
+                  ),
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Text(
+                      'Terbitkan Promo',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                    SizedBox(width: 6),
+                    Icon(Icons.arrow_forward_rounded,
+                        size: 16, color: Colors.white),
+                  ],
                 ),
-              ),
-              SizedBox(width: 6),
-              Icon(Icons.arrow_forward_rounded, size: 16, color: Colors.white),
-            ],
-          ),
         ),
       ),
     );
@@ -1488,6 +1681,9 @@ class _TambahPromoScreenState extends State<TambahPromoScreen> {
     String? hint,
     IconData? suffixIcon,
     String? suffixText,
+    VoidCallback? onTap,
+    bool readOnly = false,
+    TextInputType? keyboardType,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -1496,7 +1692,13 @@ class _TambahPromoScreenState extends State<TambahPromoScreen> {
       ),
       child: TextField(
         controller: controller,
-        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+        readOnly: readOnly,
+        onTap: onTap,
+        keyboardType: keyboardType,
+        style: const TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0F172A)),
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
@@ -1507,12 +1709,14 @@ class _TambahPromoScreenState extends State<TambahPromoScreen> {
                       padding: const EdgeInsets.all(12),
                       child: Text(
                         suffixText,
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                        style: const TextStyle(
+                            fontSize: 11, color: Color(0xFF64748B)),
                       ),
                     )
                   : null),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           isDense: true,
         ),
       ),

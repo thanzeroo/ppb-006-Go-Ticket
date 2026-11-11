@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../../core/services/hotel_service.dart';
+
 /// Form Input Hotel & Kamar (Section A - Section E)
 /// Sesuai dengan desain visual pada Gambar 1 (Input Hotel).
 class InputHotelScreen extends StatefulWidget {
@@ -10,6 +12,8 @@ class InputHotelScreen extends StatefulWidget {
 }
 
 class _InputHotelScreenState extends State<InputHotelScreen> {
+  bool _isSubmitting = false;
+
   // Section A
   final _hotelNameController =
       TextEditingController(text: 'Royal Sunset Luxury Resort & Spa');
@@ -1386,6 +1390,121 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
     );
   }
 
+  Future<void> _submitForm() async {
+    final name = _hotelNameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nama hotel / properti wajib diisi!'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+
+    final address = _addressController.text.trim();
+    final city = _cityController.text.trim();
+    if (address.isEmpty || city.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Alamat dan kota wajib diisi!'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      double parsePrice(String text) {
+        final clean = text.replaceAll(RegExp(r'[^0-9]'), '');
+        return double.tryParse(clean) ?? 500000.0;
+      }
+
+      final weekdayPrice = parsePrice(_weekdayPriceController.text);
+      final weekendPrice = parsePrice(_weekendPriceController.text);
+      final deposit = parsePrice(_depositController.text);
+
+      String formatTime(String text, String fallback) {
+        final match = RegExp(r'\b(\d{1,2}):(\d{2})\b').firstMatch(text);
+        if (match != null) {
+          final h = match.group(1)!.padLeft(2, '0');
+          final m = match.group(2)!;
+          return '$h:$m:00';
+        }
+        return fallback;
+      }
+
+      final checkInTime = formatTime(_checkInController.text, '14:00:00');
+      final checkOutTime = formatTime(_checkOutController.text, '12:00:00');
+
+      final activeFacilities = _facilities.entries
+          .where((e) => e.value)
+          .map((e) => e.key)
+          .toList();
+
+      final activeAmenities = _roomAmenities.entries
+          .where((e) => e.value)
+          .map((e) => e.key)
+          .toList();
+
+      int parseCapacity(String text) {
+        final match = RegExp(r'\d+').firstMatch(text);
+        if (match != null) {
+          return int.tryParse(match.group(0)!) ?? 2;
+        }
+        return 2;
+      }
+
+      await HotelService.instance.createHotel(
+        name: name,
+        address: address,
+        city: city,
+        ptName: _ptNameController.text.trim(),
+        nib: _nibController.text.trim(),
+        npwp: _npwpController.text.trim(),
+        phone: _phoneController.text.trim(),
+        whatsapp: _waController.text.trim(),
+        checkInTime: checkInTime,
+        checkOutTime: checkOutTime,
+        deposit: deposit,
+        cancellationPolicy: _cancellationPolicy == 0
+            ? 'Bebas Pembatalan (H-3)'
+            : 'Non-Refundable',
+        facilities: activeFacilities,
+        roomName: _roomNameController.text.trim(),
+        roomCapacity: parseCapacity(_capacityController.text),
+        roomSizeM2: double.tryParse(_roomSizeController.text.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 36.0,
+        bedType: _bedTypeController.text.trim(),
+        weekdayPrice: weekdayPrice,
+        weekendPrice: weekendPrice,
+        roomAmenities: activeAmenities,
+      );
+
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Berhasil! Hotel dan data kamar berhasil disimpan ke database Supabase.'),
+          backgroundColor: Color(0xFF00758F),
+        ),
+      );
+
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal mendaftarkan hotel: $e'),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
+      );
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Bottom Action Bar
   // ---------------------------------------------------------------------------
@@ -1402,19 +1521,22 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
         width: double.infinity,
         height: 46,
         child: ElevatedButton.icon(
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Berhasil! Hotel & Kamar berhasil didaftarkan ke sistem.'),
-                backgroundColor: Color(0xFF00758F),
-              ),
-            );
-            Navigator.pop(context);
-          },
-          icon: const Icon(Icons.cloud_done_rounded, size: 18, color: Colors.white),
-          label: const Text(
-            'Lanjutkan & Daftarkan Hotel ➔',
-            style: TextStyle(
+          onPressed: _isSubmitting ? null : _submitForm,
+          icon: _isSubmitting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.cloud_done_rounded, size: 18, color: Colors.white),
+          label: Text(
+            _isSubmitting
+                ? 'Mendaftarkan ke Database...'
+                : 'Lanjutkan & Daftarkan Hotel ➔',
+            style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w800,
               color: Colors.white,

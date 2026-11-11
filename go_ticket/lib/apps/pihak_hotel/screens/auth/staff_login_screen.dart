@@ -121,7 +121,7 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(errorMsg),
-          backgroundColor: Colors.red.shade700,
+          backgroundColor: const Color(0xFFEF4444),
         ),
       );
     }

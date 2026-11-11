@@ -259,7 +259,7 @@ class HotelModel {
           const ['WiFi Cepat', 'Kolam Renang', 'Parkir Gratis', 'AC'],
       rating: (json['rating'] as num?)?.toDouble() ?? 4.8,
       reviewCount: json['review_count'] ?? 142,
-      status: json['status_operasional'] == 'aktif'
+      status: (json['status_operasional'] ?? json['status'])?.toString().toLowerCase().contains('aktif') == true
           ? HotelStatus.active
           : HotelStatusExtension.fromString(json['status'] ?? 'active'),
       adminUserId: json['admin_user_id']?.toString(),
