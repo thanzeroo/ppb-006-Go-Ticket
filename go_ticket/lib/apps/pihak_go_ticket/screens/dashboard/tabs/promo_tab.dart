@@ -43,11 +43,36 @@ class _PromoTabState extends State<PromoTab> {
   }
 
   Future<void> _delete(String id) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hapus Promo',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        content:
+            const Text('Apakah Anda yakin ingin menghapus voucher promo ini?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Hapus', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
     final ok = await PromoService.instance.deletePromo(id);
     if (ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Promo berhasil dihapus')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Promo berhasil dihapus dari database')),
+        );
+      }
       _loadPromos();
     }
   }
@@ -248,8 +273,16 @@ class _PromoTabState extends State<PromoTab> {
     final code = p['code']?.toString() ?? 'PROMO';
     final title = p['title']?.toString() ?? 'Voucher Promo';
     final desc = p['description']?.toString() ?? '';
-    final discountPercent = p['discountPercent']?.toString() ?? '10';
-    final expired = p['expiredDate']?.toString() ?? '-';
+    final discountVal = p['discountPercent']?.toString() ?? '10';
+    final discountType =
+        p['discountType']?.toString().toLowerCase() ?? 'persen';
+    final discountBadge = discountType == 'nominal'
+        ? 'DISKON Rp $discountVal'
+        : 'DISKON $discountVal%';
+
+    final expiredRaw = p['expiredDate']?.toString() ?? '-';
+    final expired =
+        expiredRaw.contains('T') ? expiredRaw.split('T').first : expiredRaw;
     final promoId = p['id']?.toString() ?? '';
 
     return Container(
@@ -279,7 +312,7 @@ class _PromoTabState extends State<PromoTab> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  'DISKON $discountPercent%',
+                  discountBadge,
                   style: const TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w800,
