@@ -14,24 +14,11 @@ class AdminLoginScreen extends StatefulWidget {
 }
 
 class _AdminLoginScreenState extends State<AdminLoginScreen> {
-  final _emailController = TextEditingController(text: 'admin.master@goticket.id');
-  final _passwordController = TextEditingController(text: 'SuperSecret2025!');
+  final _emailController = TextEditingController(text: 'superadmin@gmail.com');
+  final _passwordController = TextEditingController(text: '12345678');
 
   // PIN 6 digit untuk 2FA
-  final List<TextEditingController> _pinControllers = List.generate(
-    6,
-    (index) => TextEditingController(
-      text: index == 0
-          ? '8'
-          : index == 1
-              ? '3'
-              : index == 2
-                  ? '9'
-                  : index == 3
-                      ? '2'
-                      : '',
-    ),
-  );
+  final List<TextEditingController> _pinControllers = List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _pinFocusNodes = List.generate(6, (_) => FocusNode());
 
   bool _rememberSession = true;
@@ -71,8 +58,15 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
+      String msg = e.toString().replaceAll('Exception: ', '');
+      if (msg.toLowerCase().contains('invalid login credentials')) {
+        msg = 'Email atau password salah. Pastikan kredensial sesuai di database.';
+      }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login Admin gagal: $e')),
+        SnackBar(
+          content: Text('Login Admin gagal: $msg'),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
       );
     }
   }
@@ -104,9 +98,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Top Badge Status
-              _buildTopBadge(),
-              const SizedBox(height: 18),
 
               // Logo Box dengan Cyan Glow
               _buildLogoHeader(),
@@ -163,17 +154,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
               // Pill Button Hubungi Tim Teknis & Keamanan Server
               _buildSupportButton(),
               const SizedBox(height: 12),
-
-              // Footer IP Otoritas
-              const Text(
-                'IP Otoritas: 180.252.164.20 (Jakarta Gateway Secured)',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 10.5,
-                  color: Color(0xFF64748B),
-                ),
-              ),
-              const SizedBox(height: 12),
             ],
           ),
         ),
@@ -184,40 +164,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   // ---------------------------------------------------------------------------
   // WIDGETS
   // ---------------------------------------------------------------------------
-
-  /// Top Badge Status: PORTAL SENTRAL SUPER ADMIN • TINGKAT OTORISASI LEVEL 1
-  Widget _buildTopBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEBF0FE),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: const BoxDecoration(
-              color: Color(0xFF00C2FF),
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 8),
-          const Text(
-            'PORTAL SENTRAL SUPER ADMIN • TINGKAT OTORISASI LEVEL 1',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1E40AF),
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   /// Logo Box dengan Cyan Glow
   Widget _buildLogoHeader() {
@@ -272,7 +218,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         const SizedBox(height: 6),
         _buildInputField(
           controller: _emailController,
-          hint: 'admin.master@goticket.id',
+          hint: 'superadmin@gmail.com',
           icon: Icons.shield_outlined,
         ),
         const SizedBox(height: 16),
@@ -318,7 +264,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         const SizedBox(height: 6),
         _buildInputField(
           controller: _passwordController,
-          hint: 'SuperSecret2025!',
+          hint: '12345678',
           icon: Icons.lock_outline_rounded,
           obscureText: _obscurePassword,
           suffixIcon: IconButton(

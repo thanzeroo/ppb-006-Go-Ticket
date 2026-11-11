@@ -110,10 +110,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
   }
 
   Future<void> _submitRegister() async {
-    // 1. Validasi form registrasi
-    if (!(_registerFormKey.currentState?.validate() ?? false)) return;
-
-    // 2. Persetujuan Syarat & Ketentuan: tampilkan TermsScreen bila belum disetujui
+    // 1. Persetujuan Syarat & Ketentuan: tampilkan TermsScreen bila belum disetujui
     if (!_agreeTerms) {
       final agreed = await Navigator.of(context).push<bool>(
         MaterialPageRoute(builder: (_) => const TermsScreen()),
@@ -125,9 +122,16 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         return;
       }
       if (mounted) {
-        setState(() => _agreeTerms = true);
+        setState(() {
+          _agreeTerms = true;
+          _tabIndex = 0;
+        });
       }
+      return;
     }
+
+    // 2. Validasi form registrasi
+    if (!(_registerFormKey.currentState?.validate() ?? false)) return;
 
     // 3. Panggil registerCustomer ke Supabase
     setState(() => _isLoading = true);

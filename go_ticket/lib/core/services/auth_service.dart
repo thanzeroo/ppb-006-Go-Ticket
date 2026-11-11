@@ -213,18 +213,41 @@ class AuthService {
 
     if (sbService.isReady && sbService.client != null) {
       try {
-        // Cek login via tabel 'staf_hotel'
+        final input = staffIdOrEmail.trim();
+        String sessionEmail = input;
+        String? token;
+
+        // 1. Jika input berupa email, autentikasi via Supabase Auth
+        if (input.contains('@')) {
+          final authResponse = await sbService.client!.auth.signInWithPassword(
+            email: input,
+            password: password,
+          );
+          final authUser = authResponse.user;
+          if (authUser == null) {
+            throw Exception('Gagal login: Sesi Supabase Auth tidak valid');
+          }
+          sessionEmail = (authUser.email ?? input).trim();
+          token = authResponse.session?.accessToken;
+        }
+
+        // 2. Cek login via tabel 'staf_hotel'
         final staffQuery = await sbService
             .table(SupabaseConfig.tableStafHotel)
             ?.select()
-            .or('id_staf.eq.$staffIdOrEmail,email.eq.$staffIdOrEmail')
+            .or('email.ilike.$sessionEmail,id_staf.eq.$input')
             .maybeSingle();
 
         if (staffQuery != null) {
           final model = UserModel.fromJson(staffQuery);
-          await _saveUserSession(model, 'staf-token-${model.id}');
+          await _saveUserSession(model, token ?? 'staf-token-${model.id}');
           _currentUser = model;
           return model;
+        } else {
+          if (input.contains('@')) {
+            await sbService.client!.auth.signOut();
+          }
+          throw Exception('Akun staf $input tidak terdaftar di database.');
         }
       } on PostgrestException catch (e) {
         debugPrint('❌ [SUPABASE STAFF LOGIN ERROR] PostgrestException -> message: ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}');
@@ -238,11 +261,11 @@ class AuthService {
       }
     }
 
-    throw Exception('Gagal login staff: Database tidak terhubung atau staf tidak ditemukan');
+    throw Exception('Gagal login staff: Database tidak terhubung');
   }
 
   // ---------------------------------------------------------------------------
-  // 3. LOGIN SUPER ADMIN (Platform Owner)
+  // 3. LOGIN SUPER ADMIN (Platform Owner / Pihak Go Ticket)
   // ---------------------------------------------------------------------------
   Future<UserModel> loginSuperAdmin({
     required String email,
@@ -253,19 +276,42 @@ class AuthService {
 
     if (sbService.isReady && sbService.client != null) {
       try {
-        // Cek tabel 'super_admin'
+        final cleanEmail = email.trim();
+
+        // 1. Autentikasi resmi via Supabase Auth
+        final authResponse = await sbService.client!.auth.signInWithPassword(
+          email: cleanEmail,
+          password: password,
+        );
+
+        final authUser = authResponse.user;
+        if (authUser == null) {
+          throw Exception('Gagal login: Sesi Supabase Auth tidak valid');
+        }
+
+        // 2. Query data super_admin berdasarkan email sesi aktif
+        final sessionEmail = (authUser.email ?? cleanEmail).trim();
         final adminRes = await sbService
             .table(SupabaseConfig.tableSuperAdmin)
             ?.select()
-            .eq('email_admin', email.trim())
+            .ilike('email_admin', sessionEmail)
             .maybeSingle();
 
         if (adminRes != null) {
           final adminUser = UserModel.fromJson(adminRes);
-          await _saveUserSession(adminUser, 'admin-token-${adminUser.id}');
+          await _saveUserSession(
+            adminUser,
+            authResponse.session?.accessToken ?? 'admin-token-${adminUser.id}',
+          );
           _currentUser = adminUser;
           return adminUser;
+        } else {
+          await sbService.client!.auth.signOut();
+          throw Exception('Akun $sessionEmail tidak terdaftar sebagai Super Admin Go Ticket di database.');
         }
+      } on AuthException catch (e) {
+        debugPrint('❌ [SUPABASE SUPERADMIN LOGIN ERROR] AuthException -> message: ${e.message}, statusCode: ${e.statusCode}, code: ${e.code}');
+        rethrow;
       } on PostgrestException catch (e) {
         debugPrint('❌ [SUPABASE SUPERADMIN LOGIN ERROR] PostgrestException -> message: ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}');
         rethrow;
@@ -275,7 +321,7 @@ class AuthService {
       }
     }
 
-    throw Exception('Gagal login Super Admin: Akun tidak ditemukan di database');
+    throw Exception('Gagal login Super Admin: Database Supabase tidak terhubung');
   }
 
   // ---------------------------------------------------------------------------

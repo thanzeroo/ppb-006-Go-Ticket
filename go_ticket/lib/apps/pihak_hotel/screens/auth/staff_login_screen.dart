@@ -115,8 +115,15 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
       if (!mounted) return;
       setState(() => _isLoading = false);
       debugPrint('❌ [StaffLoginScreen] Error: $e');
+      String msg = e.toString().replaceAll('Exception: ', '');
+      if (msg.toLowerCase().contains('invalid login credentials')) {
+        msg = 'ID Staf / Email atau password salah.';
+      }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login gagal: $e')),
+        SnackBar(
+          content: Text('Login gagal: $msg'),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
       );
     }
   }
