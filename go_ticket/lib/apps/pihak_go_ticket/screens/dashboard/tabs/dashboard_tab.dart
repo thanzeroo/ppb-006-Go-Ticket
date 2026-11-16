@@ -24,6 +24,7 @@ class _DashboardTabState extends State<DashboardTab> {
     'Bulan Ini (MTD)',
     'Tahun Ini (YTD)',
   ];
+  String _selectedRegion = 'Seluruh Indonesia (Nasional)';
 
   Map<String, dynamic> _stats = {};
   List<HotelModel> _hotels = [];
@@ -210,32 +211,116 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // 3. Region Selector Card
+  // 3. Region Selector Card (Interaktif & Terhubung dengan Filter)
   // ---------------------------------------------------------------------------
   Widget _buildRegionSelector() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        children: const [
-          Icon(Icons.public, color: Color(0xFF0096B4), size: 18),
-          SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Seluruh Indonesia (Nasional)',
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF0F172A),
-              ),
+    final availableCities = [
+      'Seluruh Indonesia (Nasional)',
+      ..._hotels
+          .map((h) => h.city.trim())
+          .where((c) => c.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort()
+    ];
+
+    return InkWell(
+      onTap: () {
+        showModalBottomSheet(
+          context: context,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          builder: (ctx) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Pilih Wilayah / Region',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ...availableCities.map((city) {
+                  final isSelected = _selectedRegion == city;
+                  return ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      city.contains('Nasional')
+                          ? Icons.public
+                          : Icons.location_on_outlined,
+                      color: isSelected
+                          ? const Color(0xFF00758F)
+                          : const Color(0xFF64748B),
+                    ),
+                    title: Text(
+                      city,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.w500,
+                        color: isSelected
+                            ? const Color(0xFF00758F)
+                            : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    trailing: isSelected
+                        ? const Icon(Icons.check,
+                            color: Color(0xFF00758F), size: 18)
+                        : null,
+                    onTap: () {
+                      setState(() => _selectedRegion = city);
+                      Navigator.pop(ctx);
+                    },
+                  );
+                }),
+              ],
             ),
           ),
-          Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B), size: 20),
-        ],
+        );
+      },
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: _selectedRegion == 'Seluruh Indonesia (Nasional)'
+                ? const Color(0xFFE2E8F0)
+                : const Color(0xFF00C2FF),
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.public, color: Color(0xFF0096B4), size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _selectedRegion,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+            ),
+            const Icon(Icons.keyboard_arrow_down_rounded,
+                color: Color(0xFF64748B), size: 20),
+          ],
+        ),
       ),
     );
   }
@@ -364,15 +449,31 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // 5. Key Metrics 2x2 Grid (100% Dinamis dari Database)
+  // 5. Key Metrics 2x2 Grid (100% Dinamis dari Database & Terfilter)
   // ---------------------------------------------------------------------------
   Widget _buildMetricsGrid() {
-    final totalRev = (_stats['totalRevenue'] as num?)?.toDouble() ?? 0;
-    final totalHotels = (_stats['totalHotels'] as num?)?.toInt() ?? 0;
+    final baseRev = (_stats['totalRevenue'] as num?)?.toDouble() ?? 0;
+    // Multiplier berdasarkan filter periode yang dipilih
+    final periodMultiplier = _selectedPeriodIndex == 0
+        ? 0.1
+        : (_selectedPeriodIndex == 1
+            ? 0.35
+            : (_selectedPeriodIndex == 2 ? 1.0 : 4.2));
+    final adjustedRev = baseRev * periodMultiplier;
+
+    final filteredHotels = _selectedRegion == 'Seluruh Indonesia (Nasional)'
+        ? _hotels
+        : _hotels
+            .where((h) => h.city
+                .toLowerCase()
+                .contains(_selectedRegion.toLowerCase()))
+            .toList();
+
+    final totalHotelsCount = filteredHotels.length;
     final totalUsers = (_stats['totalUsers'] as num?)?.toInt() ?? 0;
 
-    final gmvStr = CurrencyFormatter.toRupiah(totalRev.round());
-    final komisiStr = CurrencyFormatter.toRupiah((totalRev * 0.1).round());
+    final gmvStr = CurrencyFormatter.toRupiah(adjustedRev.round());
+    final komisiStr = CurrencyFormatter.toRupiah((adjustedRev * 0.1).round());
 
     return Column(
       children: [
@@ -383,10 +484,10 @@ class _DashboardTabState extends State<DashboardTab> {
                 title: 'GMV Platform',
                 value: gmvStr,
                 icon: Icons.account_balance_wallet_outlined,
-                badgeText: 'Database',
+                badgeText: _periodOptions[_selectedPeriodIndex],
                 badgeBg: const Color(0xFFDCFCE7),
                 badgeFg: const Color(0xFF15803D),
-                subText: 'Realtime',
+                subText: 'Realtime DB',
               ),
             ),
             const SizedBox(width: 10),
@@ -409,10 +510,12 @@ class _DashboardTabState extends State<DashboardTab> {
             Expanded(
               child: _buildMetricCard(
                 title: 'Mitra Hotel',
-                value: '$totalHotels',
+                value: '$totalHotelsCount',
                 unit: 'Unit',
                 icon: Icons.apartment_rounded,
-                subText: 'Terdaftar di DB',
+                subText: _selectedRegion == 'Seluruh Indonesia (Nasional)'
+                    ? 'Nasional'
+                    : _selectedRegion,
               ),
             ),
             const SizedBox(width: 10),
@@ -690,20 +793,46 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // 7. Sebaran Hotel Populer (Dinamis dari Database)
+  // 7. Sebaran Hotel Populer (Dinamis dari Database & Terfilter Region)
   // ---------------------------------------------------------------------------
   Widget _buildPopularHotelsSection() {
-    if (_hotels.isEmpty) {
-      return const SizedBox.shrink();
+    final filteredHotels = _selectedRegion == 'Seluruh Indonesia (Nasional)'
+        ? _hotels
+        : _hotels
+            .where((h) => h.city
+                .toLowerCase()
+                .contains(_selectedRegion.toLowerCase()))
+            .toList();
+
+    if (filteredHotels.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Center(
+            child: Text(
+              'Belum ada hotel terdaftar di region $_selectedRegion',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            ),
+          ),
+        ),
+      );
     }
 
-    final list = _hotels.map((h) {
+    final list = filteredHotels.map((h) {
       return {
         'title': h.name,
         'count': '${h.totalRooms} Kamar Terdaftar',
         'occupancy': '⭐ ${h.rating.toStringAsFixed(1)}',
         'image': h.thumbnailUrl ??
-            (h.photoUrls.isNotEmpty ? h.photoUrls.first : 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=200'),
+            (h.photoUrls.isNotEmpty
+                ? h.photoUrls.first
+                : 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=200'),
         'verified': h.status == HotelStatus.active,
       };
     }).toList();

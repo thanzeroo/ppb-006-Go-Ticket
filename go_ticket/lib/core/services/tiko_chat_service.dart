@@ -148,8 +148,8 @@ Tersedia juga alur khusus petugas untuk mengelola booking, memantau kamar, serta
 
   /// Daftar model — coba dari yang paling ringan & stabil dulu
   static const List<String> _models = [
-    'gemini-3.5-flash-lite',
     'gemini-flash-lite-latest',
+    'gemini-3.5-flash-lite',
     'gemini-flash-latest',
   ];
 
@@ -236,14 +236,16 @@ Tersedia juga alur khusus petugas untuk mengelola booking, memantau kamar, serta
               final replyText = parts[0]['text'] as String? ?? '';
               final cleanReply = replyText.trim();
 
-              _history.add(TikoChatMessage(
-                text: cleanReply,
-                isUser: false,
-                timestamp: DateTime.now(),
-              ));
+              if (cleanReply.isNotEmpty) {
+                _history.add(TikoChatMessage(
+                  text: cleanReply,
+                  isUser: false,
+                  timestamp: DateTime.now(),
+                ));
 
-              debugPrint('✅ [TikoChatService] Berhasil dengan model: $model');
-              return cleanReply;
+                debugPrint('✅ [TikoChatService] Berhasil dengan model: $model');
+                return cleanReply;
+              }
             }
           }
         }
@@ -261,10 +263,22 @@ Tersedia juga alur khusus petugas untuk mengelola booking, memantau kamar, serta
         }
       }
 
-      return 'Maaf, server AI sedang sibuk. Coba lagi dalam beberapa saat ya! 🙏';
+      final fallback = 'Maaf, server AI sedang sibuk. Coba lagi dalam beberapa saat ya! 🙏';
+      _history.add(TikoChatMessage(
+        text: fallback,
+        isUser: false,
+        timestamp: DateTime.now(),
+      ));
+      return fallback;
     } catch (e) {
       debugPrint('❌ [TikoChatService] Exception: $e');
-      return 'Maaf, terjadi kesalahan. Pastikan koneksi internet kamu stabil dan coba lagi ya! 🙏';
+      final errorMsg = 'Maaf, terjadi kesalahan. Pastikan koneksi internet kamu stabil dan coba lagi ya! 🙏';
+      _history.add(TikoChatMessage(
+        text: errorMsg,
+        isUser: false,
+        timestamp: DateTime.now(),
+      ));
+      return errorMsg;
     }
   }
 

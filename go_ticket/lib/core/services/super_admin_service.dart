@@ -58,32 +58,52 @@ class SuperAdminService {
     };
   }
 
-  /// Mengambil semua akun user di platform
+  /// Mengambil semua akun user di platform (Tamu & Staf Hotel)
   Future<List<UserModel>> getAllUsers() async {
     final sb = SupabaseService.instance;
+    final List<UserModel> allUsers = [];
 
     if (sb.isReady) {
       try {
-        final res = await sb
+        // 1. Ambil data customer dari tabel users
+        final resUsers = await sb
             .table(SupabaseConfig.tableUsers)
             ?.select()
             .order('created_at', ascending: false);
-        if (res != null) {
-          return (res as List)
-              .map((u) => UserModel.fromJson(Map<String, dynamic>.from(u)))
-              .toList();
+        if (resUsers != null) {
+          for (final u in (resUsers as List)) {
+            final m = Map<String, dynamic>.from(u);
+            if (!m.containsKey('role') || m['role'] == null) {
+              m['role'] = 'customer';
+            }
+            allUsers.add(UserModel.fromJson(m));
+          }
         }
-        return [];
       } catch (e) {
-        debugPrint('⚠️ [SuperAdminService] getAllUsers error: $e');
-        return [];
+        debugPrint('⚠️ [SuperAdminService] getAllUsers (users) error: $e');
+      }
+
+      try {
+        // 2. Ambil data staf hotel dari tabel staf_hotel
+        final resStaff = await sb
+            .table(SupabaseConfig.tableStafHotel)
+            ?.select()
+            .order('created_at', ascending: false);
+        if (resStaff != null) {
+          for (final s in (resStaff as List)) {
+            final m = Map<String, dynamic>.from(s);
+            allUsers.add(UserModel.fromJson(m));
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ [SuperAdminService] getAllUsers (staf_hotel) error: $e');
       }
     }
 
-    return [];
+    return allUsers;
   }
 
-  /// Mengaktifkan / memblokir akun user
+  /// Mengaktifkan / memblokir akun user atau staf
   Future<bool> toggleUserStatus(String userId, bool isActive) async {
     final sb = SupabaseService.instance;
 
@@ -95,9 +115,140 @@ class SuperAdminService {
             'status_akun': isActive ? 'aktif' : 'tersuspend',
           }).eq('id_user', parsedId);
           return true;
+        } else {
+          // Staf hotel dengan string ID (contoh: FO-2025-001)
+          await sb.table(SupabaseConfig.tableStafHotel)?.update({
+            'status_karyawan': isActive ? 'Aktif' : 'Nonaktif',
+            'status_duty': isActive ? 'On' : 'Off',
+          }).eq('id_staf', userId);
+          return true;
         }
       } catch (e) {
         debugPrint('⚠️ [SuperAdminService] toggleUserStatus error: $e');
+        return false;
+      }
+    }
+
+    return false;
+  }
+
+  /// Update data profil user / staf oleh Super Admin
+  Future<bool> updateUser({
+    required String userId,
+    required String fullName,
+    String? email,
+    String? phoneNumber,
+    String? status,
+  }) async {
+    final sb = SupabaseService.instance;
+
+    if (sb.isReady) {
+      try {
+        final parsedId = int.tryParse(userId);
+        if (parsedId != null) {
+          final payload = <String, dynamic>{
+            'nama_lengkap': fullName.trim(),
+          };
+          if (email != null && email.trim().isNotEmpty) {
+            payload['email'] = email.trim();
+          }
+          if (phoneNumber != null) {
+            payload['no_telepon'] = phoneNumber.trim();
+          }
+          if (status != null) {
+            payload['status_akun'] = status.toLowerCase();
+          }
+
+          await sb
+              .table(SupabaseConfig.tableUsers)
+              ?.update(payload)
+              .eq('id_user', parsedId);
+          return true;
+        } else {
+          // Staf hotel
+          final payload = <String, dynamic>{
+            'nama_staf': fullName.trim(),
+          };
+          if (email != null && email.trim().isNotEmpty) {
+            payload['email'] = email.trim();
+          }
+          if (phoneNumber != null) {
+            payload['no_telepon'] = phoneNumber.trim();
+          }
+          if (status != null) {
+            payload['status_karyawan'] =
+                status.toLowerCase() == 'aktif' ? 'Aktif' : 'Nonaktif';
+          }
+
+          await sb
+              .table(SupabaseConfig.tableStafHotel)
+              ?.update(payload)
+              .eq('id_staf', userId);
+          return true;
+        }
+      } catch (e) {
+        debugPrint('⚠️ [SuperAdminService] updateUser error: $e');
+        return false;
+      }
+    }
+
+    return false;
+  }
+
+  /// Hapus akun user / staf dari database
+  Future<bool> deleteUser(String userId) async {
+    final sb = SupabaseService.instance;
+
+    if (sb.isReady) {
+      try {
+        final parsedId = int.tryParse(userId);
+        if (parsedId != null) {
+          await sb
+              .table(SupabaseConfig.tableUsers)
+              ?.delete()
+              .eq('id_user', parsedId);
+          return true;
+        } else {
+          await sb
+              .table(SupabaseConfig.tableStafHotel)
+              ?.delete()
+              .eq('id_staf', userId);
+          return true;
+        }
+      } catch (e) {
+        debugPrint('⚠️ [SuperAdminService] deleteUser error: $e');
+        return false;
+      }
+    }
+
+    return false;
+  }
+
+  /// Menambah user baru ke database Supabase
+  Future<bool> createUser({
+    required String fullName,
+    required String email,
+    String? phoneNumber,
+    String role = 'customer',
+  }) async {
+    final sb = SupabaseService.instance;
+
+    if (sb.isReady) {
+      try {
+        final payload = <String, dynamic>{
+          'nama_lengkap': fullName.trim(),
+          'email': email.trim(),
+          'no_telepon': phoneNumber?.trim() ?? '',
+          'password': '',
+          'status_akun': 'aktif',
+          'tier_membership': 'Bronze',
+          'saldo_poin': 0.0,
+        };
+
+        await sb.table(SupabaseConfig.tableUsers)?.insert(payload);
+        return true;
+      } catch (e) {
+        debugPrint('⚠️ [SuperAdminService] createUser error: $e');
         return false;
       }
     }

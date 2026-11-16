@@ -467,7 +467,7 @@ class HotelService {
     if (sb.isReady) {
       try {
         final parsedId = int.tryParse(hotelId);
-        final val = status == HotelStatus.active ? 'aktif' : status.apiValue;
+        final val = status == HotelStatus.active ? 'Aktif' : 'Nonaktif';
         var q = sb.table(SupabaseConfig.tableMitraPenginapan)?.update({
           'status_operasional': val,
         });
@@ -484,5 +484,102 @@ class HotelService {
     }
 
     return false;
+  }
+
+  /// Update data hotel/mitra penginapan (Super Admin / Admin Hotel)
+  Future<bool> updateHotel({
+    required String hotelId,
+    required String name,
+    required String city,
+    required String address,
+    String? phone,
+    String? whatsapp,
+    String? statusOperasional,
+    String? checkInTime,
+    String? checkOutTime,
+    double? deposit,
+    String? cancellationPolicy,
+  }) async {
+    final sb = SupabaseService.instance;
+    if (!sb.isReady || sb.client == null) return false;
+
+    try {
+      final parsedId = int.tryParse(hotelId);
+      final updateData = <String, dynamic>{
+        'nama_properti': name.trim(),
+        'kota_wilayah': city.trim(),
+        'alamat_lengkap': address.trim(),
+      };
+
+      if (phone != null) updateData['no_telepon'] = phone.trim();
+      if (whatsapp != null) updateData['whatsapp'] = whatsapp.trim();
+      if (statusOperasional != null) {
+        updateData['status_operasional'] = statusOperasional.trim();
+      }
+      if (checkInTime != null) updateData['waktu_checkin'] = checkInTime.trim();
+      if (checkOutTime != null) {
+        updateData['waktu_checkout'] = checkOutTime.trim();
+      }
+      if (deposit != null) updateData['deposit_nominal'] = deposit;
+      if (cancellationPolicy != null) {
+        updateData['kebijakan_batal'] = cancellationPolicy.trim();
+      }
+
+      var q = sb.table(SupabaseConfig.tableMitraPenginapan)?.update(updateData);
+      if (parsedId != null) {
+        await q?.eq('id_penginapan', parsedId);
+      } else {
+        await q?.eq('id_penginapan', hotelId);
+      }
+      return true;
+    } catch (e) {
+      debugPrint('⚠️ [HotelService] updateHotel error: $e');
+      return false;
+    }
+  }
+
+  /// Hapus mitra hotel beserta tipe kamar & unit kamar
+  Future<bool> deleteHotel(String hotelId) async {
+    final sb = SupabaseService.instance;
+    if (!sb.isReady || sb.client == null) return false;
+
+    try {
+      final parsedId = int.tryParse(hotelId);
+
+      // 1. Hapus unit kamar
+      if (parsedId != null) {
+        await sb
+            .table(SupabaseConfig.tableKamar)
+            ?.delete()
+            .eq('id_penginapan', parsedId);
+        // 2. Hapus tipe kamar
+        await sb
+            .table(SupabaseConfig.tableTipeKamar)
+            ?.delete()
+            .eq('id_penginapan', parsedId);
+        // 3. Hapus mitra penginapan
+        await sb
+            .table(SupabaseConfig.tableMitraPenginapan)
+            ?.delete()
+            .eq('id_penginapan', parsedId);
+      } else {
+        await sb
+            .table(SupabaseConfig.tableKamar)
+            ?.delete()
+            .eq('id_penginapan', hotelId);
+        await sb
+            .table(SupabaseConfig.tableTipeKamar)
+            ?.delete()
+            .eq('id_penginapan', hotelId);
+        await sb
+            .table(SupabaseConfig.tableMitraPenginapan)
+            ?.delete()
+            .eq('id_penginapan', hotelId);
+      }
+      return true;
+    } catch (e) {
+      debugPrint('⚠️ [HotelService] deleteHotel error: $e');
+      return false;
+    }
   }
 }
