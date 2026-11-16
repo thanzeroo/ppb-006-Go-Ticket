@@ -45,6 +45,7 @@ class StaffData {
   final String name;
   final String id;
   final String role;
+  final String roleKey;
   final String statusLabel;
   final Color statusBg;
   final Color statusFg;
@@ -54,11 +55,14 @@ class StaffData {
   final String avatarUrl;
   final String? shift;
   final String? status;
+  final String? email;
+  final String? nik;
 
   const StaffData({
     required this.name,
     required this.id,
     required this.role,
+    this.roleKey = 'front_office',
     String? statusLabel,
     this.statusBg = const Color(0xFFDCFCE7),
     this.statusFg = const Color(0xFF16A34A),
@@ -68,6 +72,8 @@ class StaffData {
     required this.avatarUrl,
     this.shift,
     this.status,
+    this.email,
+    this.nik,
   }) : statusLabel = statusLabel ?? status ?? 'Aktif Bertugas';
 }
 

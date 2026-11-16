@@ -123,7 +123,7 @@ class _KerusakanTabState extends State<KerusakanTab> {
                     icon: Icons.build_circle_outlined,
                     number: '$_openCount',
                     label: 'Tiket Terbuka',
-                    badgeText: _openCount > 0 ? '${_openCount} Aktif' : null,
+                    badgeText: _openCount > 0 ? '$_openCount Aktif' : null,
                     badgeBg: const Color(0xFFFEE2E2),
                     badgeTextColor: const Color(0xFFDC2626),
                   ),
@@ -194,7 +194,10 @@ class _KerusakanTabState extends State<KerusakanTab> {
               width: double.infinity,
               height: 46,
               child: ElevatedButton.icon(
-                onPressed: () => showLaporKerusakanModal(context),
+                onPressed: () => showLaporKerusakanModal(
+                  context,
+                  onTicketCreated: _loadData,
+                ),
                 icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.white, size: 18),
                 label: const Text('+ Lapor Kerusakan Baru', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white)),
                 style: ElevatedButton.styleFrom(

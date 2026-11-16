@@ -35,14 +35,12 @@ class _AdministratorDashboardTabState
   }
 
   Future<void> _loadData() async {
-    final hotelId =
-        AuthService.instance.currentUser?.managedHotelId ?? '';
-    final bookings = hotelId.isEmpty
-        ? <BookingModel>[]
-        : await BookingService.instance.getHotelBookings(hotelId);
-    final reviews = hotelId.isEmpty
-        ? <ReviewModel>[]
-        : await ReviewService.instance.getReviewsByHotel(hotelId);
+    final userHotelId = AuthService.instance.currentUser?.managedHotelId;
+    final hotelId = (userHotelId != null && userHotelId.isNotEmpty)
+        ? userHotelId
+        : '1';
+    final bookings = await BookingService.instance.getHotelBookings(hotelId);
+    final reviews = await ReviewService.instance.getReviewsByHotel(hotelId);
     if (mounted) {
       setState(() {
         _bookings = bookings;

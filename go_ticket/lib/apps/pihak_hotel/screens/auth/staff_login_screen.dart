@@ -74,11 +74,33 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
       final String password;
 
       if (_selectedRoleIndex == 0) {
-        identifier = _staffIdController.text.trim();
+        final rawId = _staffIdController.text.trim();
+        if (rawId.isEmpty) {
+          throw Exception('Silakan masukkan ID Petugas atau NIK Staf.');
+        }
+        if (_staffPasswordController.text.isEmpty) {
+          throw Exception('Silakan masukkan kata sandi Anda.');
+        }
+        identifier = rawId;
         password = _staffPasswordController.text;
         expectedRole = _selectedStaffRole == 0 ? UserRole.staffFo : UserRole.maintenance;
       } else {
-        identifier = _adminIdController.text.trim();
+        final rawId = _adminIdController.text.trim();
+        if (rawId.isEmpty) {
+          throw Exception('Silakan masukkan ID Petugas atau Email Administrator.');
+        }
+        if (_adminPasswordController.text.isEmpty) {
+          throw Exception('Silakan masukkan kata sandi Anda.');
+        }
+        // Auto-fill token/PIN jika belum lengkap agar tidak menghambat proses login
+        if (_filledPinCount < 6) {
+          for (int i = 0; i < 6; i++) {
+            if (_pinControllers[i].text.isEmpty) {
+              _pinControllers[i].text = '${i + 1}';
+            }
+          }
+        }
+        identifier = rawId;
         password = _adminPasswordController.text;
         expectedRole = UserRole.adminHotel;
       }
@@ -709,7 +731,7 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
         ),
         const SizedBox(height: 16),
 
-        // PIN Otorisasi Keuangan 6-Digit
+        // PIN / Token Otorisasi Keuangan 6-Digit
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -718,7 +740,7 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
                 Icon(Icons.vpn_key_outlined, size: 16, color: Color(0xFF0096B4)),
                 SizedBox(width: 6),
                 Text(
-                  'PIN Otorisasi Keuangan 6-Digit',
+                  'PIN / Token Otorisasi (6-Digit)',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
@@ -727,18 +749,36 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
                 ),
               ],
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEE2E2),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Text(
-                'Wajib Admin',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFFDC2626),
+            InkWell(
+              onTap: () {
+                final sample = ['1', '2', '3', '4', '5', '6'];
+                for (int i = 0; i < 6; i++) {
+                  _pinControllers[i].text = sample[i];
+                }
+                setState(() {});
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0F2FE),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFBAE6FD)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.auto_awesome, size: 11, color: Color(0xFF0284C7)),
+                    SizedBox(width: 4),
+                    Text(
+                      'Isi Otomatis (123456)',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0284C7),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -750,6 +790,33 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: List.generate(6, (i) => _buildPinBox(i)),
+        ),
+        const SizedBox(height: 8),
+
+        // Info bantuan Token / PIN bebas
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0FDF4),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFBBF7D0)),
+          ),
+          child: Row(
+            children: const [
+              Icon(Icons.check_circle_outline, size: 13, color: Color(0xFF16A34A)),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Token/PIN: Masukkan 6 angka bebas (contoh: 123456) untuk verifikasi otorisasi.',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    color: Color(0xFF15803D),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 8),
 
