@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:go_ticket/core/services/supabase_service.dart';
 import 'package:go_ticket/core/widgets/gt_ui.dart';
 
 /// Keamanan Akun & Kata Sandi (Figma: "USER Page KeamananAkun&KataSandi").
@@ -47,7 +49,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(m)));
 
-  void _updatePassword() {
+  Future<void> _updatePassword() async {
     if (_old.text.isEmpty) return _snack('Masukkan kata sandi saat ini');
     if (!(_okLen && _okCase && _okSym)) {
       return _snack('Kata sandi baru belum memenuhi kriteria keamanan');
@@ -55,13 +57,26 @@ class _SecurityScreenState extends State<SecurityScreen> {
     if (_new.text != _confirm.text) {
       return _snack('Konfirmasi kata sandi tidak sama');
     }
-    setState(() {
-      _passwordUpdated = true;
-      _old.clear();
-      _new.clear();
-      _confirm.clear();
-    });
-    _snack('Kata sandi berhasil diperbarui');
+
+    try {
+      final client = SupabaseService.instance.client;
+      if (client != null) {
+        await client.auth.updateUser(
+          UserAttributes(password: _new.text.trim()),
+        );
+      }
+      if (!mounted) return;
+      setState(() {
+        _passwordUpdated = true;
+        _old.clear();
+        _new.clear();
+        _confirm.clear();
+      });
+      _snack('Kata sandi berhasil diperbarui di Supabase');
+    } catch (e) {
+      if (!mounted) return;
+      _snack('Gagal memperbarui kata sandi: $e');
+    }
   }
 
   Future<void> _changePin() async {

@@ -23,8 +23,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.initState();
     final user = AuthService.instance.currentUser;
     _name = TextEditingController(text: user?.fullName ?? '');
-    _phone = TextEditingController(text: user?.phoneNumber ?? '+62 812-3456-7890');
+    _phone = TextEditingController(text: user?.phoneNumber ?? '');
     _email = user?.email ?? 'user@goticket.com';
+    _loadProfileFromSupabase();
+  }
+
+  Future<void> _loadProfileFromSupabase() async {
+    final user = AuthService.instance.currentUser;
+    if (user == null) return;
+    final sb = SupabaseService.instance;
+    if (sb.isReady && sb.client != null) {
+      try {
+        final uid = int.tryParse(user.id);
+        if (uid != null) {
+          final res = await sb
+              .table(SupabaseConfig.tableUsers)
+              ?.select()
+              .eq('id_user', uid)
+              .maybeSingle();
+          if (res != null && mounted) {
+            setState(() {
+              if (res['nama_lengkap'] != null &&
+                  res['nama_lengkap'].toString().isNotEmpty) {
+                _name.text = res['nama_lengkap'];
+              }
+              if (res['no_telepon'] != null &&
+                  res['no_telepon'].toString().isNotEmpty) {
+                _phone.text = res['no_telepon'];
+              }
+              if (res['alamat_domisili'] != null &&
+                  res['alamat_domisili'].toString().isNotEmpty) {
+                _address.text = res['alamat_domisili'];
+              }
+              if (res['jenis_kelamin'] != null) {
+                _male = res['jenis_kelamin'].toString().toLowerCase() !=
+                    'perempuan';
+              }
+              if (res['tanggal_lahir'] != null) {
+                final d = DateTime.tryParse(res['tanggal_lahir'].toString());
+                if (d != null) _birth = d;
+              }
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ Error fetching profile: $e');
+      }
+    }
   }
 
   DateTime _birth = DateTime(1994, 8, 14);
@@ -34,8 +79,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _currency = 'IDR - Indonesian Rupiah (Rp)';
 
   static const _months = [
-    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli',
-    'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember'
   ];
 
   @override
@@ -66,10 +121,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await AuthService.instance.updateProfile(
         fullName: _name.text.trim(),
         phone: _phone.text.trim(),
+        birthDate: _birth,
+        gender: _male ? 'Laki-laki' : 'Perempuan',
+        address: _address.text.trim(),
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Profil berhasil disimpan')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profil berhasil disimpan ke Supabase')));
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;

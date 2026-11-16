@@ -15,8 +15,15 @@ class SupabaseConfig {
   /// Anon Public Key dari file .env
   static String get supabaseAnonKey => dotenv.env['SUPABASE_ANON_KEY'] ?? '';
 
-  /// Gunakan anon key dari .env sebagai active API key
-  static String get activeApiKey => supabaseAnonKey;
+  /// Service Role Key (Secret) dari file .env
+  static String get supabaseServiceRoleKey =>
+      dotenv.env['SUPABASE_SERVICE_ROLE_KEY'] ?? '';
+
+  /// Gunakan service_role key jika tersedia untuk menjamin operasi CRUD backend tidak terhalang RLS,
+  /// fallback ke anon key jika tidak diset.
+  static String get activeApiKey => supabaseServiceRoleKey.isNotEmpty
+      ? supabaseServiceRoleKey
+      : supabaseAnonKey;
 
   /// Mengecek apakah URL & Key sudah diisi
   static bool get isConfigured =>

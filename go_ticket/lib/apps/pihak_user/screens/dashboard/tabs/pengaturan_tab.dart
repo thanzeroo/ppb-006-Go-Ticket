@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:go_ticket/core/services/auth_service.dart';
 import 'package:go_ticket/core/services/customer_data_service.dart';
+import 'package:go_ticket/core/services/promo_service.dart';
 import 'package:go_ticket/core/widgets/user_avatar.dart';
 import '../../auth/customer_login_screen.dart';
 import '../../auth/terms_screen.dart';
@@ -27,6 +28,7 @@ class _PengaturanTabState extends State<PengaturanTab> {
   String _language = 'Bahasa Indonesia';
   int _savedGuestsCount = 0;
   int _savedHotelsCount = 0;
+  int _voucherCount = 0;
   int _points = 0;
   String _tier = 'MEMBER BRONZE GO TICKET';
 
@@ -41,12 +43,14 @@ class _PengaturanTabState extends State<PengaturanTab> {
     final hotels = await CustomerDataService.instance.getSavedHotels();
     final points = await CustomerDataService.instance.getRewardPoints();
     final tier = await CustomerDataService.instance.getMembershipTier();
+    final promos = await PromoService.instance.getPromos(activeOnly: true);
     if (mounted) {
       setState(() {
         _savedGuestsCount = guests.length;
         _savedHotelsCount = hotels.length;
         _points = points;
         _tier = tier;
+        _voucherCount = promos.length;
       });
     }
   }
@@ -227,10 +231,11 @@ class _PengaturanTabState extends State<PengaturanTab> {
   @override
   Widget build(BuildContext context) {
     final user = AuthService.instance.currentUser;
-    final fullName =
-        (user?.fullName.isNotEmpty == true) ? user!.fullName : 'Aditya Pratama';
+    final fullName = (user?.fullName.isNotEmpty == true)
+        ? user!.fullName
+        : (user?.email?.split('@').first ?? 'Pengguna');
     final email =
-        (user?.email?.isNotEmpty == true) ? user!.email! : 'aditya.pratama@email.com';
+        (user?.email?.isNotEmpty == true) ? user!.email! : '';
     final isVerified = user?.isVerified ?? true;
     final points = _points;
     final tier = _tier;
@@ -308,8 +313,8 @@ class _PengaturanTabState extends State<PengaturanTab> {
                     _buildMenuItem(
                       icon: Icons.local_offer_outlined,
                       title: 'Voucher & Promo Saya',
-                      subtitle: 'Diskon eksklusif member Platinum',
-                      badge: '2 Baru',
+                      subtitle: 'Diskon eksklusif & kupon spesial',
+                      badge: '$_voucherCount Baru',
                       badgeColor: const Color(0xFF00B4D8),
                       onTap: () => _go(const VoucherScreen()),
                     ),

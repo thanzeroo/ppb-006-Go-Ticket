@@ -7,6 +7,9 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/models/booking_model.dart';
+import '../../../../core/models/review_model.dart';
+import '../../../../core/services/auth_service.dart';
+import '../../../../core/services/review_service.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../core/widgets/custom_button.dart';
 import '../../../../core/widgets/custom_text_field.dart';
@@ -59,13 +62,39 @@ class _PostCheckoutReviewScreenState extends State<PostCheckoutReviewScreen> {
 
     setState(() => _isLoading = true);
 
-    await Future.delayed(const Duration(milliseconds: 500));
+    try {
+      final user = AuthService.instance.currentUser;
+      final b = booking;
 
-    if (!mounted) return;
-    setState(() {
-      _isLoading = false;
-      _isSubmitted = true;
-    });
+      final rev = ReviewModel(
+        id: '',
+        bookingId: b?.id ?? '',
+        hotelId: b?.hotelId ?? '1',
+        customerId: user?.id ?? '1',
+        customerName: user?.fullName ?? 'Tamu Go Ticket',
+        overallRating: _overallRating.toDouble(),
+        cleanlinessRating: _cleanlinessRating > 0 ? _cleanlinessRating : _overallRating,
+        facilityRating: _facilityRating > 0 ? _facilityRating : _overallRating,
+        locationRating: _locationRating > 0 ? _locationRating : _overallRating,
+        serviceRating: _serviceRating > 0 ? _serviceRating : _overallRating,
+        reviewText: _reviewController.text.trim(),
+        createdAt: DateTime.now(),
+      );
+
+      await ReviewService.instance.addReview(rev);
+
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _isSubmitted = true;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal mengirim ulasan: $e')),
+      );
+    }
   }
 
   // ---------------------------------------------------------------------------

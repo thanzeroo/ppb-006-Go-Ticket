@@ -123,26 +123,30 @@ class ReviewModel {
   // ---------------------------------------------------------------------------
 
   factory ReviewModel.fromJson(Map<String, dynamic> json) {
+    final userMap = json['users'] as Map<String, dynamic>?;
+    final ratingVal = (json['overall_rating'] ?? json['rating_bintang'] as num?)?.toDouble() ?? 0.0;
+    final dateStr = json['created_at'] ?? json['tgl_ulasan'] ?? DateTime.now().toIso8601String();
+
     return ReviewModel(
-      id: json['id']?.toString() ?? '',
-      bookingId: json['booking_id']?.toString() ?? '',
-      hotelId: json['hotel_id']?.toString() ?? '',
-      customerId: json['customer_id']?.toString() ?? '',
-      customerName: json['customer_name'] ?? 'Anonim',
+      id: json['id']?.toString() ?? json['id_ulasan']?.toString() ?? '',
+      bookingId: json['booking_id']?.toString() ?? json['id_booking']?.toString() ?? '',
+      hotelId: json['hotel_id']?.toString() ?? json['id_penginapan']?.toString() ?? '',
+      customerId: json['customer_id']?.toString() ?? json['id_user']?.toString() ?? '',
+      customerName: json['customer_name'] ?? userMap?['nama_lengkap'] ?? 'Tamu Go Ticket',
       customerAvatarUrl: json['customer_avatar_url'],
-      overallRating: (json['overall_rating'] as num?)?.toDouble() ?? 0.0,
-      cleanlinessRating: json['cleanliness_rating'],
+      overallRating: ratingVal,
+      cleanlinessRating: json['cleanliness_rating'] ?? json['rating_kebersihan'],
       facilityRating: json['facility_rating'],
       locationRating: json['location_rating'],
-      serviceRating: json['service_rating'],
+      serviceRating: json['service_rating'] ?? json['rating_pelayanan'],
       valueRating: json['value_rating'],
-      reviewText: json['review_text'] ?? json['comment'],
+      reviewText: json['review_text'] ?? json['komentar'] ?? json['comment'],
       photoUrls: (json['photo_urls'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
-          [],
-      createdAt: DateTime.parse(json['created_at']),
-      hotelResponse: json['hotel_response'],
+          (json['foto_ulasan'] != null ? [json['foto_ulasan'].toString()] : []),
+      createdAt: DateTime.tryParse(dateStr.toString()) ?? DateTime.now(),
+      hotelResponse: json['hotel_response'] ?? json['tanggapan_hotel'],
       hotelResponseAt: json['hotel_response_at'] != null
           ? DateTime.tryParse(json['hotel_response_at'])
           : null,
@@ -154,6 +158,24 @@ class ReviewModel {
           ? DateTime.tryParse(json['check_out_date'])
           : null,
     );
+  }
+
+  Map<String, dynamic> toSupabaseRow() {
+    final bId = int.tryParse(bookingId);
+    final hId = int.tryParse(hotelId);
+    final cId = int.tryParse(customerId);
+
+    return {
+      if (bId != null) 'id_booking': bId,
+      if (hId != null) 'id_penginapan': hId,
+      if (cId != null) 'id_user': cId,
+      'rating_bintang': overallRating.toInt(),
+      'rating_kebersihan': cleanlinessRating ?? overallRating.toInt(),
+      'rating_pelayanan': serviceRating ?? overallRating.toInt(),
+      'komentar': reviewText ?? '',
+      'foto_ulasan': photoUrls.isNotEmpty ? photoUrls.first : null,
+      'tgl_ulasan': createdAt.toIso8601String(),
+    };
   }
 
   Map<String, dynamic> toJson() {

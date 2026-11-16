@@ -312,6 +312,24 @@ class BookingModel {
     final ciStr = json['check_in_date'] ?? json['tgl_checkin'];
     final coStr = json['check_out_date'] ?? json['tgl_checkout'];
 
+    final eticketList = json['eticket'];
+    final eticketMap = (eticketList is List && eticketList.isNotEmpty)
+        ? eticketList.first as Map<String, dynamic>?
+        : (eticketList is Map ? Map<String, dynamic>.from(eticketList) : null);
+
+    final paymentList = json['pembayaran'];
+    final paymentMap = (paymentList is List && paymentList.isNotEmpty)
+        ? paymentList.first as Map<String, dynamic>?
+        : (paymentList is Map ? Map<String, dynamic>.from(paymentList) : null);
+
+    final hotelMap = json['mitra_penginapan'] as Map<String, dynamic>?;
+    final roomMap = json['tipe_kamar'] as Map<String, dynamic>?;
+
+    final hotelAddr = json['hotel_address'] ??
+        (hotelMap != null
+            ? '${hotelMap['kota_wilayah'] ?? ''} • ${hotelMap['alamat_lengkap'] ?? ''}'
+            : null);
+
     return BookingModel(
       id: json['id']?.toString() ?? json['id_booking']?.toString() ?? '',
       bookingCode: json['booking_code'] ??
@@ -329,16 +347,15 @@ class BookingModel {
           json['id_penginapan']?.toString() ??
           '',
       hotelName: json['hotel_name'] ??
-          (json['mitra_penginapan'] != null
-              ? json['mitra_penginapan']['nama_properti']
-              : 'Aruna Stay'),
+          hotelMap?['nama_properti'] ??
+          'Aruna Stay',
+      hotelAddress: hotelAddr,
       roomId: json['room_id']?.toString() ??
           json['id_tipe_kamar']?.toString() ??
           '',
       roomTypeName: json['room_type_name'] ??
-          (json['tipe_kamar'] != null
-              ? json['tipe_kamar']['nama_tipe']
-              : 'Standard Room'),
+          roomMap?['nama_tipe'] ??
+          'Standard Room',
       roomNumber: json['room_number'] ??
           (json['kamar'] != null ? json['kamar']['nomor_kamar'] : '101'),
       checkInDate: ciStr != null
@@ -366,9 +383,14 @@ class BookingModel {
       totalAmount: (json['total_amount'] as num?)?.toInt() ??
           (json['total_harga'] as num?)?.toInt() ??
           0,
-      paymentMethod: json['payment_method'] ?? 'QRIS / Virtual Account',
-      paymentStatus: json['payment_status'] ?? 'paid',
-      paymentTransactionId: json['payment_transaction_id'],
+      paymentMethod: paymentMap?['metode_pembayaran'] ??
+          json['payment_method'] ??
+          'QRIS / Virtual Account',
+      paymentStatus: paymentMap?['status_pembayaran'] ??
+          json['payment_status'] ??
+          'paid',
+      paymentTransactionId: paymentMap?['no_referensi_trx'] ??
+          json['payment_transaction_id'],
       paymentProofUrl: json['payment_proof_url'],
       paidAt: json['paid_at'] != null
           ? DateTime.tryParse(json['paid_at'])
@@ -376,7 +398,9 @@ class BookingModel {
               ? DateTime.tryParse(json['tgl_booking'])
               : null),
       status: parseBookingStatus(json['status_booking'] ?? json['status']),
-      qrCodeData: json['qr_code_data'] ?? json['kode_booking'],
+      qrCodeData: eticketMap?['qr_code_token'] ??
+          json['qr_code_data'] ??
+          json['kode_booking'],
       actualCheckInTime: json['actual_check_in_time'] != null
           ? DateTime.tryParse(json['actual_check_in_time'])
           : null,

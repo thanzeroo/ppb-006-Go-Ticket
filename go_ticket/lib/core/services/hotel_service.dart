@@ -77,7 +77,7 @@ class HotelService {
     final all = await getHotels();
     if (all.isEmpty) return [];
     final featured = all.where((h) => h.isRecommended || h.isPopular).toList();
-    return featured;
+    return featured.isNotEmpty ? featured : all.take(5).toList();
   }
 
   /// Detail hotel berdasarkan ID

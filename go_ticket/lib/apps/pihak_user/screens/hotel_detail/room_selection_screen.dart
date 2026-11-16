@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:go_ticket/core/models/booking_args.dart';
+import 'package:go_ticket/core/services/hotel_service.dart';
 import '../../router/customer_router.dart';
 import 'package:go_ticket/core/widgets/gt_ui.dart';
 
@@ -16,6 +17,7 @@ class RoomSelectionScreen extends StatefulWidget {
 enum _DayStatus { available, full, maintenance }
 
 class _Room {
+  final String? id;
   final String name;
   final String capacity;
   final List<String> features;
@@ -26,6 +28,7 @@ class _Room {
   final String? note;
   final bool soldOut;
   const _Room({
+    this.id,
     required this.name,
     required this.capacity,
     required this.features,
@@ -45,6 +48,8 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
   DateTime? _in;
   DateTime? _out;
   int _room = 0;
+  List<_Room> _rooms = [];
+  bool _isLoadingRooms = true;
 
   static const _monthNames = [
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli',
@@ -63,6 +68,48 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
     }
     _in = checkIn;
     _out = checkOut;
+    _loadRooms();
+  }
+
+  Future<void> _loadRooms() async {
+    try {
+      final dbRooms =
+          await HotelService.instance.getRoomsByHotel(_args.hotelId);
+      if (mounted) {
+        if (dbRooms.isNotEmpty) {
+          setState(() {
+            _rooms = dbRooms.map((r) {
+              return _Room(
+                id: r.id,
+                name: r.name,
+                capacity: 'Maks. ${r.capacity} Tamu',
+                features: r.amenities.isNotEmpty
+                    ? r.amenities
+                    : [r.bedType ?? '1 King Bed', 'AC', 'WiFi Gratis'],
+                price: r.priceWeekday.toInt(),
+                image: r.displayImage,
+                badge: r.totalUnits <= 2
+                    ? 'Sisa ${r.totalUnits} Kamar Lagi!'
+                    : null,
+              );
+            }).toList();
+            _isLoadingRooms = false;
+          });
+        } else {
+          setState(() {
+            _rooms = _defaultRooms;
+            _isLoadingRooms = false;
+          });
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _rooms = _defaultRooms;
+          _isLoadingRooms = false;
+        });
+      }
+    }
   }
 
   DateTime get _today {
@@ -109,8 +156,9 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
 
   int get _baseRoomPrice => _args.roomPrice > 0 ? _args.roomPrice : 850000;
 
-  List<_Room> get _rooms => [
+  List<_Room> get _defaultRooms => [
         _Room(
+          id: '1',
           name: 'Deluxe Ocean View',
           capacity: 'Maks. 2 Dewasa, 1 Anak',
           features: const [
@@ -129,6 +177,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
           badge: 'Sisa 2 Kamar Lagi!',
         ),
         _Room(
+          id: '2',
           name: 'Executive Suite Jacuzzi',
           capacity: 'Maks. 3 Dewasa',
           features: const [
@@ -142,6 +191,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
           note: 'Tersedia untuk 2 malam',
         ),
         _Room(
+          id: '3',
           name: 'Sunset Villa with Private Pool',
           capacity: 'Maks. 4 Dewasa',
           features: const [],
@@ -161,7 +211,8 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       );
       return;
     }
-    final room = _rooms[_room];
+    if (_rooms.isEmpty) return;
+    final room = _rooms[_room.clamp(0, _rooms.length - 1)];
     if (room.soldOut) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -173,6 +224,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       context,
       CustomerRouter.guestDetail,
       arguments: _args.copyWith(
+        roomId: room.id,
         roomName: room.name,
         roomImage: room.image,
         roomPrice: room.price,

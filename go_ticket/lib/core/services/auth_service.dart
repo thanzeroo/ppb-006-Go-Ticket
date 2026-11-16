@@ -603,11 +603,14 @@ class AuthService {
     return true;
   }
 
-  /// Update profil pengguna (Nama, No HP, dll)
+  /// Update profil pengguna (Nama, No HP, Tanggal Lahir, Gender, Domisili)
   Future<UserModel> updateProfile({
     String? fullName,
     String? phone,
     String? avatarUrl,
+    DateTime? birthDate,
+    String? gender,
+    String? address,
   }) async {
     if (_currentUser == null) {
       throw Exception('Pengguna belum login');
@@ -625,14 +628,26 @@ class AuthService {
       try {
         final userIdNum = int.tryParse(updated.id);
         if (userIdNum != null) {
-          await sbService.table(SupabaseConfig.tableUsers)?.update({
+          final payload = <String, dynamic>{
             if (fullName != null) 'nama_lengkap': fullName.trim(),
             if (phone != null) 'no_telepon': phone.trim(),
-            if (avatarUrl != null) 'foto_profil': avatarUrl,
-          }).eq('id_user', userIdNum);
+            if (birthDate != null)
+              'tanggal_lahir':
+                  '${birthDate.year.toString().padLeft(4, '0')}-${birthDate.month.toString().padLeft(2, '0')}-${birthDate.day.toString().padLeft(2, '0')}',
+            if (gender != null) 'jenis_kelamin': gender.trim(),
+            if (address != null) 'alamat_domisili': address.trim(),
+          };
+
+          if (payload.isNotEmpty) {
+            await sbService
+                .table(SupabaseConfig.tableUsers)
+                ?.update(payload)
+                .eq('id_user', userIdNum);
+          }
         }
       } catch (e) {
         debugPrint('⚠️ Supabase updateProfile error: $e');
+        rethrow;
       }
     }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:go_ticket/core/services/auth_service.dart';
+import 'package:go_ticket/core/services/customer_data_service.dart';
 import 'package:go_ticket/core/services/hotel_service.dart';
 import 'package:go_ticket/core/services/supabase_service.dart';
 import 'package:go_ticket/core/utils/currency_formatter.dart';
@@ -36,6 +37,7 @@ class _CariTabState extends State<CariTab> {
   _CariFilters _filters = const _CariFilters();
 
   List<Map<String, dynamic>> _hotels = [];
+  final Set<String> _savedHotelIds = {};
   bool _isLoading = false;
   String _sort = 'Terpopuler';
 
@@ -43,6 +45,34 @@ class _CariTabState extends State<CariTab> {
   void initState() {
     super.initState();
     _fetchHotels();
+  }
+
+  Future<void> _toggleSave(Map<String, dynamic> hotel) async {
+    final id = hotel['id']?.toString() ?? hotel['name']?.toString() ?? '';
+    final isSaved = await CustomerDataService.instance.toggleSavedHotel(hotel);
+    if (mounted) {
+      setState(() {
+        if (isSaved) {
+          _savedHotelIds.add(id);
+        } else {
+          _savedHotelIds.remove(id);
+        }
+        final idx = _hotels.indexWhere(
+            (h) => (h['id']?.toString() ?? h['name']?.toString()) == id);
+        if (idx >= 0) {
+          _hotels[idx]['isFavorite'] = isSaved;
+        }
+      });
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isSaved
+              ? '${hotel['name']} disimpan ke favorit'
+              : '${hotel['name']} dihapus dari favorit'),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
   }
 
   @override
@@ -118,7 +148,13 @@ class _CariTabState extends State<CariTab> {
     setState(() => _isLoading = true);
     try {
       final data = await HotelService.instance.getHotels(sortBy: _sort);
+      final savedList = await CustomerDataService.instance.getSavedHotels();
       if (mounted) {
+        _savedHotelIds.clear();
+        for (final s in savedList) {
+          final id = s['id']?.toString() ?? s['name']?.toString() ?? '';
+          if (id.isNotEmpty) _savedHotelIds.add(id);
+        }
         final promoIndex = data.indexWhere(
           (hotel) =>
               hotel.originalPrice != null &&
@@ -127,6 +163,8 @@ class _CariTabState extends State<CariTab> {
         setState(() {
           _hotels = data.asMap().entries.map((entry) {
             final h = entry.value;
+            final isFav = _savedHotelIds.contains(h.id) ||
+                _savedHotelIds.contains(h.name);
             final originalPrice =
                 entry.key == promoIndex ? h.originalPrice : null;
             final discountPercent = originalPrice == null
@@ -150,7 +188,7 @@ class _CariTabState extends State<CariTab> {
               'features': h.amenities,
               'tag': h.isRecommended ? 'Paling Diminati' : null,
               'tagColor': const Color(0xFF00B4D8),
-              'isFavorite': false,
+              'isFavorite': isFav,
               'isFree': false,
               'imageUrl': h.thumbnailUrl ??
                   (h.photoUrls.isNotEmpty ? h.photoUrls.first : ''),
@@ -695,21 +733,24 @@ class _CariTabState extends State<CariTab> {
               Positioned(
                 top: 10,
                 right: 10,
-                child: Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    hotel['isFavorite'] as bool
-                        ? Icons.favorite
-                        : Icons.favorite_border,
-                    color: hotel['isFavorite'] as bool
-                        ? Colors.red
-                        : const Color(0xFF9CA3AF),
-                    size: 18,
+                child: GestureDetector(
+                  onTap: () => _toggleSave(hotel),
+                  child: Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.9),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      hotel['isFavorite'] as bool
+                          ? Icons.favorite
+                          : Icons.favorite_border,
+                      color: hotel['isFavorite'] as bool
+                          ? Colors.red
+                          : const Color(0xFF9CA3AF),
+                      size: 18,
+                    ),
                   ),
                 ),
               ),

@@ -20,18 +20,49 @@ class BookingService {
   Future<BookingModel> createBooking(BookingModel booking) async {
     final sb = SupabaseService.instance;
 
-    if (sb.isReady) {
+    if (sb.isReady && sb.client != null) {
       try {
-        final row = {
-          'id_user': int.tryParse(booking.customerId) ?? 1,
-          'id_penginapan': int.tryParse(booking.hotelId) ?? 1,
-          'id_tipe_kamar': booking.roomId.isNotEmpty ? booking.roomId : '1',
+        final currentUserId = AuthService.instance.currentUser?.id;
+        final userIdNum = int.tryParse(currentUserId ?? booking.customerId);
+        final hotelIdNum = int.tryParse(booking.hotelId);
+
+        // Validasi tipe kamar jika ada di database
+        String? validRoomTypeId;
+        if (booking.roomId.isNotEmpty) {
+          final checkRoom = await sb
+              .table(SupabaseConfig.tableTipeKamar)
+              ?.select('id_tipe_kamar')
+              .eq('id_tipe_kamar', booking.roomId)
+              .maybeSingle();
+          if (checkRoom != null) {
+            validRoomTypeId = booking.roomId;
+          }
+        }
+
+        // Jika belum ada tipe kamar spesifik, cari kamar default milik hotel
+        if (validRoomTypeId == null && hotelIdNum != null) {
+          final firstRoom = await sb
+              .table(SupabaseConfig.tableTipeKamar)
+              ?.select('id_tipe_kamar')
+              .eq('id_penginapan', hotelIdNum)
+              .maybeSingle();
+          if (firstRoom != null) {
+            validRoomTypeId = firstRoom['id_tipe_kamar']?.toString();
+          }
+        }
+
+        final row = <String, dynamic>{
+          if (userIdNum != null) 'id_user': userIdNum,
+          if (hotelIdNum != null) 'id_penginapan': hotelIdNum,
+          if (validRoomTypeId != null) 'id_tipe_kamar': validRoomTypeId,
           'kode_booking': booking.bookingCode,
           'tgl_booking': DateTime.now().toIso8601String(),
-          'tgl_checkin': booking.checkInDate.toIso8601String().substring(0, 10),
-          'tgl_checkout': booking.checkOutDate.toIso8601String().substring(0, 10),
-          'jml_malam': booking.totalNights,
-          'jml_dewasa': booking.guestCount,
+          'tgl_checkin':
+              booking.checkInDate.toIso8601String().substring(0, 10),
+          'tgl_checkout':
+              booking.checkOutDate.toIso8601String().substring(0, 10),
+          'jml_malam': booking.totalNights > 0 ? booking.totalNights : 1,
+          'jml_dewasa': booking.guestCount > 0 ? booking.guestCount : 1,
           'jml_anak': 0,
           'total_harga': booking.totalAmount.toDouble(),
           'potongan_diskon': booking.discountAmount.toDouble(),
@@ -46,7 +77,63 @@ class BookingService {
             .single();
 
         if (res != null) {
-          return BookingModel.fromJson(Map<String, dynamic>.from(res));
+          final int newBookingId =
+              int.tryParse(res['id_booking'].toString()) ?? 0;
+
+          if (newBookingId > 0) {
+            // 1. Simpan data pembayaran ke tabel pembayaran
+            try {
+              await sb.table(SupabaseConfig.tablePembayaran)?.insert({
+                'id_booking': newBookingId,
+                'no_referensi_trx': 'TRX-${booking.bookingCode}',
+                'metode_pembayaran':
+                    booking.paymentMethod ?? 'QRIS / GoPay Instan',
+                'nominal_bayar': booking.totalAmount.toDouble(),
+                'tgl_bayar': DateTime.now().toIso8601String(),
+                'status_pembayaran': 'Berhasil',
+              });
+            } catch (e) {
+              debugPrint('⚠️ [BookingService] Insert pembayaran error: $e');
+            }
+
+            // 2. Terbitkan e-tiket digital ke tabel eticket
+            try {
+              await sb.table(SupabaseConfig.tableEticket)?.insert({
+                'id_booking': newBookingId,
+                'nomor_tiket': 'TKT-${booking.bookingCode}',
+                'qr_code_token': 'GT-QR-${booking.bookingCode}',
+                'tgl_terbit': DateTime.now().toIso8601String(),
+                'status_tiket': 'Aktif',
+              });
+            } catch (e) {
+              debugPrint('⚠️ [BookingService] Insert eticket error: $e');
+            }
+
+            // 3. Tambah loyalty reward poin pengguna (cashback 5%)
+            if (userIdNum != null) {
+              try {
+                final pointsEarned = (booking.totalAmount * 0.05).toInt();
+                if (pointsEarned > 0) {
+                  final userRow = await sb
+                      .table(SupabaseConfig.tableUsers)
+                      ?.select('saldo_poin')
+                      .eq('id_user', userIdNum)
+                      .maybeSingle();
+                  final currentPoints =
+                      (userRow?['saldo_poin'] as num?)?.toInt() ?? 0;
+                  await sb.table(SupabaseConfig.tableUsers)?.update({
+                    'saldo_poin': currentPoints + pointsEarned,
+                  }).eq('id_user', userIdNum);
+                }
+              } catch (e) {
+                debugPrint('⚠️ [BookingService] Update reward points error: $e');
+              }
+            }
+          }
+
+          final fullBooking = await getBookingById(booking.bookingCode);
+          return fullBooking ??
+              BookingModel.fromJson(Map<String, dynamic>.from(res));
         }
       } catch (e) {
         debugPrint('⚠️ [BookingService] Supabase createBooking error: $e');
@@ -66,18 +153,20 @@ class BookingService {
     final user = AuthService.instance.currentUser;
     final userId = user?.id ?? sb.currentAuthUser?.id;
 
-    if (sb.isReady) {
+    if (sb.isReady && sb.client != null) {
       try {
-        var q = sb.table(SupabaseConfig.tableBooking)?.select('*');
+        dynamic q = sb.table(SupabaseConfig.tableBooking)?.select(
+            '*, mitra_penginapan(*), tipe_kamar(*), eticket(*), pembayaran(*)');
+        if (q == null) return [];
 
         if (userId != null) {
           final uid = int.tryParse(userId);
           if (uid != null) {
-            q = q?.eq('id_user', uid);
+            q = q.eq('id_user', uid);
           }
         }
 
-        if (status != null && q != null) {
+        if (status != null) {
           final statusMap = {
             BookingStatus.confirmed: 'confirmed',
             BookingStatus.checkedIn: 'checked_in',
@@ -88,7 +177,7 @@ class BookingService {
           q = q.eq('status_booking', statusMap[status] ?? status.apiValue);
         }
 
-        final res = await q?.order('tgl_booking', ascending: false);
+        final res = await q.order('id_booking', ascending: false);
         if (res != null) {
           return (res as List)
               .map((b) => BookingModel.fromJson(Map<String, dynamic>.from(b)))
@@ -146,10 +235,11 @@ class BookingService {
   /// Detail pemesanan berdasarkan ID atau Kode Booking
   Future<BookingModel?> getBookingById(String idOrCode) async {
     final sb = SupabaseService.instance;
-    if (sb.isReady) {
+    if (sb.isReady && sb.client != null) {
       try {
         final parsedId = int.tryParse(idOrCode);
-        var q = sb.table(SupabaseConfig.tableBooking)?.select('*');
+        dynamic q = sb.table(SupabaseConfig.tableBooking)?.select(
+            '*, mitra_penginapan(*), tipe_kamar(*), eticket(*), pembayaran(*)');
 
         if (parsedId != null) {
           q = q?.or('id_booking.eq.$parsedId,kode_booking.eq.$idOrCode');

@@ -5,6 +5,7 @@ import 'package:go_ticket/core/services/customer_data_service.dart';
 import 'package:go_ticket/core/widgets/gt_ui.dart';
 
 class _Guest {
+  int? id;
   String name;
   String relation;
   String nik;
@@ -13,13 +14,15 @@ class _Guest {
   String birth;
   bool isChild;
   bool isMain;
+
   _Guest({
+    this.id,
     required this.name,
     required this.relation,
     this.nik = '',
     this.phone = '',
     this.email = '',
-    required this.birth,
+    this.birth = '',
     this.isChild = false,
     this.isMain = false,
   });
@@ -41,6 +44,7 @@ class SavedGuestsScreen extends StatefulWidget {
 
 class _SavedGuestsScreenState extends State<SavedGuestsScreen> {
   int _filter = 0; // 0 semua, 1 dewasa, 2 anak
+  bool _isLoading = true;
 
   List<_Guest> _guests = [];
 
@@ -50,38 +54,74 @@ class _SavedGuestsScreenState extends State<SavedGuestsScreen> {
     _loadGuests();
   }
 
-  void _loadGuests() {
-    if (CustomerDataService.instance.isFreshUser) {
-      _guests = [];
-      return;
+  Future<void> _loadGuests() async {
+    setState(() => _isLoading = true);
+    try {
+      final list = await CustomerDataService.instance.getSavedGuests();
+      if (!mounted) return;
+
+      if (list.isNotEmpty) {
+        setState(() {
+          _guests = list.map((m) {
+            return _Guest(
+              id: m['id'] as int?,
+              name: m['name']?.toString() ?? '',
+              relation: m['relation']?.toString() ?? 'Keluarga / Rekan',
+              nik: m['nik']?.toString() ?? '',
+              phone: m['phone']?.toString() ?? '',
+              email: m['email']?.toString() ?? '',
+              birth: m['birth']?.toString() ?? '',
+              isChild: m['isChild'] == true,
+              isMain: m['isMain'] == true,
+            );
+          }).toList();
+          _isLoading = false;
+        });
+      } else {
+        // Jika belum ada data tamu di cloud
+        if (CustomerDataService.instance.isFreshUser) {
+          setState(() {
+            _guests = [];
+            _isLoading = false;
+          });
+        } else {
+          // Inisialisasi tamu utama dari akun login
+          final user = AuthService.instance.currentUser;
+          if (user != null && user.fullName.isNotEmpty) {
+            final added = await CustomerDataService.instance.addSavedGuest(
+              name: user.fullName,
+              phone: user.phoneNumber,
+              email: user.email,
+              relation: 'Akun Utama',
+              isChild: false,
+            );
+            if (added != null && mounted) {
+              setState(() {
+                _guests = [
+                  _Guest(
+                    id: added['id_saved_guest'] as int?,
+                    name: user.fullName,
+                    relation: 'Akun Utama',
+                    phone: user.phoneNumber ?? '',
+                    email: user.email ?? '',
+                    isMain: true,
+                  ),
+                ];
+                _isLoading = false;
+              });
+              return;
+            }
+          }
+          setState(() {
+            _guests = [];
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error loading guests: $e');
+      if (mounted) setState(() => _isLoading = false);
     }
-    final user = AuthService.instance.currentUser;
-    final name = (user != null && user.fullName.isNotEmpty)
-        ? user.fullName
-        : 'Aditya Pratama';
-    final email = user?.email ?? 'aditya.pratama@email.com';
-    final phone = user?.phoneNumber ?? '+62 812-3456-7890';
-    _guests = [
-      _Guest(
-          name: name,
-          relation: 'Akun Utama',
-          nik: '3171••••••••1004',
-          phone: phone,
-          email: email,
-          birth: '14 Agu 1994 (Dewasa)',
-          isMain: true),
-      _Guest(
-          name: 'Siti Rahmawati',
-          relation: 'Keluarga / Rekan',
-          nik: '3273••••••••8821',
-          phone: '+62 813-9876-5432',
-          birth: ''),
-      _Guest(
-          name: 'Kenzo Pratama',
-          relation: 'Anak Kandung',
-          birth: '20 Mei 2019',
-          isChild: true),
-    ];
   }
 
   List<_Guest> get _visible => _guests.where((g) {
@@ -145,22 +185,47 @@ class _SavedGuestsScreenState extends State<SavedGuestsScreen> {
     );
 
     if (ok == true && name.text.trim().isNotEmpty) {
-      setState(() {
+      final nameStr = name.text.trim();
+      final nikStr = nik.text.trim();
+      final phoneStr = phone.text.trim();
+      final relationStr = child ? 'Anak Kandung' : 'Keluarga / Rekan';
+
+      try {
         if (isNew) {
-          _guests.add(_Guest(
-            name: name.text.trim(),
-            relation: child ? 'Anak' : 'Keluarga / Rekan',
-            nik: nik.text.trim(),
-            phone: phone.text.trim(),
-            birth: '',
+          await CustomerDataService.instance.addSavedGuest(
+            name: nameStr,
+            nik: nikStr,
+            phone: phoneStr,
+            relation: relationStr,
             isChild: child,
-          ));
-        } else {
-          guest.name = name.text.trim();
-          guest.nik = nik.text.trim();
-          guest.phone = phone.text.trim();
+          );
+        } else if (guest.id != null) {
+          await CustomerDataService.instance.updateSavedGuest(
+            guestId: guest.id!,
+            name: nameStr,
+            nik: nikStr,
+            phone: phoneStr,
+            relation: relationStr,
+            isChild: child,
+          );
         }
-      });
+        await _loadGuests();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(isNew
+                  ? 'Data tamu "$nameStr" berhasil disimpan ke database'
+                  : 'Data tamu "$nameStr" berhasil diperbarui'),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Gagal menyimpan tamu: $e')),
+          );
+        }
+      }
     }
     name.dispose();
     nik.dispose();
@@ -172,7 +237,7 @@ class _SavedGuestsScreenState extends State<SavedGuestsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Hapus Tamu?'),
-        content: Text('Data ${g.name} akan dihapus dari daftar tamu tersimpan.'),
+        content: Text('Data ${g.name} akan dihapus dari database Supabase.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -183,7 +248,18 @@ class _SavedGuestsScreenState extends State<SavedGuestsScreen> {
         ],
       ),
     );
-    if (ok == true) setState(() => _guests.remove(g));
+
+    if (ok == true) {
+      if (g.id != null) {
+        await CustomerDataService.instance.deleteSavedGuest(g.id!);
+      }
+      await _loadGuests();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Data ${g.name} berhasil dihapus')),
+        );
+      }
+    }
   }
 
   @override
@@ -240,14 +316,21 @@ class _SavedGuestsScreenState extends State<SavedGuestsScreen> {
             ]),
           ),
           const SizedBox(height: 14),
-          for (final g in _visible) _card(g),
-          if (_visible.isEmpty)
+          if (_isLoading)
             const Padding(
               padding: EdgeInsets.all(32),
-              child: Center(
-                  child: Text('Belum ada data tamu',
-                      style: TextStyle(color: GT.muted))),
-            ),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else ...[
+            for (final g in _visible) _card(g),
+            if (_visible.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(32),
+                child: Center(
+                    child: Text('Belum ada data tamu',
+                        style: TextStyle(color: GT.muted))),
+              ),
+          ],
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
