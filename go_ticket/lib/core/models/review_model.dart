@@ -109,6 +109,16 @@ class ReviewModel {
     return customerName.isNotEmpty ? customerName[0].toUpperCase() : '?';
   }
 
+  /// Alias authorName untuk kompatibilitas UI
+  String get authorName => customerName;
+
+  /// Alias comment untuk kompatibilitas UI
+  String get comment => reviewText ?? '';
+
+  /// Alias formattedDate untuk display tanggal ulasan
+  String get formattedDate =>
+      '${createdAt.day.toString().padLeft(2, '0')}/${createdAt.month.toString().padLeft(2, '0')}/${createdAt.year}';
+
   /// Mendapatkan kategori rating sebagai string (Luar Biasa, Sangat Baik, dll.)
   String get ratingLabel {
     if (overallRating >= 4.5) return 'Luar Biasa';

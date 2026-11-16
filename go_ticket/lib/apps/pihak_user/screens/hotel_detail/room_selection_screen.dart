@@ -236,8 +236,18 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ready = _in != null && _out != null && !_rooms[_room].soldOut;
-    final total = _rooms[_room].price * _nights;
+    if (_isLoadingRooms) {
+      return Scaffold(
+        backgroundColor: GT.bg,
+        appBar: const GTAppBar(title: 'Pilih Kamar'),
+        body: const Center(child: CircularProgressIndicator(color: GT.teal)),
+      );
+    }
+    final currentRoom = _rooms.isNotEmpty
+        ? _rooms[_room.clamp(0, _rooms.length - 1)]
+        : _defaultRooms.first;
+    final ready = _in != null && _out != null && !currentRoom.soldOut;
+    final total = currentRoom.price * _nights;
     return Scaffold(
       backgroundColor: GT.bg,
       appBar: const GTAppBar(title: 'Property Detail'),

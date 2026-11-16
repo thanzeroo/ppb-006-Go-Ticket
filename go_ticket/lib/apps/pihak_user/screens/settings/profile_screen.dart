@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:go_ticket/core/config/supabase_config.dart';
 import 'package:go_ticket/core/services/auth_service.dart';
+import 'package:go_ticket/core/services/supabase_service.dart';
 import 'package:go_ticket/core/widgets/gt_ui.dart';
 import 'package:go_ticket/core/widgets/user_avatar.dart';
 

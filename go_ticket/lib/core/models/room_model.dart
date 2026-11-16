@@ -116,6 +116,9 @@ class RoomModel {
   /// Persentase diskon yang sedang berlaku (0 jika tidak ada diskon)
   final int discountPercent;
 
+  /// Total unit kamar yang tersedia untuk tipe ini
+  final int totalUnits;
+
   /// Daftar fasilitas kamar (misalnya: 'AC', 'TV', 'WiFi', 'Bathtub')
   final List<String> facilities;
 
@@ -151,6 +154,7 @@ class RoomModel {
     this.weekendPrice,
     this.peakSeasonPrice,
     this.discountPercent = 0,
+    this.totalUnits = 5,
     List<String> facilities = const [],
     List<String>? amenities,
     this.mainImageUrl,
@@ -184,6 +188,15 @@ class RoomModel {
   List<String> get photoUrls => imageUrls;
   List<String> get amenities => facilities;
   double? get roomSizeM2 => areaM2;
+
+  /// Alias getter name untuk nama tipe kamar
+  String get name => typeName;
+
+  /// Alias getter capacity untuk kapasitas maksimal tamu
+  int get capacity => maxGuests;
+
+  /// Alias getter priceWeekday untuk harga dasar per malam
+  int get priceWeekday => pricePerNight;
 
   // ---------------------------------------------------------------------------
   // SERIALIZATION
@@ -226,6 +239,9 @@ class RoomModel {
           (json['harga_weekend'] as num?)?.toInt(),
       peakSeasonPrice: (json['peak_season_price'] as num?)?.toInt(),
       discountPercent: json['discount_percent'] ?? 0,
+      totalUnits: (json['total_units'] as num?)?.toInt() ??
+          (json['total_unit'] as num?)?.toInt() ??
+          5,
       facilities: (json['facilities'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
