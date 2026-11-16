@@ -27,14 +27,10 @@ class LaporKerusakanModalContent extends StatefulWidget {
 }
 
 class _LaporKerusakanModalContentState extends State<LaporKerusakanModalContent> {
-  final _roomController = TextEditingController(text: '101');
-  final _titleController =
-      TextEditingController(text: 'AC Menetes Air & Kurang Dingin');
-  final _descController = TextEditingController(
-    text:
-        'Tamu mengeluhkan ada tetesan air dari indoor unit AC mengalir ke meja samping ranjang, filter kotor.',
-  );
-  MaintenancePriority _priority = MaintenancePriority.high;
+  final _roomController = TextEditingController();
+  final _titleController = TextEditingController();
+  final _descController = TextEditingController();
+  MaintenancePriority _priority = MaintenancePriority.medium;
   bool _isSubmitting = false;
 
   @override
@@ -73,8 +69,10 @@ class _LaporKerusakanModalContentState extends State<LaporKerusakanModalContent>
         priority: _priority,
         status: MaintenanceStatus.open,
         category: TicketCategory.ac,
-        reportedById: user?.id ?? '1',
-        reportedByName: user?.fullName ?? 'Petugas FO',
+        reportedById: (user != null && user.id.isNotEmpty)
+            ? user.id
+            : 'MT-2025-001',
+        reportedByName: user?.fullName ?? 'Petugas Maintenance',
         createdAt: DateTime.now(),
       );
 

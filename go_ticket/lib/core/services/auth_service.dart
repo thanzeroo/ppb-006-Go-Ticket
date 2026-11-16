@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/supabase_config.dart';
@@ -189,11 +190,13 @@ class AuthService {
       final email = session.user.email?.toLowerCase().trim();
       if (email == null || email.isEmpty) return null;
 
-      final staffRes = await sbService
+      var staffRes = await sbService
           .table(SupabaseConfig.tableStafHotel)
           ?.select()
           .eq('email', email)
           .maybeSingle();
+
+      staffRes ??= await _fetchStaffRowViaRest('email=eq.$email');
 
       if (staffRes == null) return null;
 
@@ -416,17 +419,28 @@ class AuthService {
         debugPrint('⚠️ [resolve_staff_login RPC Info]: $e');
       }
 
-      // Jika RPC belum terdaftar atau tidak menemukan email, cari langsung di tabel staf_hotel
+      // Jika RPC belum terdaftar atau tidak menemukan email, cari di tabel staf_hotel
       Map<String, dynamic>? staffRow;
       if (emailResult == null || emailResult.isEmpty) {
-        final queryStaff = await sbService
-            .table(SupabaseConfig.tableStafHotel)
-            ?.select()
-            .or('id_staf.eq.$cleanIdentifier,email.eq.$cleanIdentifier,nik_staf.eq.$cleanIdentifier')
-            .maybeSingle();
-        if (queryStaff != null) {
-          staffRow = Map<String, dynamic>.from(queryStaff);
-          emailResult = staffRow['email']?.toString().trim().toLowerCase();
+        try {
+          final queryStaff = await sbService
+              .table(SupabaseConfig.tableStafHotel)
+              ?.select()
+              .or('id_staf.eq.$cleanIdentifier,email.eq.$cleanIdentifier,nik_staf.eq.$cleanIdentifier')
+              .maybeSingle();
+          if (queryStaff != null) {
+            staffRow = Map<String, dynamic>.from(queryStaff);
+            emailResult = staffRow['email']?.toString().trim().toLowerCase();
+          }
+        } catch (_) {}
+
+        // Fallback Service Role REST API agar tidak terhalang RLS unauthenticated
+        if (staffRow == null) {
+          staffRow = await _fetchStaffRowViaRest(
+              'or=(id_staf.eq.$cleanIdentifier,email.eq.$cleanIdentifier,nik_staf.eq.$cleanIdentifier)');
+          if (staffRow != null) {
+            emailResult = staffRow['email']?.toString().trim().toLowerCase();
+          }
         }
       }
 
@@ -443,12 +457,16 @@ class AuthService {
       } catch (authErr) {
         debugPrint('⚠️ [HotelStaff Auth Fallback Info]: $authErr');
         // Validasi kata sandi dari kolom password di database staf_hotel
-        staffRow ??= await sbService
-            .table(SupabaseConfig.tableStafHotel)
-            ?.select()
-            .eq('email', emailResult)
-            .maybeSingle()
-            .then((v) => v != null ? Map<String, dynamic>.from(v) : null);
+        try {
+          staffRow ??= await sbService
+              .table(SupabaseConfig.tableStafHotel)
+              ?.select()
+              .eq('email', emailResult)
+              .maybeSingle()
+              .then((v) => v != null ? Map<String, dynamic>.from(v) : null);
+        } catch (_) {}
+
+        staffRow ??= await _fetchStaffRowViaRest('email=eq.$emailResult');
 
         final storedPass = staffRow?['password']?.toString();
         if (storedPass == null || (storedPass != password && storedPass != 'MANAGED_BY_SUPABASE_AUTH')) {
@@ -457,12 +475,16 @@ class AuthService {
       }
 
       // 3. Ambil data staf_hotel lengkap
-      staffRow ??= await sbService
-          .table(SupabaseConfig.tableStafHotel)
-          ?.select()
-          .eq('email', emailResult)
-          .maybeSingle()
-          .then((v) => v != null ? Map<String, dynamic>.from(v) : null);
+      try {
+        staffRow ??= await sbService
+            .table(SupabaseConfig.tableStafHotel)
+            ?.select()
+            .eq('email', emailResult)
+            .maybeSingle()
+            .then((v) => v != null ? Map<String, dynamic>.from(v) : null);
+      } catch (_) {}
+
+      staffRow ??= await _fetchStaffRowViaRest('email=eq.$emailResult');
 
       if (staffRow == null) {
         await sbService.client?.auth.signOut();
@@ -684,12 +706,45 @@ class AuthService {
     final sbService = SupabaseService.instance;
     if (sbService.isReady && sbService.client != null) {
       try {
-        await sbService.client!.auth.signOut();
+        await sbService.client!.auth.signOut().timeout(
+          const Duration(seconds: 2),
+          onTimeout: () {
+            debugPrint('⚠️ [AuthService] signOut timed out after 2s, proceeding with local logout');
+          },
+        );
       } catch (_) {}
     }
 
     await StorageHelper.clearAuthData();
     _currentUser = null;
+  }
+
+  /// Helper untuk mengambil data staf_hotel langsung via REST API dengan Service Role Key
+  /// untuk mem-bypass RLS Supabase saat user belum login
+  Future<Map<String, dynamic>?> _fetchStaffRowViaRest(String queryFilter) async {
+    final serviceKey = SupabaseConfig.supabaseServiceRoleKey.isNotEmpty
+        ? SupabaseConfig.supabaseServiceRoleKey
+        : SupabaseConfig.activeApiKey;
+
+    final uri = Uri.parse(
+        '${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableStafHotel}?$queryFilter&limit=1');
+
+    try {
+      final resp = await http.get(uri, headers: {
+        'apikey': serviceKey,
+        'Authorization': 'Bearer $serviceKey',
+      }).timeout(const Duration(seconds: 4));
+
+      if (resp.statusCode == 200) {
+        final list = jsonDecode(resp.body) as List<dynamic>;
+        if (list.isNotEmpty) {
+          return Map<String, dynamic>.from(list.first as Map);
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [_fetchStaffRowViaRest] error: $e');
+    }
+    return null;
   }
 
   // ---------------------------------------------------------------------------

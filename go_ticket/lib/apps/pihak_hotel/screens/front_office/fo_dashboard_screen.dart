@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/services/auth_service.dart';
+import '../../../../core/widgets/tiko_chat_bubble.dart';
+import '../auth/staff_login_screen.dart';
 import 'tabs/fo_booking_tab.dart';
 import 'tabs/fo_check_in_tab.dart';
 import 'tabs/fo_check_out_tab.dart';
@@ -24,34 +26,59 @@ class _FoDashboardScreenState extends State<FoDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFD),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header Top Bar
-            _buildTopAppBar(),
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: const Color(0xFFF8FAFD),
+          body: SafeArea(
+            child: Column(
+              children: [
+                // Header Top Bar
+                _buildTopAppBar(),
 
-            // Body Sesuai Tab yang Aktif
-            Expanded(
-              child: IndexedStack(
-                index: _currentTabIndex,
-                children: [
-                  FoDashboardTab(
-                    onNavigateTab: (index) {
-                      setState(() => _currentTabIndex = index);
-                    },
+                // Body Sesuai Tab yang Aktif
+                Expanded(
+                  child: IndexedStack(
+                    index: _currentTabIndex,
+                    children: [
+                      FoDashboardTab(
+                        onNavigateTab: (index) {
+                          setState(() => _currentTabIndex = index);
+                        },
+                      ),
+                      const FoBookingTab(),
+                      const FoCheckInTab(),
+                      const FoCheckOutTab(),
+                    ],
                   ),
-                  const FoBookingTab(),
-                  const FoCheckInTab(),
-                  const FoCheckOutTab(),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
+          bottomNavigationBar: _buildBottomNav(),
         ),
+        const TikoChatBubble(),
+      ],
+    );
+  }
+
+  Future<void> _handleLogout() async {
+    try {
+      await AuthService.instance.logout();
+    } catch (e) {
+      debugPrint('⚠️ [Logout error]: $e');
+    }
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const StaffLoginScreen()),
+      (route) => false,
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Berhasil keluar. Silakan login kembali.'),
+        backgroundColor: Color(0xFF007A87),
+        duration: Duration(seconds: 2),
       ),
-      bottomNavigationBar: _buildBottomNav(),
     );
   }
 
@@ -103,7 +130,7 @@ class _FoDashboardScreenState extends State<FoDashboardScreen> {
             ],
           ),
 
-          // Role & Shift info + Profile Avatar
+          // Role & Shift info + Profile Avatar + Tombol Logout Merah
           Row(
             children: [
               Column(
@@ -138,6 +165,38 @@ class _FoDashboardScreenState extends State<FoDashboardScreen> {
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Tombol Logout Merah
+              Tooltip(
+                message: 'Keluar / Logout',
+                child: InkWell(
+                  onTap: _handleLogout,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFCA5A5)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.logout_rounded, color: Color(0xFFDC2626), size: 16),
+                        SizedBox(width: 4),
+                        Text(
+                          'Logout',
+                          style: TextStyle(
+                            color: Color(0xFFDC2626),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

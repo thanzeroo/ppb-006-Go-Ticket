@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import '../config/supabase_config.dart';
 import '../models/hotel_model.dart';
@@ -138,23 +140,53 @@ class HotelService {
     return [];
   }
 
-  /// Menambah kamar baru (Admin Hotel)
+  /// Menambah tipe kamar baru (Admin Hotel)
   Future<RoomModel> addRoom(RoomModel room) async {
+    final serviceKey = SupabaseConfig.supabaseServiceRoleKey.isNotEmpty
+        ? SupabaseConfig.supabaseServiceRoleKey
+        : SupabaseConfig.activeApiKey;
+
+    final payload = {
+      'id_penginapan': int.tryParse(room.hotelId) ?? 1,
+      'nama_tipe': room.typeName,
+      'kapasitas_tamu': room.maxGuests,
+      'harga_dasar': room.pricePerNight,
+      'harga_weekend': room.weekendPrice ?? room.pricePerNight,
+      'luas_m2': room.areaM2 ?? 24.0,
+      'tipe_bed': room.bedType ?? 'King Bed',
+      'total_unit': room.totalUnits > 0 ? room.totalUnits : 10,
+    };
+
+    try {
+      final uri = Uri.parse(
+          '${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableTipeKamar}');
+      final resp = await http.post(
+        uri,
+        headers: {
+          'apikey': serviceKey,
+          'Authorization': 'Bearer $serviceKey',
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation',
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (resp.statusCode == 201 || resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        if (data is List && data.isNotEmpty) {
+          return RoomModel.fromJson(Map<String, dynamic>.from(data.first));
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [HotelService] addRoom REST error: $e');
+    }
+
     final sb = SupabaseService.instance;
     if (sb.isReady) {
       try {
         final res = await sb
             .table(SupabaseConfig.tableTipeKamar)
-            ?.insert({
-              'id_penginapan': int.tryParse(room.hotelId) ?? 1,
-              'nama_tipe': room.typeName,
-              'kapasitas_tamu': room.maxGuests,
-              'harga_dasar': room.pricePerNight,
-              'harga_weekend': room.weekendPrice ?? room.pricePerNight,
-              'luas_m2': room.roomSizeM2 ?? 24.0,
-              'tipe_bed': room.bedType ?? 'King Bed',
-              'total_unit': 10,
-            })
+            ?.insert(payload)
             .select()
             .single();
         if (res != null) {
@@ -170,15 +202,43 @@ class HotelService {
 
   /// Memperbarui data kamar
   Future<bool> updateRoom(RoomModel room) async {
+    final serviceKey = SupabaseConfig.supabaseServiceRoleKey.isNotEmpty
+        ? SupabaseConfig.supabaseServiceRoleKey
+        : SupabaseConfig.activeApiKey;
+
+    final payload = {
+      'nama_tipe': room.typeName,
+      'kapasitas_tamu': room.maxGuests,
+      'harga_dasar': room.pricePerNight,
+      'harga_weekend': room.weekendPrice ?? room.pricePerNight,
+    };
+
+    try {
+      final uri = Uri.parse(
+          '${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableTipeKamar}?id_tipe_kamar=eq.${room.id}');
+      final resp = await http.patch(
+        uri,
+        headers: {
+          'apikey': serviceKey,
+          'Authorization': 'Bearer $serviceKey',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(payload),
+      );
+      if (resp.statusCode == 200 || resp.statusCode == 204) {
+        return true;
+      }
+    } catch (e) {
+      debugPrint('⚠️ [HotelService] updateRoom REST error: $e');
+    }
+
     final sb = SupabaseService.instance;
     if (sb.isReady) {
       try {
-        await sb.table(SupabaseConfig.tableTipeKamar)?.update({
-          'nama_tipe': room.typeName,
-          'kapasitas_tamu': room.maxGuests,
-          'harga_dasar': room.pricePerNight,
-          'harga_weekend': room.weekendPrice ?? room.pricePerNight,
-        }).eq('id_tipe_kamar', room.id);
+        await sb
+            .table(SupabaseConfig.tableTipeKamar)
+            ?.update(payload)
+            .eq('id_tipe_kamar', room.id);
         return true;
       } catch (e) {
         debugPrint('⚠️ [HotelService] Update room Supabase error: $e');
@@ -191,18 +251,44 @@ class HotelService {
 
   /// Update status kamar (Available -> Occupied / Dirty / Cleaning)
   Future<bool> updateRoomStatus(String roomId, RoomStatus newStatus) async {
+    final statusMap = {
+      RoomStatus.available: 'Tersedia',
+      RoomStatus.occupied: 'Terisi',
+      RoomStatus.dirty: 'Kotor',
+      RoomStatus.cleaning: 'Dibersihkan',
+      RoomStatus.maintenance: 'Perbaikan',
+    };
+
+    final statusVal = statusMap[newStatus] ?? newStatus.apiValue;
+
+    final serviceKey = SupabaseConfig.supabaseServiceRoleKey.isNotEmpty
+        ? SupabaseConfig.supabaseServiceRoleKey
+        : SupabaseConfig.activeApiKey;
+
+    try {
+      final uri = Uri.parse(
+          '${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableKamar}?id_kamar=eq.$roomId');
+      final resp = await http.patch(
+        uri,
+        headers: {
+          'apikey': serviceKey,
+          'Authorization': 'Bearer $serviceKey',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'status_kamar': statusVal}),
+      );
+      if (resp.statusCode == 200 || resp.statusCode == 204) {
+        return true;
+      }
+    } catch (e) {
+      debugPrint('⚠️ [HotelService] updateRoomStatus REST error: $e');
+    }
+
     final sb = SupabaseService.instance;
     if (sb.isReady) {
       try {
-        final statusMap = {
-          RoomStatus.available: 'tersedia',
-          RoomStatus.occupied: 'terisi',
-          RoomStatus.dirty: 'kotor',
-          RoomStatus.cleaning: 'dibersihkan',
-          RoomStatus.maintenance: 'maintenance',
-        };
         await sb.table(SupabaseConfig.tableKamar)?.update({
-          'status_kamar': statusMap[newStatus] ?? newStatus.apiValue,
+          'status_kamar': statusVal,
         }).eq('id_kamar', roomId);
         return true;
       } catch (e) {
@@ -214,12 +300,36 @@ class HotelService {
     return false;
   }
 
-  /// Menghapus kamar
+  /// Menghapus tipe kamar atau kamar
   Future<bool> deleteRoom(String roomId) async {
+    final serviceKey = SupabaseConfig.supabaseServiceRoleKey.isNotEmpty
+        ? SupabaseConfig.supabaseServiceRoleKey
+        : SupabaseConfig.activeApiKey;
+
+    try {
+      final uri = Uri.parse(
+          '${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableKamar}?id_kamar=eq.$roomId');
+      final resp = await http.delete(
+        uri,
+        headers: {
+          'apikey': serviceKey,
+          'Authorization': 'Bearer $serviceKey',
+        },
+      );
+      if (resp.statusCode == 200 || resp.statusCode == 204) {
+        return true;
+      }
+    } catch (e) {
+      debugPrint('⚠️ [HotelService] deleteRoom REST error: $e');
+    }
+
     final sb = SupabaseService.instance;
     if (sb.isReady) {
       try {
-        await sb.table(SupabaseConfig.tableKamar)?.delete().eq('id_kamar', roomId);
+        await sb
+            .table(SupabaseConfig.tableKamar)
+            ?.delete()
+            .eq('id_kamar', roomId);
         return true;
       } catch (e) {
         debugPrint('⚠️ [HotelService] deleteRoom error: $e');

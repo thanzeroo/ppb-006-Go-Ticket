@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/widgets/tiko_chat_bubble.dart';
 import 'tabs/dashboard_tab.dart';
 import 'tabs/kelola_hotel_tab.dart';
 import 'tabs/keuangan_tab.dart';
@@ -39,31 +40,36 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFD),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header Top Bar yang beradaptasi sesuai Tab yang aktif
-            _buildTopAppBar(),
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: const Color(0xFFF8FAFD),
+          body: SafeArea(
+            child: Column(
+              children: [
+                // Header Top Bar yang beradaptasi sesuai Tab yang aktif
+                _buildTopAppBar(),
 
-            // IndexedStack untuk perpindahan tab yang cepat dan mulus
-            Expanded(
-              child: IndexedStack(
-                index: _currentTabIndex,
-                children: [
-                  DashboardTab(onNavigateTab: _onSelectTab),
-                  const KeuanganTab(),
-                  const PromoTab(),
-                  const KelolaHotelTab(),
-                  const UserTab(),
-                ],
-              ),
+                // IndexedStack untuk perpindahan tab yang cepat dan mulus
+                Expanded(
+                  child: IndexedStack(
+                    index: _currentTabIndex,
+                    children: [
+                      DashboardTab(onNavigateTab: _onSelectTab),
+                      const KeuanganTab(),
+                      const PromoTab(),
+                      const KelolaHotelTab(),
+                      const UserTab(),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
+          bottomNavigationBar: _buildBottomNav(),
         ),
-      ),
-      bottomNavigationBar: _buildBottomNav(),
+        const TikoChatBubble(),
+      ],
     );
   }
 

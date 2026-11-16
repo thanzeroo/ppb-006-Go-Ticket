@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../core/widgets/tiko_chat_bubble.dart';
 import 'tabs/beranda_tab.dart';
 import 'tabs/cari_tab.dart';
 import 'tabs/pesanan_tab.dart';
@@ -68,14 +69,19 @@ class _CustomerDashboardScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
-      extendBody: false,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
-      ),
-      bottomNavigationBar: _buildBottomNav(),
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: const Color(0xFFF5F7FA),
+          extendBody: false,
+          body: IndexedStack(
+            index: _currentIndex,
+            children: _pages,
+          ),
+          bottomNavigationBar: _buildBottomNav(),
+        ),
+        const TikoChatBubble(),
+      ],
     );
   }
 

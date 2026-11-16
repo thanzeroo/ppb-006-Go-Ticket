@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import '../config/supabase_config.dart';
 import '../models/booking_model.dart';
@@ -271,26 +273,56 @@ class BookingService {
     final booking = await getBookingById(bookingId);
     if (booking == null) return false;
 
-    final sb = SupabaseService.instance;
-    if (sb.isReady) {
-      try {
-        final bId = int.tryParse(booking.id);
-        if (bId != null) {
-          await sb.table(SupabaseConfig.tableBooking)?.update({
-            'status_booking': 'checked_in',
-          }).eq('id_booking', bId);
+    final serviceKey = SupabaseConfig.supabaseServiceRoleKey.isNotEmpty
+        ? SupabaseConfig.supabaseServiceRoleKey
+        : SupabaseConfig.activeApiKey;
 
-          // Masukkan ke tabel check_in
-          await sb.table(SupabaseConfig.tableCheckIn)?.insert({
+    final bId = int.tryParse(booking.id);
+    if (bId != null) {
+      final staffId = AuthService.instance.currentUser?.id;
+      final validStaffId =
+          (staffId != null && staffId.isNotEmpty) ? staffId : 'FO-2025-001';
+      final validRoomId = booking.roomId.isNotEmpty ? booking.roomId : '1';
+
+      // 1. Update status booking di Supabase
+      try {
+        final updateUri = Uri.parse(
+            '${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableBooking}?id_booking=eq.$bId');
+        await http.patch(
+          updateUri,
+          headers: {
+            'apikey': serviceKey,
+            'Authorization': 'Bearer $serviceKey',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({'status_booking': 'checked_in'}),
+        );
+      } catch (e) {
+        debugPrint('⚠️ [BookingService] Update booking status error: $e');
+      }
+
+      // 2. Masukkan ke tabel check_in
+      try {
+        final checkInUri = Uri.parse(
+            '${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableCheckIn}');
+        await http.post(
+          checkInUri,
+          headers: {
+            'apikey': serviceKey,
+            'Authorization': 'Bearer $serviceKey',
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation',
+          },
+          body: jsonEncode({
             'id_booking': bId,
-            'id_kamar': booking.roomNumber,
-            'id_staf': '1',
+            'id_kamar': validRoomId,
+            'id_staf': validStaffId,
             'waktu_checkin_aktual': DateTime.now().toIso8601String(),
             'status_checkin': 'selesai',
-          });
-        }
+          }),
+        );
       } catch (e) {
-        debugPrint('⚠️ [BookingService] Supabase checkInGuest error: $e');
+        debugPrint('⚠️ [BookingService] Insert check_in record error: $e');
       }
     }
 
@@ -306,26 +338,56 @@ class BookingService {
     final booking = await getBookingById(bookingId);
     if (booking == null) return false;
 
-    final sb = SupabaseService.instance;
-    if (sb.isReady) {
-      try {
-        final bId = int.tryParse(booking.id);
-        if (bId != null) {
-          await sb.table(SupabaseConfig.tableBooking)?.update({
-            'status_booking': 'completed',
-          }).eq('id_booking', bId);
+    final serviceKey = SupabaseConfig.supabaseServiceRoleKey.isNotEmpty
+        ? SupabaseConfig.supabaseServiceRoleKey
+        : SupabaseConfig.activeApiKey;
 
-          // Masukkan ke tabel check_out
-          await sb.table(SupabaseConfig.tableCheckOut)?.insert({
+    final bId = int.tryParse(booking.id);
+    if (bId != null) {
+      final staffId = AuthService.instance.currentUser?.id;
+      final validStaffId =
+          (staffId != null && staffId.isNotEmpty) ? staffId : 'FO-2025-001';
+      final validRoomId = booking.roomId.isNotEmpty ? booking.roomId : '1';
+
+      // 1. Update status booking jadi completed
+      try {
+        final updateUri = Uri.parse(
+            '${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableBooking}?id_booking=eq.$bId');
+        await http.patch(
+          updateUri,
+          headers: {
+            'apikey': serviceKey,
+            'Authorization': 'Bearer $serviceKey',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({'status_booking': 'completed'}),
+        );
+      } catch (e) {
+        debugPrint('⚠️ [BookingService] Update booking checkout error: $e');
+      }
+
+      // 2. Masukkan ke tabel check_out
+      try {
+        final checkOutUri = Uri.parse(
+            '${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableCheckOut}');
+        await http.post(
+          checkOutUri,
+          headers: {
+            'apikey': serviceKey,
+            'Authorization': 'Bearer $serviceKey',
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation',
+          },
+          body: jsonEncode({
             'id_booking': bId,
-            'id_kamar': booking.roomNumber,
-            'id_staf': '1',
+            'id_kamar': validRoomId,
+            'id_staf': validStaffId,
             'waktu_checkout_aktual': DateTime.now().toIso8601String(),
             'status_checkout': 'selesai',
-          });
-        }
+          }),
+        );
       } catch (e) {
-        debugPrint('⚠️ [BookingService] Supabase checkOutGuest error: $e');
+        debugPrint('⚠️ [BookingService] Insert check_out record error: $e');
       }
     }
 

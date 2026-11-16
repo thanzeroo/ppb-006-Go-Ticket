@@ -11,6 +11,8 @@ import '../../../../core/services/hotel_service.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/theme/hotel_admin_theme.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/widgets/tiko_chat_bubble.dart';
+import '../auth/staff_login_screen.dart';
 import 'tabs/dashboard_tab.dart';
 import 'tabs/kamar_tarif_tab.dart';
 import 'tabs/keuangan_tab.dart';
@@ -223,28 +225,53 @@ class _AdministratorDashboardScreenState
       KeuanganTab(transactions: _transactions),
     ];
 
-    return Scaffold(
-      backgroundColor: adminBg,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Top Bar with official Logo
-            _buildTopAppBar(),
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: adminBg,
+          body: SafeArea(
+            child: Column(
+              children: [
+                // Top Bar with official Logo
+                _buildTopAppBar(),
 
-            // Content
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : IndexedStack(
-                      index: _selectedTab,
-                      children: tabViews,
-                    ),
+                // Content
+                Expanded(
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : IndexedStack(
+                          index: _selectedTab,
+                          children: tabViews,
+                        ),
+                ),
+
+                // Bottom Navigation Bar
+                _buildBottomNav(tabs),
+              ],
             ),
-
-            // Bottom Navigation Bar
-            _buildBottomNav(tabs),
-          ],
+          ),
         ),
+        const TikoChatBubble(),
+      ],
+    );
+  }
+
+  Future<void> _handleLogout() async {
+    try {
+      await AuthService.instance.logout();
+    } catch (e) {
+      debugPrint('⚠️ [Logout error]: $e');
+    }
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const StaffLoginScreen()),
+      (route) => false,
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Berhasil keluar. Silakan login kembali.'),
+        backgroundColor: Color(0xFF007A87),
+        duration: Duration(seconds: 2),
       ),
     );
   }
@@ -307,6 +334,38 @@ class _AdministratorDashboardScreenState
             icon: const Icon(Icons.refresh_rounded, color: Color(0xFF0284C7)),
             onPressed: _loadData,
             tooltip: 'Segarkan data',
+          ),
+          const SizedBox(width: 4),
+          // Tombol Logout Merah
+          Tooltip(
+            message: 'Keluar / Logout',
+            child: InkWell(
+              onTap: _handleLogout,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEE2E2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFFCA5A5)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.logout_rounded, color: Color(0xFFDC2626), size: 16),
+                    SizedBox(width: 4),
+                    Text(
+                      'Logout',
+                      style: TextStyle(
+                        color: Color(0xFFDC2626),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),

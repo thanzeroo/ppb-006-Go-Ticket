@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/services/auth_service.dart';
+import '../../../../core/widgets/tiko_chat_bubble.dart';
+import '../auth/staff_login_screen.dart';
 import 'tabs/kebersihan_tab.dart';
 import 'tabs/kerusakan_tab.dart';
 import 'tabs/maintenance_overview_tab.dart';
@@ -24,33 +27,58 @@ class _MaintenanceDashboardScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFD),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Top Bar
-            _buildTopAppBar(),
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: const Color(0xFFF8FAFD),
+          body: SafeArea(
+            child: Column(
+              children: [
+                // Top Bar
+                _buildTopAppBar(),
 
-            // Konten Sesuai Tab Aktif
-            Expanded(
-              child: IndexedStack(
-                index: _currentTabIndex,
-                children: [
-                  MaintenanceOverviewTab(
-                    onNavigateTab: (index) {
-                      setState(() => _currentTabIndex = index);
-                    },
+                // Konten Sesuai Tab Aktif
+                Expanded(
+                  child: IndexedStack(
+                    index: _currentTabIndex,
+                    children: [
+                      MaintenanceOverviewTab(
+                        onNavigateTab: (index) {
+                          setState(() => _currentTabIndex = index);
+                        },
+                      ),
+                      const KebersihanTab(),
+                      const KerusakanTab(),
+                    ],
                   ),
-                  const KebersihanTab(),
-                  const KerusakanTab(),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
+          bottomNavigationBar: _buildBottomNav(),
         ),
+        const TikoChatBubble(),
+      ],
+    );
+  }
+
+  Future<void> _handleLogout() async {
+    try {
+      await AuthService.instance.logout();
+    } catch (e) {
+      debugPrint('⚠️ [Logout error]: $e');
+    }
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const StaffLoginScreen()),
+      (route) => false,
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Berhasil keluar. Silakan login kembali.'),
+        backgroundColor: Color(0xFF007A87),
+        duration: Duration(seconds: 2),
       ),
-      bottomNavigationBar: _buildBottomNav(),
     );
   }
 
@@ -118,14 +146,52 @@ class _MaintenanceDashboardScreenState
               ),
             ],
           ),
-          Container(
-            width: 36,
-            height: 36,
-            decoration: const BoxDecoration(
-              color: Color(0xFF0A5868),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.person, color: Colors.white, size: 20),
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF0A5868),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.person, color: Colors.white, size: 18),
+              ),
+              const SizedBox(width: 8),
+              // Tombol Logout Merah
+              Tooltip(
+                message: 'Keluar / Logout',
+                child: InkWell(
+                  onTap: _handleLogout,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFCA5A5)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.logout_rounded,
+                            color: Color(0xFFDC2626), size: 16),
+                        SizedBox(width: 4),
+                        Text(
+                          'Logout',
+                          style: TextStyle(
+                            color: Color(0xFFDC2626),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

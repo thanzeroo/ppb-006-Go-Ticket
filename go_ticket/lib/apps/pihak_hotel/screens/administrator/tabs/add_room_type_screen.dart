@@ -57,10 +57,10 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: 'Standar Twin Suite');
-    _weekdayPriceController = TextEditingController(text: 'Rp 550.000');
-    _weekendPriceController = TextEditingController(text: 'Rp 680.000');
-    _depositController = TextEditingController(text: 'Rp 300.000');
+    _nameController = TextEditingController();
+    _weekdayPriceController = TextEditingController();
+    _weekendPriceController = TextEditingController();
+    _depositController = TextEditingController();
     _selectedFacilities = Set.from(_facilities);
   }
 
