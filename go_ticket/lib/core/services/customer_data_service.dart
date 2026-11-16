@@ -133,6 +133,8 @@ class CustomerDataService {
                 'rating': '4.8',
                 'reviews': '142',
                 'features': <String>['WiFi Cepat', 'Kolam Renang', 'AC'],
+                'extras': <String>[],
+                'availability': 'Tersedia',
                 'imageUrl':
                     'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600',
                 'type': 'Resor • ⭐ 5',

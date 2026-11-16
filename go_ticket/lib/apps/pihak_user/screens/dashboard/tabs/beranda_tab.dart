@@ -741,7 +741,7 @@ class _BerandaTabState extends State<BerandaTab> {
             ),
             const SizedBox(height: 12),
             Column(
-              children: list.map((h) => _buildHotelCard(h)).toList(),
+              children: list.take(5).map((h) => _buildHotelCard(h)).toList(),
             ),
           ],
         );

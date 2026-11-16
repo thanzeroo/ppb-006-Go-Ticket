@@ -32,6 +32,7 @@ class CariTab extends StatefulWidget {
 
 class _CariTabState extends State<CariTab> {
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   String _searchQuery = '';
   _CariFilters _filters = const _CariFilters();
 
@@ -39,11 +40,25 @@ class _CariTabState extends State<CariTab> {
   final Set<String> _savedHotelIds = {};
   bool _isLoading = false;
   String _sort = 'Terpopuler';
+  int _currentLimit = 10;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _fetchHotels();
+  }
+
+  void _onScroll() {
+    if (_scrollController.hasClients &&
+        _scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 250) {
+      if (_currentLimit < _visibleHotels.length) {
+        setState(() {
+          _currentLimit += 10;
+        });
+      }
+    }
   }
 
   Future<void> _toggleSave(Map<String, dynamic> hotel) async {
@@ -76,6 +91,7 @@ class _CariTabState extends State<CariTab> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -374,6 +390,9 @@ class _CariTabState extends State<CariTab> {
   @override
   Widget build(BuildContext context) {
     final visibleHotels = _visibleHotels;
+    final displayedHotels = visibleHotels.take(_currentLimit).toList();
+    final hasMore = visibleHotels.length > displayedHotels.length;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       body: Stack(
@@ -382,7 +401,10 @@ class _CariTabState extends State<CariTab> {
             children: [
               _buildSearchHeader(),
               _buildFilterBar(),
-              _buildResultsInfo(),
+              _buildResultsInfo(
+                displayedCount: displayedHotels.length,
+                totalCount: visibleHotels.length,
+              ),
               Expanded(
                 child: _isLoading && _hotels.isEmpty
                     ? const Center(child: CircularProgressIndicator())
@@ -400,10 +422,42 @@ class _CariTabState extends State<CariTab> {
                             ),
                           )
                         : ListView.builder(
+                            controller: _scrollController,
                             padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                            itemCount: visibleHotels.length,
+                            itemCount: displayedHotels.length + (hasMore ? 1 : 0),
                             itemBuilder: (context, index) {
-                              return _buildHotelCard(visibleHotels[index]);
+                              if (index == displayedHotels.length) {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  child: Center(
+                                    child: OutlinedButton.icon(
+                                      onPressed: () {
+                                        setState(() {
+                                          _currentLimit += 10;
+                                        });
+                                      },
+                                      style: OutlinedButton.styleFrom(
+                                        side: const BorderSide(
+                                            color: Color(0xFF00B4D8)),
+                                        shape: const StadiumBorder(),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 18, vertical: 10),
+                                      ),
+                                      icon: const Icon(Icons.arrow_downward,
+                                          size: 16, color: Color(0xFF00B4D8)),
+                                      label: Text(
+                                        'Muat 10 Penginapan Berikutnya (${displayedHotels.length}/${visibleHotels.length})',
+                                        style: GoogleFonts.inter(
+                                          color: const Color(0xFF00B4D8),
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+                              return _buildHotelCard(displayedHotels[index]);
                             },
                           ),
               ),
@@ -491,8 +545,10 @@ class _CariTabState extends State<CariTab> {
                     Expanded(
                       child: TextField(
                         controller: _searchController,
-                        onChanged: (value) =>
-                            setState(() => _searchQuery = value),
+                        onChanged: (value) => setState(() {
+                          _searchQuery = value;
+                          _currentLimit = 10;
+                        }),
                         decoration: InputDecoration(
                           hintText: 'Cari nama hotel, kota, atau fasilitas...',
                           hintStyle: GoogleFonts.inter(
@@ -509,7 +565,10 @@ class _CariTabState extends State<CariTab> {
                                   tooltip: 'Hapus pencarian',
                                   onPressed: () {
                                     _searchController.clear();
-                                    setState(() => _searchQuery = '');
+                                    setState(() {
+                                      _searchQuery = '';
+                                      _currentLimit = 10;
+                                    });
                                   },
                                   icon: const Icon(Icons.close, size: 18),
                                 ),
@@ -614,8 +673,13 @@ class _CariTabState extends State<CariTab> {
     );
   }
 
-  Widget _buildResultsInfo() {
-    final resultCount = _visibleHotels.length;
+  Widget _buildResultsInfo({int? displayedCount, int? totalCount}) {
+    final resultCount = totalCount ?? _visibleHotels.length;
+    final shown = displayedCount ?? resultCount;
+    final countText = (resultCount > 10 && shown < resultCount)
+        ? '$shown dari $resultCount Penginapan '
+        : '$resultCount Penginapan ';
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Row(
@@ -625,7 +689,7 @@ class _CariTabState extends State<CariTab> {
             text: TextSpan(
               children: [
                 TextSpan(
-                  text: '$resultCount Penginapan ',
+                  text: countText,
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
