@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/models/hotel_admin_model.dart';
@@ -9,6 +11,8 @@ import '../../../../core/services/hotel_service.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/theme/hotel_admin_theme.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/widgets/tiko_chat_bubble.dart';
+import '../auth/staff_login_screen.dart';
 import 'tabs/dashboard_tab.dart';
 import 'tabs/kamar_tarif_tab.dart';
 import 'tabs/keuangan_tab.dart';
@@ -63,28 +67,113 @@ class _AdministratorDashboardScreenState
         );
       }).toList();
 
-      // 2. Load Staff
+      // 2. Load Staff (Dinamis dari database staf_hotel)
       List<StaffData> mappedStaff = [];
-      final sb = SupabaseService.instance;
-      if (sb.isReady) {
-        final staffRes = await sb
-            .table(SupabaseConfig.tableStafHotel)
-            ?.select()
-            .eq('id_penginapan', int.tryParse(hotelId) ?? 1);
-        if (staffRes != null) {
-          mappedStaff = (staffRes as List).map((s) {
+      try {
+        final serviceKey = SupabaseConfig.supabaseServiceRoleKey.isNotEmpty
+            ? SupabaseConfig.supabaseServiceRoleKey
+            : SupabaseConfig.activeApiKey;
+
+        List<dynamic>? rawStaffList;
+        if (serviceKey.isNotEmpty && SupabaseConfig.supabaseUrl.isNotEmpty) {
+          final uri = Uri.parse(
+              '${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableStafHotel}?select=*&id_penginapan=eq.${int.tryParse(hotelId) ?? 1}&order=created_at.desc');
+          final resp = await http.get(uri, headers: {
+            'apikey': serviceKey,
+            'Authorization': 'Bearer $serviceKey',
+          });
+          if (resp.statusCode == 200) {
+            rawStaffList = jsonDecode(resp.body) as List<dynamic>;
+          }
+        }
+
+        final sb = SupabaseService.instance;
+        if (rawStaffList == null && sb.isReady) {
+          final staffRes = await sb
+              .table(SupabaseConfig.tableStafHotel)
+              ?.select()
+              .eq('id_penginapan', int.tryParse(hotelId) ?? 1)
+              .order('created_at', ascending: false);
+          if (staffRes != null) {
+            rawStaffList = staffRes as List;
+          }
+        }
+
+        if (rawStaffList != null) {
+          mappedStaff = rawStaffList.map((s) {
             final m = Map<String, dynamic>.from(s);
+            final rawRole =
+                (m['role_jabatan'] ?? m['role'] ?? '').toString().toLowerCase();
+
+            final String displayRole;
+            final String roleKey;
+            final List<String> aksesList;
+            final Color roleBg;
+            final Color roleFg;
+
+            if (rawRole.contains('admin')) {
+              displayRole = 'Administrator';
+              roleKey = 'administrator';
+              aksesList = [
+                'Kelola Karyawan',
+                'Master Kamar',
+                'Keuangan & Kas',
+                'Otoritas Penuh'
+              ];
+              roleBg = const Color(0xFFDCFCE7);
+              roleFg = const Color(0xFF15803D);
+            } else if (rawRole.contains('maint') ||
+                rawRole.contains('housekeeping')) {
+              displayRole = 'Maintenance';
+              roleKey = 'maintenance';
+              aksesList = [
+                'Kebersihan Kamar',
+                'Laporan Kerusakan',
+                'Checklist Sanitasi'
+              ];
+              roleBg = const Color(0xFFEDE9FE);
+              roleFg = const Color(0xFF7C3AED);
+            } else {
+              displayRole = 'Staf';
+              roleKey = 'front_office';
+              aksesList = [
+                'Check-in Tamu',
+                'Check-out Tamu',
+                'Verifikasi Booking',
+                'Alokasi Kunci'
+              ];
+              roleBg = const Color(0xFFE0F4FB);
+              roleFg = const Color(0xFF0284C7);
+            }
+
+            final isDuty =
+                (m['status_duty'] ?? '').toString().toLowerCase() == 'on';
+            final statusKaryawan = m['status_karyawan'] ?? 'Aktif';
+
             return StaffData(
-              name: m['nama_lengkap'] ?? m['nama_staf'] ?? 'Staff',
-              id: '#STF-${m['id_staf']}',
-              role: m['posisi_jabatan'] ?? m['peran'] ?? 'Front Office',
-              statusLabel: m['status_keaktifan'] == 'aktif' ? 'Aktif Bertugas' : 'Non-aktif',
+              name: m['nama_staf'] ?? m['nama_lengkap'] ?? 'Karyawan',
+              id: m['id_staf'] ?? '',
+              role: displayRole,
+              roleKey: roleKey,
+              statusLabel: isDuty
+                  ? 'On-Duty'
+                  : (statusKaryawan == 'Aktif' ? 'Off-Duty' : 'Non-aktif'),
+              statusBg: roleBg,
+              statusFg: roleFg,
+              onlineDotColor:
+                  isDuty ? const Color(0xFF22C55E) : const Color(0xFF94A3B8),
+              akses: aksesList,
+              wa: m['no_telepon'] ?? '-',
               avatarUrl: m['foto_profil'] ??
                   'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop',
-              wa: m['no_telepon'] ?? '-',
+              shift: m['shift_tugas'] ?? 'Shift Pagi (07:00 – 15:00 WIB)',
+              email: m['email'],
+              nik: m['nik_staf'],
             );
           }).toList();
         }
+      } catch (staffErr) {
+        debugPrint('⚠️ [LoadDashboardData] Gagal load staff: $staffErr');
       }
 
       // 3. Load Transactions
@@ -131,33 +220,58 @@ class _AdministratorDashboardScreenState
 
     final tabViews = [
       const AdministratorDashboardTab(),
-      KamarTarifTab(rooms: _rooms),
-      StafTimTab(staff: _staff),
+      KamarTarifTab(rooms: _rooms, onRefresh: _loadData),
+      StafTimTab(staff: _staff, onRefresh: _loadData),
       KeuanganTab(transactions: _transactions),
     ];
 
-    return Scaffold(
-      backgroundColor: adminBg,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Top Bar with official Logo
-            _buildTopAppBar(),
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: adminBg,
+          body: SafeArea(
+            child: Column(
+              children: [
+                // Top Bar with official Logo
+                _buildTopAppBar(),
 
-            // Content
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : IndexedStack(
-                      index: _selectedTab,
-                      children: tabViews,
-                    ),
+                // Content
+                Expanded(
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : IndexedStack(
+                          index: _selectedTab,
+                          children: tabViews,
+                        ),
+                ),
+
+                // Bottom Navigation Bar
+                _buildBottomNav(tabs),
+              ],
             ),
-
-            // Bottom Navigation Bar
-            _buildBottomNav(tabs),
-          ],
+          ),
         ),
+        const TikoChatBubble(),
+      ],
+    );
+  }
+
+  Future<void> _handleLogout() async {
+    try {
+      await AuthService.instance.logout();
+    } catch (e) {
+      debugPrint('⚠️ [Logout error]: $e');
+    }
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const StaffLoginScreen()),
+      (route) => false,
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Berhasil keluar. Silakan login kembali.'),
+        backgroundColor: Color(0xFF007A87),
+        duration: Duration(seconds: 2),
       ),
     );
   }
@@ -220,6 +334,38 @@ class _AdministratorDashboardScreenState
             icon: const Icon(Icons.refresh_rounded, color: Color(0xFF0284C7)),
             onPressed: _loadData,
             tooltip: 'Segarkan data',
+          ),
+          const SizedBox(width: 4),
+          // Tombol Logout Merah
+          Tooltip(
+            message: 'Keluar / Logout',
+            child: InkWell(
+              onTap: _handleLogout,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEE2E2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFFCA5A5)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.logout_rounded, color: Color(0xFFDC2626), size: 16),
+                    SizedBox(width: 4),
+                    Text(
+                      'Logout',
+                      style: TextStyle(
+                        color: Color(0xFFDC2626),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),

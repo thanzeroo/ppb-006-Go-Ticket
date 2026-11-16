@@ -182,9 +182,7 @@ class PromoService {
 
       final currentUserId =
           int.tryParse(AuthService.instance.currentUser?.id ?? '');
-      if (currentUserId != null) {
-        payload['dibuat_oleh'] = currentUserId;
-      }
+      payload['dibuat_oleh'] = currentUserId ?? 1;
 
       final res = await sb
           .table(SupabaseConfig.tableKampanyePromo)
@@ -200,6 +198,72 @@ class PromoService {
     } catch (e) {
       debugPrint('⚠️ [PromoService] createPromo error: $e');
       rethrow;
+    }
+  }
+
+  /// Toggle status aktif/nonaktif promo (Super Admin)
+  Future<bool> togglePromoStatus(String promoId, bool isActive) async {
+    final sb = SupabaseService.instance;
+    if (sb.isReady) {
+      try {
+        final pId = int.tryParse(promoId);
+        if (pId != null) {
+          await sb.table(SupabaseConfig.tableKampanyePromo)?.update({
+            'status_promo': isActive ? 'Aktif' : 'Nonaktif',
+          }).eq('promo_id', pId);
+          return true;
+        }
+      } catch (e) {
+        debugPrint('⚠️ [PromoService] togglePromoStatus error: $e');
+        return false;
+      }
+    }
+    return false;
+  }
+
+  /// Update data promo yang sudah ada (Super Admin)
+  Future<bool> updatePromo({
+    required String promoId,
+    required String name,
+    required String code,
+    required double discountValue,
+    String discountType = 'Persen',
+    double? maxDiscount,
+    double? minTransaction,
+    int? totalQuota,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? status,
+  }) async {
+    final sb = SupabaseService.instance;
+    if (!sb.isReady || sb.client == null) return false;
+
+    try {
+      final pId = int.tryParse(promoId);
+      if (pId == null) return false;
+
+      final payload = <String, dynamic>{
+        'nama_kampanye': name.trim(),
+        'kode_promo': code.trim().toUpperCase(),
+        'besaran_diskon': discountValue,
+        'tipe_diskon': discountType,
+      };
+
+      if (maxDiscount != null) payload['maks_plafon_diskon'] = maxDiscount;
+      if (minTransaction != null) payload['min_transaksi'] = minTransaction;
+      if (totalQuota != null) payload['total_kuota'] = totalQuota;
+      if (startDate != null) payload['tgl_mulai'] = startDate.toIso8601String();
+      if (endDate != null) payload['tgl_berakhir'] = endDate.toIso8601String();
+      if (status != null) payload['status_promo'] = status;
+
+      await sb
+          .table(SupabaseConfig.tableKampanyePromo)
+          ?.update(payload)
+          .eq('promo_id', pId);
+      return true;
+    } catch (e) {
+      debugPrint('⚠️ [PromoService] updatePromo error: $e');
+      return false;
     }
   }
 

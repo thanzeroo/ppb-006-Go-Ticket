@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:go_ticket/core/models/booking_args.dart';
 import 'package:go_ticket/core/services/auth_service.dart';
+import 'package:go_ticket/core/services/customer_data_service.dart';
 import '../../router/customer_router.dart';
 import 'package:go_ticket/core/widgets/gt_ui.dart';
 
@@ -62,6 +63,85 @@ class _GuestDetailFormScreenState extends State<GuestDetailFormScreen> {
   void _snack(String m) => ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(m)));
+
+  Future<void> _pickSavedGuest() async {
+    final guests = await CustomerDataService.instance.getSavedGuests();
+    if (!mounted) return;
+    if (guests.isEmpty) {
+      _snack('Belum ada data tamu tersimpan di akun Anda.');
+      return;
+    }
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Pilih Tamu Tersimpan',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                  IconButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: guests.length,
+                itemBuilder: (context, idx) {
+                  final g = guests[idx];
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      backgroundColor: GT.sky,
+                      child: Text(
+                        (g['name'] ?? 'T')
+                            .toString()
+                            .substring(0, 1)
+                            .toUpperCase(),
+                        style: const TextStyle(
+                            color: GT.teal, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    title: Text(g['name'] ?? '',
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                    subtitle: Text('${g['relation']} • ${g['phone']}'),
+                    onTap: () {
+                      setState(() {
+                        _name.text = g['name'] ?? '';
+                        final rawPhone = g['phone']?.toString() ?? '';
+                        _phone.text =
+                            rawPhone.replaceFirst('+62', '').trim();
+                        if ((g['email']?.toString() ?? '').isNotEmpty) {
+                          _email.text = g['email'];
+                        }
+                        _forSelf = false;
+                      });
+                      Navigator.pop(ctx);
+                    },
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   void _next() {
     final emailOk =
@@ -427,7 +507,32 @@ class _GuestDetailFormScreenState extends State<GuestDetailFormScreen> {
             ),
           ]),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: _pickSavedGuest,
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Icon(Icons.people_alt_outlined, size: 16, color: GT.teal),
+                SizedBox(width: 6),
+                Text(
+                  'Pilih dari Tamu Tersimpan',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: GT.teal,
+                  ),
+                ),
+                SizedBox(width: 4),
+                Icon(Icons.chevron_right, size: 16, color: GT.teal),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
         _field('Nama Lengkap', _name, Icons.account_circle_outlined,
             trailingLabel: 'Sesuai KTP / Paspor', hint: 'Nama lengkap'),
         const SizedBox(height: 14),

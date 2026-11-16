@@ -13,6 +13,11 @@ class PromoTab extends StatefulWidget {
 }
 
 class _PromoTabState extends State<PromoTab> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  String _selectedStatusFilter = 'Semua'; // 'Semua', 'Aktif', 'Nonaktif'
+  String _selectedTypeFilter = 'Semua'; // 'Semua', 'Persen', 'Nominal'
+
   List<Map<String, dynamic>> _promos = [];
   bool _isLoading = true;
 
@@ -42,6 +47,65 @@ class _PromoTabState extends State<PromoTab> {
     }
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<Map<String, dynamic>> get _filteredPromos {
+    return _promos.where((p) {
+      // 1. Search filter
+      final q = _searchQuery.trim().toLowerCase();
+      if (q.isNotEmpty) {
+        final code = (p['code'] ?? '').toString().toLowerCase();
+        final title = (p['title'] ?? '').toString().toLowerCase();
+        final desc = (p['description'] ?? '').toString().toLowerCase();
+        if (!code.contains(q) && !title.contains(q) && !desc.contains(q)) {
+          return false;
+        }
+      }
+
+      // 2. Status filter
+      final isActive = p['isActive'] == true ||
+          (p['status'] ?? '').toString().toLowerCase().contains('aktif');
+      if (_selectedStatusFilter == 'Aktif') {
+        if (!isActive) return false;
+      } else if (_selectedStatusFilter == 'Nonaktif') {
+        if (isActive) return false;
+      }
+
+      // 3. Discount Type filter
+      final dType = (p['discountType'] ?? '').toString().toLowerCase();
+      if (_selectedTypeFilter == 'Persen') {
+        if (!dType.contains('persen')) return false;
+      } else if (_selectedTypeFilter == 'Nominal') {
+        if (!dType.contains('nominal')) return false;
+      }
+
+      return true;
+    }).toList();
+  }
+
+  Future<void> _togglePromo(Map<String, dynamic> p) async {
+    final promoId = p['id']?.toString() ?? '';
+    final isCurrentlyActive = p['isActive'] == true ||
+        (p['status'] ?? '').toString().toLowerCase().contains('aktif');
+    final newActiveState = !isCurrentlyActive;
+
+    final ok = await PromoService.instance.togglePromoStatus(promoId, newActiveState);
+    if (ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Status voucher "${p['code']}" diubah menjadi ${newActiveState ? "Aktif" : "Nonaktif"}'),
+          backgroundColor: newActiveState ? const Color(0xFF16A34A) : Colors.orange,
+        ),
+      );
+      _loadPromos();
+    }
+  }
+
   Future<void> _delete(String id) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -49,7 +113,7 @@ class _PromoTabState extends State<PromoTab> {
         title: const Text('Hapus Promo',
             style: TextStyle(fontWeight: FontWeight.bold)),
         content:
-            const Text('Apakah Anda yakin ingin menghapus voucher promo ini?'),
+            const Text('Apakah Anda yakin ingin menghapus voucher promo ini? Data yang dihapus tidak dapat dipulihkan.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -67,18 +131,276 @@ class _PromoTabState extends State<PromoTab> {
     if (confirm != true) return;
 
     final ok = await PromoService.instance.deletePromo(id);
-    if (ok) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Promo berhasil dihapus dari database')),
-        );
-      }
+    if (ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Promo berhasil dihapus dari database'),
+          backgroundColor: Color(0xFF16A34A),
+        ),
+      );
       _loadPromos();
     }
   }
 
+  void _showEditPromoModal(Map<String, dynamic> p) {
+    final promoId = p['id']?.toString() ?? '';
+    final nameCtrl = TextEditingController(text: p['title']?.toString() ?? '');
+    final codeCtrl = TextEditingController(text: p['code']?.toString() ?? '');
+    final discountValCtrl =
+        TextEditingController(text: '${(p['discountPercent'] as num?)?.toInt() ?? 10}');
+    final maxDiscCtrl =
+        TextEditingController(text: '${(p['maxDiscount'] as num?)?.toInt() ?? 0}');
+    final minTxCtrl =
+        TextEditingController(text: '${(p['minBookingAmount'] as num?)?.toInt() ?? 0}');
+    final quotaCtrl =
+        TextEditingController(text: '${p['totalQuota'] ?? 100}');
+
+    String discountType = (p['discountType'] ?? 'Persen').toString();
+    bool isActive = p['isActive'] == true ||
+        (p['status'] ?? '').toString().toLowerCase().contains('aktif');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 20,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Edit Voucher Promo',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Nama Kampanye Promo *',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: codeCtrl,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: InputDecoration(
+                      labelText: 'Kode Promo (Kupon) *',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: discountType.toLowerCase().contains('nominal')
+                              ? 'Nominal'
+                              : 'Persen',
+                          decoration: InputDecoration(
+                            labelText: 'Tipe Diskon',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'Persen', child: Text('Persentase (%)')),
+                            DropdownMenuItem(value: 'Nominal', child: Text('Nominal (Rp)')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              setModalState(() => discountType = val);
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: discountValCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'Besaran Diskon *',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: maxDiscCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'Maks. Diskon (Rp)',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: minTxCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'Min. Belanja (Rp)',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: quotaCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Total Kuota Voucher',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Status Promo Aktif',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
+                      Switch(
+                        value: isActive,
+                        activeColor: const Color(0xFF00C2FF),
+                        onChanged: (val) {
+                          setModalState(() => isActive = val);
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00758F),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () async {
+                        final discVal = double.tryParse(discountValCtrl.text) ?? 0;
+                        if (nameCtrl.text.trim().isEmpty ||
+                            codeCtrl.text.trim().isEmpty ||
+                            discVal <= 0) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Nama, Kode, dan Besaran Diskon wajib diisi dengan benar'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+
+                        final ok = await PromoService.instance.updatePromo(
+                          promoId: promoId,
+                          name: nameCtrl.text.trim(),
+                          code: codeCtrl.text.trim(),
+                          discountValue: discVal,
+                          discountType: discountType,
+                          maxDiscount: double.tryParse(maxDiscCtrl.text),
+                          minTransaction: double.tryParse(minTxCtrl.text),
+                          totalQuota: int.tryParse(quotaCtrl.text),
+                          status: isActive ? 'Aktif' : 'Nonaktif',
+                        );
+
+                        if (mounted) {
+                          Navigator.pop(ctx);
+                          if (ok) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Voucher promo berhasil diperbarui ke database!'),
+                                backgroundColor: Color(0xFF16A34A),
+                              ),
+                            );
+                            _loadPromos();
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Gagal memperbarui voucher promo'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      child: const Text('Simpan Perubahan',
+                          style: TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final activeCount = _promos.where((p) {
+      return p['isActive'] == true ||
+          (p['status'] ?? '').toString().toLowerCase().contains('aktif');
+    }).length;
+
     return RefreshIndicator(
       onRefresh: _loadPromos,
       child: ListView(
@@ -116,7 +438,7 @@ class _PromoTabState extends State<PromoTab> {
                     ),
                     const SizedBox(width: 5),
                     Text(
-                      '${_promos.length} Aktif',
+                      '$activeCount Aktif',
                       style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
@@ -183,9 +505,130 @@ class _PromoTabState extends State<PromoTab> {
               ),
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
 
-          // 4. Daftar Voucher Header
+          // 4. Mini Stats Box
+          Row(
+            children: [
+              Expanded(
+                child: _buildMiniStat(
+                  'Total Promo',
+                  '${_promos.length}',
+                  Icons.confirmation_number_outlined,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildMiniStat(
+                  'Promo Aktif',
+                  '$activeCount',
+                  Icons.check_circle_outline,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildMiniStat(
+                  'Nonaktif',
+                  '${_promos.length - activeCount}',
+                  Icons.pause_circle_outline,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // 5. Search Bar
+          Container(
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (val) => setState(() => _searchQuery = val),
+              style: const TextStyle(fontSize: 13),
+              decoration: InputDecoration(
+                hintText: 'Cari kode kupon, nama promo, atau deskripsi...',
+                hintStyle:
+                    const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                prefixIcon:
+                    const Icon(Icons.search, size: 18, color: Color(0xFF94A3B8)),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 16),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : null,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // 6. Status Filter Chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildFilterChip(
+                  label: 'Semua Status (${_promos.length})',
+                  isSelected: _selectedStatusFilter == 'Semua',
+                  onTap: () => setState(() => _selectedStatusFilter = 'Semua'),
+                ),
+                const SizedBox(width: 8),
+                _buildFilterChip(
+                  label: 'Aktif ($activeCount)',
+                  isSelected: _selectedStatusFilter == 'Aktif',
+                  onTap: () => setState(() => _selectedStatusFilter = 'Aktif'),
+                  activeColor: const Color(0xFF16A34A),
+                ),
+                const SizedBox(width: 8),
+                _buildFilterChip(
+                  label: 'Nonaktif (${_promos.length - activeCount})',
+                  isSelected: _selectedStatusFilter == 'Nonaktif',
+                  onTap: () =>
+                      setState(() => _selectedStatusFilter = 'Nonaktif'),
+                  activeColor: const Color(0xFFDC2626),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // 7. Discount Type Filter Chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildFilterChip(
+                  label: 'Semua Tipe',
+                  isSelected: _selectedTypeFilter == 'Semua',
+                  onTap: () => setState(() => _selectedTypeFilter = 'Semua'),
+                ),
+                const SizedBox(width: 8),
+                _buildFilterChip(
+                  label: 'Diskon Persen (%)',
+                  isSelected: _selectedTypeFilter == 'Persen',
+                  onTap: () => setState(() => _selectedTypeFilter = 'Persen'),
+                ),
+                const SizedBox(width: 8),
+                _buildFilterChip(
+                  label: 'Potongan Nominal (Rp)',
+                  isSelected: _selectedTypeFilter == 'Nominal',
+                  onTap: () => setState(() => _selectedTypeFilter = 'Nominal'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // 8. Header Result
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -208,7 +651,7 @@ class _PromoTabState extends State<PromoTab> {
                       shape: BoxShape.circle,
                     ),
                     child: Text(
-                      '${_promos.length}',
+                      '${_filteredPromos.length}',
                       style: const TextStyle(
                         fontSize: 10.5,
                         fontWeight: FontWeight.w800,
@@ -222,12 +665,13 @@ class _PromoTabState extends State<PromoTab> {
           ),
           const SizedBox(height: 12),
 
+          // 9. Promo Cards List
           if (_isLoading)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 40),
               child: Center(child: CircularProgressIndicator()),
             )
-          else if (_promos.isEmpty)
+          else if (_filteredPromos.isEmpty)
             Container(
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
@@ -241,7 +685,7 @@ class _PromoTabState extends State<PromoTab> {
                       size: 40, color: Color(0xFF94A3B8)),
                   SizedBox(height: 10),
                   Text(
-                    'Belum ada voucher promo aktif',
+                    'Tidak ada voucher promo yang cocok',
                     style: TextStyle(
                       fontSize: 13.5,
                       fontWeight: FontWeight.w700,
@@ -250,7 +694,7 @@ class _PromoTabState extends State<PromoTab> {
                   ),
                   SizedBox(height: 4),
                   Text(
-                    'Klik tombol "+ Buat Voucher Promo Baru" di atas untuk menambahkan promo ke database.',
+                    'Ubah kata kunci pencarian atau sesuaikan pilihan filter.',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8)),
                   ),
@@ -258,13 +702,79 @@ class _PromoTabState extends State<PromoTab> {
               ),
             )
           else
-            for (final p in _promos) ...[
+            for (final p in _filteredPromos) ...[
               _buildDynamicPromoCard(p),
               const SizedBox(height: 12),
             ],
 
           const SizedBox(height: 24),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMiniStat(String label, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 16, color: const Color(0xFF00758F)),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF64748B),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    Color? activeColor,
+  }) {
+    final color = activeColor ?? const Color(0xFF007A94);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withOpacity(0.12) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? color : const Color(0xFFCBD5E1),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+            color: isSelected ? color : const Color(0xFF475569),
+          ),
+        ),
       ),
     );
   }
@@ -276,7 +786,7 @@ class _PromoTabState extends State<PromoTab> {
     final discountVal = p['discountPercent']?.toString() ?? '10';
     final discountType =
         p['discountType']?.toString().toLowerCase() ?? 'persen';
-    final discountBadge = discountType == 'nominal'
+    final discountBadge = discountType.contains('nominal')
         ? 'DISKON Rp $discountVal'
         : 'DISKON $discountVal%';
 
@@ -284,6 +794,9 @@ class _PromoTabState extends State<PromoTab> {
     final expired =
         expiredRaw.contains('T') ? expiredRaw.split('T').first : expiredRaw;
     final promoId = p['id']?.toString() ?? '';
+
+    final isActive = p['isActive'] == true ||
+        (p['status'] ?? '').toString().toLowerCase().contains('aktif');
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -293,7 +806,7 @@ class _PromoTabState extends State<PromoTab> {
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: Colors.black.withOpacity(0.015),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -305,27 +818,98 @@ class _PromoTabState extends State<PromoTab> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE0F4FB),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  discountBadge,
-                  style: const TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0284C7),
+              Row(
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0F4FB),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      discountBadge,
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0284C7),
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isActive
+                          ? const Color(0xFFDCFCE7)
+                          : const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      isActive ? 'Aktif' : 'Nonaktif',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w700,
+                        color: isActive
+                            ? const Color(0xFF16A34A)
+                            : const Color(0xFFDC2626),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline,
-                    size: 18, color: Color(0xFFEF4444)),
-                onPressed: () => _delete(promoId),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, size: 20, color: Color(0xFF64748B)),
+                onSelected: (val) {
+                  if (val == 'edit') {
+                    _showEditPromoModal(p);
+                  } else if (val == 'toggle') {
+                    _togglePromo(p);
+                  } else if (val == 'delete') {
+                    _delete(promoId);
+                  }
+                },
+                itemBuilder: (ctx) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit_outlined, size: 16, color: Color(0xFF0284C7)),
+                        SizedBox(width: 8),
+                        Text('Edit Promo', style: TextStyle(fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'toggle',
+                    child: Row(
+                      children: [
+                        Icon(
+                          isActive ? Icons.pause_circle_outline : Icons.play_circle_outline,
+                          size: 16,
+                          color: isActive ? Colors.orange : const Color(0xFF16A34A),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          isActive ? 'Nonaktifkan Promo' : 'Aktifkan Promo',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Hapus Promo',
+                            style: TextStyle(fontSize: 12, color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -351,7 +935,7 @@ class _PromoTabState extends State<PromoTab> {
                 onTap: () {
                   Clipboard.setData(ClipboardData(text: code));
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Kode $code disalin')),
+                    SnackBar(content: Text('Kode "$code" berhasil disalin ke clipboard')),
                   );
                 },
                 child: Container(
@@ -379,9 +963,15 @@ class _PromoTabState extends State<PromoTab> {
                   ),
                 ),
               ),
-              Text(
-                'Berlaku s/d $expired',
-                style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+              Row(
+                children: [
+                  const Icon(Icons.event_outlined, size: 12, color: Color(0xFF94A3B8)),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Berlaku s/d $expired',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                  ),
+                ],
               ),
             ],
           ),

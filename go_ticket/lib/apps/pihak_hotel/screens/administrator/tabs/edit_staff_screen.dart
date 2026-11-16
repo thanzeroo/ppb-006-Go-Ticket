@@ -1,15 +1,25 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
+import '../../../../../../core/config/supabase_config.dart';
+import '../../../../../../core/models/hotel_admin_model.dart';
+
+/// Halaman Edit Data Karyawan & Kelola Hak Akses
+/// Administrator dapat mengubah nama, kontak, shift tugas, role jabatan (3 role),
+/// status keaktifan, serta menghapus akun karyawan secara permanen.
 class EditStaffScreen extends StatefulWidget {
   final String staffName;
   final String staffId;
   final String initialRole;
+  final StaffData? staff;
 
   const EditStaffScreen({
     super.key,
-    this.staffName = 'Ni Made Anggreni, S.Tr.Par',
-    this.staffId = '#STF-2024-004',
-    this.initialRole = 'Front Office Lead',
+    this.staffName = 'Karyawan Hotel',
+    this.staffId = 'STF-001',
+    this.initialRole = 'Staf',
+    this.staff,
   });
 
   @override
@@ -26,33 +36,95 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
   late TextEditingController _nikController;
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
-  late TextEditingController _addressController;
+  late TextEditingController _shiftController;
 
-  final String _statusDuty = 'Aktif Bertugas (On-Duty)';
-  String _selectedDept = 'Front Office Department';
-  String _selectedJabatan = 'Front Office Lead / Senior';
-  int _selectedShift = 0; // 0: Pagi, 1: Siang, 2: Malam
-
-  // Permissions state (6 active, 2 locked)
-  final Map<String, bool> _permissions = {
-    'booking_approval': true,
-    'checkin_keycard': true,
-    'checkout_minibar': true,
-    'room_grid': true,
-    'complaint_wa': true,
-    'refund_deposit': true,
-    'escrow_payout': false,
-    'edit_tariff': false,
-  };
+  // 0: Staf (Front Office), 1: Maintenance, 2: Administrator
+  int _selectedRole = 0;
+  bool _isDuty = false;
+  String _statusKaryawan = 'Aktif';
+  bool _isSaving = false;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: 'Ni Made Anggreni');
-    _nikController = TextEditingController(text: '5171015509980002');
-    _emailController = TextEditingController(text: 'anggreni.fo@amoraresort.com');
-    _phoneController = TextEditingController(text: '+62 813-3982-1140');
-    _addressController = TextEditingController(text: 'Jl. Danau Tamblingan No. 24, Sanur, Denpasar');
+    final s = widget.staff;
+
+    _nameController =
+        TextEditingController(text: s?.name ?? widget.staffName);
+    _nikController = TextEditingController(text: s?.nik ?? '');
+    _emailController = TextEditingController(text: s?.email ?? '');
+    _phoneController = TextEditingController(text: s?.wa ?? '');
+    _shiftController = TextEditingController(
+        text: s?.shift ?? 'Shift Pagi (07:00 – 15:00 WIB)');
+
+    // Role mapping
+    final roleStr = (s?.roleKey ?? s?.role ?? widget.initialRole).toLowerCase();
+    if (roleStr.contains('admin')) {
+      _selectedRole = 2;
+    } else if (roleStr.contains('maint') || roleStr.contains('housekeeping')) {
+      _selectedRole = 1;
+    } else {
+      _selectedRole = 0;
+    }
+
+    _isDuty = s?.statusLabel == 'On-Duty';
+    _statusKaryawan =
+        (s?.statusLabel == 'Non-aktif' || s?.status == 'Non-aktif')
+            ? 'Non-aktif'
+            : 'Aktif';
+
+    // Fetch live data dari database jika ada informasi yang belum lengkap
+    _loadLiveStaffData();
+  }
+
+  Future<void> _loadLiveStaffData() async {
+    setState(() => _isLoading = true);
+    try {
+      final serviceKey = SupabaseConfig.supabaseServiceRoleKey.isNotEmpty
+          ? SupabaseConfig.supabaseServiceRoleKey
+          : SupabaseConfig.activeApiKey;
+
+      final uri = Uri.parse(
+          '${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableStafHotel}?id_staf=eq.${widget.staffId}&select=*');
+      final resp = await http.get(uri, headers: {
+        'apikey': serviceKey,
+        'Authorization': 'Bearer $serviceKey',
+      });
+
+      if (resp.statusCode == 200) {
+        final list = jsonDecode(resp.body) as List<dynamic>;
+        if (list.isNotEmpty && mounted) {
+          final data = list.first as Map<String, dynamic>;
+          setState(() {
+            _nameController.text = data['nama_staf'] ?? _nameController.text;
+            _nikController.text = data['nik_staf'] ?? _nikController.text;
+            _emailController.text = data['email'] ?? _emailController.text;
+            _phoneController.text =
+                data['no_telepon'] ?? _phoneController.text;
+            _shiftController.text =
+                data['shift_tugas'] ?? _shiftController.text;
+
+            final r = (data['role_jabatan'] ?? '').toString().toLowerCase();
+            if (r.contains('admin')) {
+              _selectedRole = 2;
+            } else if (r.contains('maint')) {
+              _selectedRole = 1;
+            } else {
+              _selectedRole = 0;
+            }
+
+            _isDuty = (data['status_duty'] ?? '').toString().toLowerCase() ==
+                'on';
+            _statusKaryawan = data['status_karyawan'] ?? 'Aktif';
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [EditStaff] Error loading live staff data: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -61,11 +133,156 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
     _nikController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
-    _addressController.dispose();
+    _shiftController.dispose();
     super.dispose();
   }
 
-  int get _activePermissionsCount => _permissions.values.where((v) => v).length;
+  Future<void> _submitUpdateStaff() async {
+    final name = _nameController.text.trim();
+    final phone = _phoneController.text.trim();
+    final nik = _nikController.text.trim();
+    final email = _emailController.text.trim();
+
+    if (name.isEmpty) {
+      _showError('Nama lengkap karyawan wajib diisi.');
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      final roleMapping = ['front_office', 'maintenance', 'administrator'];
+      final roleDb = roleMapping[_selectedRole.clamp(0, 2)];
+
+      final payload = {
+        'nama_staf': name,
+        'no_telepon': phone.isEmpty ? null : phone,
+        'nik_staf': nik.isEmpty ? null : nik,
+        'email': email.isEmpty ? null : email,
+        'role_jabatan': roleDb,
+        'shift_tugas': _shiftController.text.trim().isEmpty
+            ? null
+            : _shiftController.text.trim(),
+        'status_duty': _isDuty ? 'On' : 'Off',
+        'status_karyawan': _statusKaryawan,
+      };
+
+      final serviceKey = SupabaseConfig.supabaseServiceRoleKey.isNotEmpty
+          ? SupabaseConfig.supabaseServiceRoleKey
+          : SupabaseConfig.activeApiKey;
+
+      final uri = Uri.parse(
+          '${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableStafHotel}?id_staf=eq.${widget.staffId}');
+      final resp = await http.patch(
+        uri,
+        headers: {
+          'apikey': serviceKey,
+          'Authorization': 'Bearer $serviceKey',
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation',
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (resp.statusCode != 200 && resp.statusCode != 204) {
+        throw Exception('Gagal menyimpan ke database: ${resp.body}');
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Perubahan data karyawan berhasil disimpan!'),
+          backgroundColor: _teal,
+        ),
+      );
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      _showError('Gagal menyimpan perubahan: $e');
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _confirmDeleteStaff() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.warning_amber_rounded,
+                color: Color(0xFFDC2626), size: 26),
+            SizedBox(width: 8),
+            Text('Hapus Akun Karyawan?',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+          ],
+        ),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus akun ${_nameController.text} (${widget.staffId}) secara permanen? Data dan kredensial login akan terhapus.',
+          style: const TextStyle(fontSize: 12.5, color: Color(0xFF475569)),
+        ),
+        actions: [
+          OutlinedButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Hapus Akun',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isSaving = true);
+    try {
+      final serviceKey = SupabaseConfig.supabaseServiceRoleKey.isNotEmpty
+          ? SupabaseConfig.supabaseServiceRoleKey
+          : SupabaseConfig.activeApiKey;
+
+      final uri = Uri.parse(
+          '${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableStafHotel}?id_staf=eq.${widget.staffId}');
+      final resp = await http.delete(uri, headers: {
+        'apikey': serviceKey,
+        'Authorization': 'Bearer $serviceKey',
+      });
+
+      if (resp.statusCode != 200 && resp.statusCode != 204) {
+        throw Exception('Gagal menghapus: ${resp.body}');
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Akun karyawan berhasil dihapus permanen.'),
+          backgroundColor: _teal,
+        ),
+      );
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      _showError('Gagal menghapus karyawan: $e');
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFEF4444),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,7 +306,7 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
             ),
             const SizedBox(width: 8),
             const Text(
-              'Edit Data Karyawan',
+              'Kelola Akses & Data Karyawan',
               style: TextStyle(
                 color: Color(0xFF0F172A),
                 fontSize: 16,
@@ -99,61 +316,59 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.help_outline, color: Color(0xFF64748B), size: 20),
-            onPressed: () {},
-          ),
-          const Padding(
-            padding: EdgeInsets.only(right: 12),
-            child: CircleAvatar(
-              radius: 14,
-              backgroundImage: NetworkImage(
-                'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop',
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: _teal))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: Column(
+                children: [
+                  // Header Card Ringkasan Karyawan
+                  _buildProfileSummaryCard(),
+                  const SizedBox(height: 16),
+
+                  // Card 1: Data Identitas & Kontak
+                  _buildProfileInfoCard(),
+                  const SizedBox(height: 16),
+
+                  // Card 2: Role Jabatan (3 Roles Hotel)
+                  _buildRoleCard(),
+                  const SizedBox(height: 16),
+
+                  // Card 3: Penjadwalan Shift & Duty
+                  _buildShiftCard(),
+                  const SizedBox(height: 16),
+
+                  // Card 4: Status Keaktifan Akun
+                  _buildStatusCard(),
+                  const SizedBox(height: 16),
+
+                  // Card 5: Area Hapus Akun Karyawan
+                  _buildDeleteCard(),
+                  const SizedBox(height: 24),
+
+                  // Tombol Aksi Bawah: Batal & Simpan Perubahan
+                  _buildBottomButtons(),
+                  const SizedBox(height: 24),
+                ],
               ),
             ),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        child: Column(
-          children: [
-            // Top Profile Card
-            _buildProfileSummaryCard(),
-
-            const SizedBox(height: 16),
-            // Card 1: Informasi Profil
-            _buildProfileInfoCard(),
-
-            const SizedBox(height: 16),
-            // Card 2: Departemen & Penjadwalan
-            _buildDeptScheduleCard(),
-
-            const SizedBox(height: 16),
-            // Card 3: Matriks Hak Akses
-            _buildAccessMatrixCard(),
-
-            const SizedBox(height: 16),
-            // Card 4: Kredensial & Autentikasi
-            _buildCredentialsCard(),
-
-            const SizedBox(height: 16),
-            // Card 5: Area Tindakan Kritis
-            _buildCriticalActionsCard(),
-
-            const SizedBox(height: 24),
-            // Bottom Buttons
-            _buildBottomButtons(),
-
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
     );
   }
 
   Widget _buildProfileSummaryCard() {
+    final roleNames = ['Staf (Front Office)', 'Maintenance', 'Administrator'];
+    final roleColors = [
+      const Color(0xFF0284C7),
+      const Color(0xFF7C3AED),
+      const Color(0xFF15803D),
+    ];
+    final roleBgs = [
+      const Color(0xFFE0F4FB),
+      const Color(0xFFEDE9FE),
+      const Color(0xFFDCFCE7),
+    ];
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -168,179 +383,105 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
         ],
       ),
       padding: const EdgeInsets.all(16),
-      child: Column(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Avatar
-              Stack(
-                children: [
-                  Container(
-                    width: 58,
-                    height: 58,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: _cNormal, width: 2),
-                    ),
-                    child: ClipOval(
-                      child: Image.network(
-                        'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop',
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => const Center(
-                          child: Icon(Icons.person, size: 36, color: Color(0xFF005E73)),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF22C55E),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE0F2FE),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            widget.staffId,
-                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF0284C7)),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        const Text('• Sejak 12 Jan 2024', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      widget.staffName,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                    ),
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0FDFE),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFBAE6FD)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.badge_outlined, size: 10, color: Color(0xFF007A87)),
-                          const SizedBox(width: 4),
-                          Text(widget.initialRole, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF007A87))),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          CircleAvatar(
+            radius: 26,
+            backgroundColor: const Color(0xFFE0F4FB),
+            backgroundImage: widget.staff?.avatarUrl.isNotEmpty == true
+                ? NetworkImage(widget.staff!.avatarUrl)
+                : null,
+            child: (widget.staff?.avatarUrl.isEmpty ?? true)
+                ? Text(
+                    _nameController.text.isNotEmpty
+                        ? _nameController.text[0].toUpperCase()
+                        : 'S',
+                    style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: _teal),
+                  )
+                : null,
           ),
-
-          const SizedBox(height: 14),
-          // Status Kepegawaian & Tugas
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
+          const SizedBox(width: 14),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Status Kepegawaian & Tugas', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
-                    Row(
-                      children: [
-                        const Icon(Icons.circle, size: 7, color: Color(0xFF16A34A)),
-                        const SizedBox(width: 4),
-                        Text(_statusDuty, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF16A34A))),
-                        const Icon(Icons.keyboard_arrow_down, size: 14, color: Color(0xFF64748B)),
-                      ],
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        widget.staffId,
+                        style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF64748B)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: roleBgs[_selectedRole.clamp(0, 2)],
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        roleNames[_selectedRole.clamp(0, 2)],
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: roleColors[_selectedRole.clamp(0, 2)],
+                        ),
+                      ),
                     ),
                   ],
                 ),
+                const SizedBox(height: 6),
+                Text(
+                  _nameController.text.isEmpty
+                      ? 'Nama Karyawan'
+                      : _nameController.text,
+                  style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A)),
+                ),
                 const SizedBox(height: 4),
                 Row(
-                  children: const [
-                    Icon(Icons.access_time, size: 11, color: Color(0xFF94A3B8)),
-                    SizedBox(width: 4),
-                    Text('Terakhir aktif: Hari ini 13:45 WITA di Terminal FO-1', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                  children: [
+                    Icon(
+                      _isDuty ? Icons.circle : Icons.circle_outlined,
+                      size: 8,
+                      color: _isDuty
+                          ? const Color(0xFF16A34A)
+                          : const Color(0xFF94A3B8),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _isDuty
+                          ? 'Aktif Bertugas (On-Duty)'
+                          : 'Sedang Libur (Off-Duty)',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
+                        color: _isDuty
+                            ? const Color(0xFF16A34A)
+                            : const Color(0xFF64748B),
+                      ),
+                    ),
                   ],
                 ),
               ],
             ),
-          ),
-
-          const SizedBox(height: 14),
-          const Divider(height: 1, color: Color(0xFFF1F5F9)),
-          const SizedBox(height: 14),
-
-          // 3 Stat Metrics
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text('CHECK-IN', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8))),
-                    SizedBox(height: 2),
-                    Text('348', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
-                    Text('Tamu bulan ini', style: TextStyle(fontSize: 9, color: Color(0xFF64748B))),
-                  ],
-                ),
-              ),
-              Container(width: 1, height: 36, color: const Color(0xFFE2E8F0)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text('RATING FO', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8))),
-                    SizedBox(height: 2),
-                    Text('4.95 / 5', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
-                    Text('⭐ 98 ulasan tamu', style: TextStyle(fontSize: 9, color: Color(0xFFD97706), fontWeight: FontWeight.w600)),
-                  ],
-                ),
-              ),
-              Container(width: 1, height: 36, color: const Color(0xFFE2E8F0)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text('AKURASI', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8))),
-                    SizedBox(height: 2),
-                    Text('100%', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF16A34A))),
-                    Text('Selisih kas nol', style: TextStyle(fontSize: 9, color: Color(0xFF16A34A))),
-                  ],
-                ),
-              ),
-            ],
           ),
         ],
       ),
@@ -349,257 +490,120 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
 
   Widget _buildProfileInfoCard() {
     return _buildSectionContainer(
-      icon: Icons.badge_outlined,
-      title: 'Informasi Profil',
-      subtitle: 'Data legalitas & jalur komunikasi staf',
-      trailing: const Icon(Icons.lock_outline, size: 16, color: Color(0xFF94A3B8)),
+      icon: Icons.person_outline,
+      title: 'Informasi Karyawan & Kontak',
+      subtitle: 'Data personal dan kredensial komunikasi',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Nama Lengkap
-          const Text('Nama Lengkap Sesuai Identitas', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
-          const SizedBox(height: 6),
-          _buildTextFormField(
-            controller: _nameController,
-            prefixIcon: Icons.badge_outlined,
-          ),
-
+          _buildFieldLabel('Nama Lengkap Karyawan *'),
+          _buildInput(controller: _nameController, hint: 'Nama Lengkap'),
           const SizedBox(height: 12),
-          // NIK
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('NIK (KTP Bali)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFDCFCE7),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text('✔ Terverifikasi HRD', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Color(0xFF16A34A))),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          _buildTextFormField(
-            controller: _nikController,
-            prefixIcon: Icons.credit_card,
-            suffixIcon: Icons.lock_outline,
-            readOnly: true,
-          ),
-
+          _buildFieldLabel('NIK KTP Karyawan'),
+          _buildInput(controller: _nikController, hint: '16 Digit NIK'),
           const SizedBox(height: 12),
-          // Email
-          const Text('Email Resmi Akun Ops', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
-          const SizedBox(height: 6),
-          _buildTextFormField(
-            controller: _emailController,
-            prefixIcon: Icons.mail_outline,
-          ),
-
+          _buildFieldLabel('Nomor WhatsApp / HP Aktif'),
+          _buildInput(controller: _phoneController, hint: '081234567890'),
           const SizedBox(height: 12),
-          // WA
-          const Text('Nomor WhatsApp / HP Aktif', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
-          const SizedBox(height: 6),
-          _buildTextFormField(
-            controller: _phoneController,
-            prefixIcon: Icons.phone_android,
-          ),
-
-          const SizedBox(height: 12),
-          // Alamat
-          const Text('Alamat Tinggal Sekarang', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
-          const SizedBox(height: 6),
-          _buildTextFormField(
-            controller: _addressController,
-            prefixIcon: Icons.location_on_outlined,
-          ),
+          _buildFieldLabel('Email Akun Login'),
+          _buildInput(
+              controller: _emailController, hint: 'email.karyawan@hotel.com'),
         ],
       ),
     );
   }
 
-  Widget _buildDeptScheduleCard() {
+  Widget _buildRoleCard() {
     return _buildSectionContainer(
-      icon: Icons.calendar_month_outlined,
-      title: 'Departemen & Penjadwalan',
-      subtitle: 'Alokasi shift kerja & stasiun operasional',
+      icon: Icons.supervised_user_circle_outlined,
+      title: 'Role Jabatan & Hak Akses',
+      subtitle: 'Tentukan peran operasional di ekosistem pihak hotel',
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Departemen Utama', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
-          const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedDept,
-                isExpanded: true,
-                icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF64748B)),
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                items: [
-                  'Front Office Department',
-                  'Housekeeping Department',
-                  'Engineering & Maintenance',
-                  'Finance & Accounting',
-                ].map((d) => DropdownMenuItem(value: d, child: Row(
-                  children: [
-                    const Icon(Icons.domain, size: 16, color: Color(0xFF007A87)),
-                    const SizedBox(width: 8),
-                    Text(d),
-                  ],
-                ))).toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => _selectedDept = val);
-                },
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 12),
-          const Text('Jabatan / Level Tanggung Jawab', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
-          const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedJabatan,
-                isExpanded: true,
-                icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF64748B)),
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                items: [
-                  'Front Office Lead / Senior',
-                  'Front Desk Agent (Staff)',
-                  'Duty Manager',
-                  'Guest Service Officer',
-                ].map((j) => DropdownMenuItem(value: j, child: Row(
-                  children: [
-                    const Icon(Icons.military_tech_outlined, size: 16, color: Color(0xFF007A87)),
-                    const SizedBox(width: 8),
-                    Text(j),
-                  ],
-                ))).toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => _selectedJabatan = val);
-                },
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 14),
-          const Text('Shift Kerja Aktif Minggu Ini', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
-          const SizedBox(height: 8),
-
-          _buildShiftOption(
+          _buildRoleRadio(
             index: 0,
-            title: 'Shift Pagi (07.00 – 15.00 WITA)',
-            badge: 'ON-DUTY',
-            desc: 'Aktif beroperasi hari ini • Handover FO-Lead',
+            title: 'Staf (Front Office)',
+            dept: 'Front Desk & Resepsionis',
+            desc:
+                'Menangani konfirmasi Check-In / Check-Out, verifikasi reservasi booking, dan alokasi kamar.',
           ),
           const SizedBox(height: 8),
-          _buildShiftOption(
+          _buildRoleRadio(
             index: 1,
-            title: 'Shift Siang (15.00 – 23.00 WITA)',
-            desc: 'Peak arrival & dinner reservation',
+            title: 'Maintenance',
+            dept: 'Engineering & Housekeeping',
+            desc:
+                'Mengelola status kebersihan kamar, inspeksi sanitasi, dan menindaklanjuti laporan kerusakan fasilitas.',
           ),
           const SizedBox(height: 8),
-          _buildShiftOption(
+          _buildRoleRadio(
             index: 2,
-            title: 'Shift Malam (23.00 – 07.00 WITA)',
-            desc: 'Night audit & late check-in',
-          ),
-
-          const SizedBox(height: 14),
-          const Text('Nomor Stasiun / Terminal Kasir POS FO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
-          const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.desktop_windows_outlined, size: 16, color: Color(0xFF007A87)),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text('Terminal FO 01 & Terminal FO 02', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
-                ),
-                TextButton(
-                  onPressed: () {},
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(40, 20),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: const Text('UBAH', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF007A87))),
-                ),
-              ],
-            ),
+            title: 'Administrator',
+            dept: 'Manajemen Hotel & Keuangan',
+            desc:
+                'Akses penuh kelola staf, master kamar & tarif, laporan keuangan hotel, serta audit operasional.',
           ),
         ],
       ),
     );
   }
 
-  Widget _buildShiftOption({
+  Widget _buildRoleRadio({
     required int index,
     required String title,
-    String? badge,
+    required String dept,
     required String desc,
   }) {
-    final isSel = _selectedShift == index;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedShift = index),
+    final isSel = _selectedRole == index;
+    return InkWell(
+      onTap: () => setState(() => _selectedRole = index),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: isSel ? const Color(0xFFF0FDFE) : const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: isSel ? const Color(0xFF38BDF8) : const Color(0xFFE2E8F0)),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSel ? const Color(0xFF00C2FF) : const Color(0xFFE2E8F0),
+            width: isSel ? 1.6 : 1,
+          ),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              isSel ? Icons.radio_button_checked : Icons.radio_button_off,
-              size: 16,
-              color: isSel ? const Color(0xFF007A87) : const Color(0xFF94A3B8),
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Icon(
+                isSel ? Icons.radio_button_checked : Icons.radio_button_off,
+                size: 17,
+                color: isSel ? _teal : const Color(0xFF94A3B8),
+              ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
-                      if (badge != null) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFDCFCE7),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(badge, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF16A34A))),
-                        ),
-                      ],
-                    ],
+                  Text(
+                    title,
+                    style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A)),
                   ),
-                  const SizedBox(height: 2),
-                  Text(desc, style: const TextStyle(fontSize: 9, color: Color(0xFF64748B))),
+                  Text(
+                    dept,
+                    style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0284C7)),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    desc,
+                    style: const TextStyle(
+                        fontSize: 10, color: Color(0xFF64748B), height: 1.3),
+                  ),
                 ],
               ),
             ),
@@ -609,215 +613,80 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
     );
   }
 
-  Widget _buildAccessMatrixCard() {
+  Widget _buildShiftCard() {
     return _buildSectionContainer(
-      icon: Icons.shield_outlined,
-      title: 'Matriks Hak Akses',
-      subtitle: 'Kewenangan modul & persetujuan transaksi',
-      trailing: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: const Color(0xFFE0F7FA),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          '$_activePermissionsCount/8 Aktif',
-          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF007A87)),
-        ),
-      ),
+      icon: Icons.access_time_rounded,
+      title: 'Shift Tugas & Jadwal Kerja',
+      subtitle: 'Alokasi shift operasional karyawan yang terdaftar',
       child: Column(
-        children: [
-          _buildAccessRow(
-            keyName: 'booking_approval',
-            icon: Icons.verified_user_outlined,
-            title: 'Verifikasi Booking & Approval OTA',
-            desc: 'Konfirmasi reservasi Traveloka, Agoda, Booking.com',
-          ),
-          const SizedBox(height: 8),
-          _buildAccessRow(
-            keyName: 'checkin_keycard',
-            icon: Icons.vpn_key_outlined,
-            title: 'Check-In, Room Assign & Keycard Encoder',
-            desc: 'Assign nomor kamar fisik & generate RFID kunci kartu',
-          ),
-          const SizedBox(height: 8),
-          _buildAccessRow(
-            keyName: 'checkout_minibar',
-            icon: Icons.receipt_long_outlined,
-            title: 'Check-Out, Extra Bill & Denda Minibar',
-            desc: 'Posting biaya tambahan & cetak invoice tamu',
-          ),
-          const SizedBox(height: 8),
-          _buildAccessRow(
-            keyName: 'room_grid',
-            icon: Icons.grid_view_outlined,
-            title: 'Pemantauan Status Kamar (Room Grid)',
-            desc: 'Melihat visual live matriks kamar bersih/kotor HK',
-          ),
-          const SizedBox(height: 8),
-          _buildAccessRow(
-            keyName: 'complaint_wa',
-            icon: Icons.chat_bubble_outline,
-            title: 'Penanganan Komplain & Concierge WA',
-            desc: 'Akses chat tiket bantuan tamu via Go Ticket gateway',
-          ),
-          const SizedBox(height: 8),
-          _buildAccessRow(
-            keyName: 'refund_deposit',
-            icon: Icons.currency_exchange,
-            title: 'Otorisasi Refund Deposit Tunai',
-            desc: 'Maksimal limit otorisasi mandiri: Rp 500.000 / tamu',
-          ),
-          const SizedBox(height: 8),
-          _buildAccessRow(
-            keyName: 'escrow_payout',
-            icon: Icons.account_balance_outlined,
-            title: 'Rekonsiliasi Escrow & Payout Global',
-            desc: 'Eksklusif otorisasi General Manager / Direksi Keuangan',
-            isLocked: true,
-          ),
-          const SizedBox(height: 8),
-          _buildAccessRow(
-            keyName: 'edit_tariff',
-            icon: Icons.edit_note,
-            title: 'Edit Master Tarif Kamar & Dynamic Pricing',
-            desc: 'Eksklusif otorisasi GM & Revenue Management System',
-            isLocked: true,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAccessRow({
-    required String keyName,
-    required IconData icon,
-    required String title,
-    required String desc,
-    bool isLocked = false,
-  }) {
-    final isChecked = _permissions[keyName] ?? false;
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: isChecked ? const Color(0xFFF0FDFE) : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: isChecked ? const Color(0xFFBAE6FD) : const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: isChecked ? const Color(0xFF007A87) : const Color(0xFF64748B)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: isLocked ? const Color(0xFF64748B) : const Color(0xFF0F172A),
-                        ),
-                      ),
-                    ),
-                    if (isLocked) ...[
-                      const Icon(Icons.lock, size: 12, color: Color(0xFFD97706)),
-                      const SizedBox(width: 4),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(desc, style: const TextStyle(fontSize: 9, color: Color(0xFF64748B))),
-              ],
-            ),
+          _buildFieldLabel('Shift Tugas Operasional'),
+          _buildInput(
+            controller: _shiftController,
+            hint: 'Shift Pagi / Siang / Malam',
           ),
-          const SizedBox(width: 8),
-          Checkbox(
-            value: isChecked,
-            onChanged: isLocked
-                ? null
-                : (val) {
-                    setState(() => _permissions[keyName] = val ?? false);
-                  },
-            activeColor: const Color(0xFF007A87),
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-        ],
-      ),
-    );
-  }
+          const SizedBox(height: 8),
 
-  Widget _buildCredentialsCard() {
-    return _buildSectionContainer(
-      icon: Icons.key_outlined,
-      title: 'Kredensial & Autentikasi',
-      subtitle: 'Keamanan login stasiun & sesi aktif',
-      child: Column(
-        children: [
-          // 2FA Container
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _buildShiftChip('Shift Pagi (07:00 – 15:00 WIB)'),
+              _buildShiftChip('Shift Siang (15:00 – 23:00 WIB)'),
+              _buildShiftChip('Shift Malam (23:00 – 07:00 WIB)'),
+              _buildShiftChip('Normal Shift (08:00 – 17:00 WIB)'),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Switch On-Duty
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFF0FDF4),
+              color: const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFBBF7D0)),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
             child: Row(
               children: [
-                const Icon(Icons.phone_android, size: 20, color: Color(0xFF16A34A)),
+                Icon(
+                  _isDuty
+                      ? Icons.check_circle_rounded
+                      : Icons.pause_circle_outline,
+                  color: _isDuty
+                      ? const Color(0xFF16A34A)
+                      : const Color(0xFF64748B),
+                  size: 20,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text('2FA (Two-Factor Auth) Aktif', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF15803D))),
-                      Text('Terhubung Google Authenticator • Device Terverifikasi', style: TextStyle(fontSize: 9, color: Color(0xFF166534))),
+                    children: [
+                      Text(
+                        _isDuty
+                            ? 'Status: Sedang Bertugas (On-Duty)'
+                            : 'Status: Sedang Istirahat / Libur (Off-Duty)',
+                        style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF0F172A)),
+                      ),
+                      const Text(
+                        'Indikator tampil aktif di dasbor operasional hotel',
+                        style:
+                            TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                      ),
                     ],
                   ),
                 ),
-                const Icon(Icons.check_circle, size: 18, color: Color(0xFF16A34A)),
+                Switch(
+                  value: _isDuty,
+                  activeThumbColor: _cNormal,
+                  onChanged: (val) => setState(() => _isDuty = val),
+                ),
               ],
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          // Send Reset Link
-          OutlinedButton.icon(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Link reset sandi telah dikirim ke email staf')),
-              );
-            },
-            icon: const Icon(Icons.send_outlined, size: 14, color: Color(0xFF0284C7)),
-            label: const Text('Kirim Link Reset Sandi ke Email Staf', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0284C7))),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(40),
-              backgroundColor: const Color(0xFFF0F9FF),
-              side: const BorderSide(color: Color(0xFFBAE6FD)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          // Force Logout
-          OutlinedButton.icon(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Sesi seluruh perangkat staf telah diputus')),
-              );
-            },
-            icon: const Icon(Icons.logout, size: 14, color: Color(0xFFD97706)),
-            label: const Text('Paksa Log Out dari Seluruh Perangkat', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFD97706))),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(40),
-              backgroundColor: const Color(0xFFFFFBEB),
-              side: const BorderSide(color: Color(0xFFFDE68A)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
         ],
@@ -825,43 +694,159 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
     );
   }
 
-  Widget _buildCriticalActionsCard() {
+  Widget _buildShiftChip(String label) {
+    return InkWell(
+      onTap: () => setState(() => _shiftController.text = label),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFCBD5E1)),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF334155)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusCard() {
+    return _buildSectionContainer(
+      icon: Icons.toggle_on_outlined,
+      title: 'Status Akun Karyawan',
+      subtitle: 'Kendali keaktifan akses login staf ke aplikasi hotel',
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: () => setState(() => _statusKaryawan = 'Aktif'),
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: _statusKaryawan == 'Aktif'
+                      ? const Color(0xFFDCFCE7)
+                      : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: _statusKaryawan == 'Aktif'
+                        ? const Color(0xFF16A34A)
+                        : const Color(0xFFE2E8F0),
+                    width: _statusKaryawan == 'Aktif' ? 1.5 : 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(Icons.check_circle,
+                        size: 16, color: Color(0xFF16A34A)),
+                    SizedBox(width: 6),
+                    Text(
+                      'Akun Aktif',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF15803D)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: InkWell(
+              onTap: () => setState(() => _statusKaryawan = 'Non-aktif'),
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: _statusKaryawan == 'Non-aktif'
+                      ? const Color(0xFFFEE2E2)
+                      : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: _statusKaryawan == 'Non-aktif'
+                        ? const Color(0xFFDC2626)
+                        : const Color(0xFFE2E8F0),
+                    width: _statusKaryawan == 'Non-aktif' ? 1.5 : 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(Icons.block, size: 16, color: Color(0xFFDC2626)),
+                    SizedBox(width: 6),
+                    Text(
+                      'Non-aktifkan',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFDC2626)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeleteCard() {
     return Container(
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFFFEF2F2),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFFECACA)),
       ),
-      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: const [
-              Icon(Icons.warning_amber_rounded, size: 18, color: Color(0xFFDC2626)),
+              Icon(Icons.warning_amber_rounded,
+                  color: Color(0xFFDC2626), size: 20),
               SizedBox(width: 8),
-              Text('Area Tindakan Kritis', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF991B1B))),
+              Text(
+                'Tindakan Kritis / Hapus Akun',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF991B1B),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 6),
           const Text(
-            'Tindakan ini akan mencabut seluruh akses operasional staf ke sistem front office resort secara instan. Gunakan jika staf mengundurkan diri, mutasi, atau melanggar SOP berat.',
-            style: TextStyle(fontSize: 10, color: Color(0xFF7F1D1D), height: 1.4),
+            'Menghapus akun akan mencabut seluruh hak akses karyawan ini dan menghapus profilnya secara permanen dari database hotel.',
+            style: TextStyle(fontSize: 11, color: Color(0xFFB91C1C), height: 1.3),
           ),
-          const SizedBox(height: 14),
-          ElevatedButton.icon(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Akun karyawan dinonaktifkan'), backgroundColor: Colors.red),
-              );
-            },
-            icon: const Icon(Icons.person_remove, size: 16),
-            label: const Text('Nonaktifkan Akun Karyawan Ini', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size.fromHeight(42),
-              backgroundColor: const Color(0xFFB91C1C),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 42,
+            child: ElevatedButton.icon(
+              onPressed: _isSaving ? null : _confirmDeleteStaff,
+              icon: const Icon(Icons.delete_forever_rounded, size: 18),
+              label: const Text('Hapus Akun Karyawan Ini',
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
             ),
           ),
         ],
@@ -874,36 +859,49 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
       children: [
         Expanded(
           flex: 2,
-          child: OutlinedButton(
-            onPressed: () => Navigator.pop(context),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              side: const BorderSide(color: Color(0xFFCBD5E1)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          child: SizedBox(
+            height: 48,
+            child: OutlinedButton(
+              onPressed: _isSaving ? null : () => Navigator.pop(context),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFFCBD5E1)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Batal',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF475569))),
             ),
-            child: const Text('Batal', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
           ),
         ),
         const SizedBox(width: 10),
         Expanded(
-          flex: 4,
-          child: ElevatedButton.icon(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Perubahan data karyawan berhasil disimpan!'),
-                  backgroundColor: Color(0xFF007A87),
-                ),
-              );
-              Navigator.pop(context);
-            },
-            icon: const Icon(Icons.check, size: 16),
-            label: const Text('Simpan Perubahan', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _teal,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          flex: 3,
+          child: SizedBox(
+            height: 48,
+            child: ElevatedButton(
+              onPressed: _isSaving ? null : _submitUpdateStaff,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00C2FF),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              child: _isSaving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2),
+                    )
+                  : const Text(
+                      'Simpan Perubahan',
+                      style:
+                          TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
             ),
           ),
         ),
@@ -911,24 +909,38 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
     );
   }
 
-  Widget _buildTextFormField({
+  Widget _buildFieldLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: Text(
+        label,
+        style: const TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF334155)),
+      ),
+    );
+  }
+
+  Widget _buildInput({
     required TextEditingController controller,
-    required IconData prefixIcon,
-    IconData? suffixIcon,
-    bool readOnly = false,
+    required String hint,
   }) {
     return TextFormField(
       controller: controller,
-      readOnly: readOnly,
-      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+      style: const TextStyle(
+          fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
       decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
         filled: true,
-        fillColor: readOnly ? const Color(0xFFF1F5F9) : const Color(0xFFF8FAFC),
-        prefixIcon: Icon(prefixIcon, size: 16, color: const Color(0xFF007A87)),
-        suffixIcon: suffixIcon != null ? Icon(suffixIcon, size: 16, color: const Color(0xFF94A3B8)) : null,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+        fillColor: const Color(0xFFF1F5FD),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
       ),
     );
   }
@@ -938,9 +950,9 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
     required String title,
     required String subtitle,
     required Widget child,
-    Widget? trailing,
   }) {
     return Container(
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -953,17 +965,15 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
           ),
         ],
       ),
-      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                width: 32,
-                height: 32,
+                padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE0F7FA),
+                  color: const Color(0xFFE0F4FB),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(icon, color: const Color(0xFF007A87), size: 18),
@@ -975,21 +985,24 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                      style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A)),
                     ),
                     Text(
                       subtitle,
-                      style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                      style: const TextStyle(
+                          fontSize: 10.5, color: Color(0xFF64748B)),
                     ),
                   ],
                 ),
               ),
-              ?trailing,
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           const Divider(height: 1, color: Color(0xFFF1F5F9)),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           child,
         ],
       ),

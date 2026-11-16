@@ -255,6 +255,11 @@ class StorageHelper {
     await prefs.remove(AppConstants.keyCurrentUser);
     await prefs.remove(AppConstants.keyUserRole);
     await prefs.remove(AppConstants.keyManagedHotelId);
+    await prefs.remove('user_id');
+    await prefs.remove('user_name');
+    await prefs.remove('user_email');
+    await prefs.remove('user_phone');
+    await prefs.remove('user_is_verified');
     debugPrint('[StorageHelper] Session cleared (logout).');
   }
 

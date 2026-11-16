@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:go_ticket/core/config/supabase_config.dart';
 import 'package:go_ticket/core/services/auth_service.dart';
+import 'package:go_ticket/core/services/supabase_service.dart';
 import 'package:go_ticket/core/widgets/gt_ui.dart';
 import 'package:go_ticket/core/widgets/user_avatar.dart';
 
@@ -15,27 +17,87 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   late final TextEditingController _name;
   late final TextEditingController _phone;
-  final _address = TextEditingController(text: 'Kec. Kuta, Kab. Badung, Bali');
+  final _address = TextEditingController();
   late String _email;
+
+  DateTime? _birth;
+  bool? _male;
+  bool _notif = true;
+  bool _phoneEditable = false;
+  String _currency = 'IDR - Indonesian Rupiah (Rp)';
 
   @override
   void initState() {
     super.initState();
     final user = AuthService.instance.currentUser;
     _name = TextEditingController(text: user?.fullName ?? '');
-    _phone = TextEditingController(text: user?.phoneNumber ?? '+62 812-3456-7890');
+    _phone = TextEditingController(text: user?.phoneNumber ?? '');
     _email = user?.email ?? 'user@goticket.com';
+    _loadProfileFromSupabase();
   }
 
-  DateTime _birth = DateTime(1994, 8, 14);
-  bool _male = true;
-  bool _notif = true;
-  bool _phoneEditable = false;
-  String _currency = 'IDR - Indonesian Rupiah (Rp)';
+  Future<void> _loadProfileFromSupabase() async {
+    final user = AuthService.instance.currentUser;
+    if (user == null) return;
+    final sb = SupabaseService.instance;
+    if (sb.isReady && sb.client != null) {
+      try {
+        final uid = int.tryParse(user.id);
+        if (uid != null) {
+          final res = await sb
+              .table(SupabaseConfig.tableUsers)
+              ?.select()
+              .eq('id_user', uid)
+              .maybeSingle();
+          if (res != null && mounted) {
+            setState(() {
+              if (res['nama_lengkap'] != null &&
+                  res['nama_lengkap'].toString().isNotEmpty) {
+                _name.text = res['nama_lengkap'];
+              }
+              if (res['no_telepon'] != null &&
+                  res['no_telepon'].toString().isNotEmpty) {
+                _phone.text = res['no_telepon'];
+              }
+              if (res['alamat_domisili'] != null &&
+                  res['alamat_domisili'].toString().isNotEmpty) {
+                _address.text = res['alamat_domisili'];
+              }
+              if (res['jenis_kelamin'] != null &&
+                  res['jenis_kelamin'].toString().isNotEmpty) {
+                final g = res['jenis_kelamin'].toString().toLowerCase();
+                if (g.contains('laki')) {
+                  _male = true;
+                } else if (g.contains('perempuan')) {
+                  _male = false;
+                }
+              }
+              if (res['tanggal_lahir'] != null) {
+                final d = DateTime.tryParse(res['tanggal_lahir'].toString());
+                if (d != null) _birth = d;
+              }
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ Error fetching profile: $e');
+      }
+    }
+  }
 
   static const _months = [
-    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli',
-    'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember'
   ];
 
   @override
@@ -49,7 +111,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _pickDate() async {
     final d = await showDatePicker(
       context: context,
-      initialDate: _birth,
+      initialDate: _birth ?? DateTime(2000, 1, 1),
       firstDate: DateTime(1940),
       lastDate: DateTime.now(),
     );
@@ -66,10 +128,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await AuthService.instance.updateProfile(
         fullName: _name.text.trim(),
         phone: _phone.text.trim(),
+        birthDate: _birth,
+        gender: _male == null ? null : (_male! ? 'Laki-laki' : 'Perempuan'),
+        address: _address.text.trim().isNotEmpty ? _address.text.trim() : null,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Profil berhasil disimpan')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profil berhasil disimpan ke Supabase')));
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
@@ -215,17 +280,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onTap: _pickDate,
                   child: _static(
                       Icons.cake_outlined,
-                      '${_birth.day} ${_months[_birth.month - 1]} ${_birth.year}',
+                      _birth != null
+                          ? '${_birth!.day} ${_months[_birth!.month - 1]} ${_birth!.year}'
+                          : 'Pilih tanggal lahir (opsional)',
                       trailing: const Icon(Icons.calendar_month_outlined,
                           color: GT.teal)),
                 ),
                 const SizedBox(height: 14),
                 _label('Jenis Kelamin'),
                 Row(children: [
-                  _gender('Laki-laki', Icons.male, _male,
+                  _gender('Laki-laki', Icons.male, _male == true,
                       () => setState(() => _male = true)),
                   const SizedBox(width: 10),
-                  _gender('Perempuan', Icons.female, !_male,
+                  _gender('Perempuan', Icons.female, _male == false,
                       () => setState(() => _male = false)),
                 ]),
                 const SizedBox(height: 14),
@@ -238,6 +305,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     controller: _address,
                     maxLines: 3,
                     decoration: const InputDecoration(
+                      hintText: 'Masukkan alamat domisili lengkap (opsional)',
+                      hintStyle: TextStyle(color: GT.muted, fontSize: 13),
                       border: InputBorder.none,
                       prefixIcon: Align(
                         widthFactor: 1,

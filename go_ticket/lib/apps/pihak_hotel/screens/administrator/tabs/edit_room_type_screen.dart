@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../../../../../../core/config/supabase_config.dart';
+import '../../../../../../core/services/supabase_service.dart';
+
 class EditRoomTypeScreen extends StatefulWidget {
+  final String? roomId;
   final String roomName;
   final String category;
 
   const EditRoomTypeScreen({
     super.key,
+    this.roomId,
     this.roomName = 'Standar Twin Suite',
     this.category = 'Suite Mewah (Luxury Suite)',
   });
@@ -24,6 +29,7 @@ class _EditRoomTypeScreenState extends State<EditRoomTypeScreen> {
   bool _extraBed = true;
   bool _surgePricing = true;
   int _cancellationPolicy = 0; // 0: Fleksibel H-2, 1: Non-Refundable
+  bool _isSaving = false;
 
   late TextEditingController _nameController;
   late TextEditingController _weekdayPriceController;
@@ -96,6 +102,66 @@ class _EditRoomTypeScreenState extends State<EditRoomTypeScreen> {
     _weekendPriceController.dispose();
     _depositController.dispose();
     super.dispose();
+  }
+
+  Future<void> _submitUpdateRoom() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nama tipe kamar wajib diisi'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      final rawWeekday =
+          _weekdayPriceController.text.replaceAll(RegExp(r'[^0-9]'), '');
+      final rawWeekend =
+          _weekendPriceController.text.replaceAll(RegExp(r'[^0-9]'), '');
+      final weekdayPrice = double.tryParse(rawWeekday) ?? 500000.0;
+      final weekendPrice =
+          double.tryParse(rawWeekend) ?? (weekdayPrice * 1.15);
+
+      final sb = SupabaseService.instance;
+      if (sb.isReady) {
+        if (widget.roomId != null && widget.roomId!.isNotEmpty) {
+          await sb.table(SupabaseConfig.tableTipeKamar)?.update({
+            'nama_tipe': name,
+            'harga_dasar': weekdayPrice,
+            'harga_weekend': weekendPrice,
+          }).eq('id_tipe_kamar', widget.roomId!);
+        } else {
+          await sb.table(SupabaseConfig.tableTipeKamar)?.update({
+            'nama_tipe': name,
+            'harga_dasar': weekdayPrice,
+            'harga_weekend': weekendPrice,
+          }).eq('nama_tipe', widget.roomName);
+        }
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Perubahan tipe kamar berhasil disimpan ke database!'),
+          backgroundColor: Color(0xFF007A87),
+        ),
+      );
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal menyimpan perubahan: $e'),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
@@ -1300,22 +1366,27 @@ class _EditRoomTypeScreenState extends State<EditRoomTypeScreen> {
         Expanded(
           flex: 4,
           child: ElevatedButton.icon(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Perubahan tipe kamar berhasil disimpan!'),
-                  backgroundColor: Color(0xFF007A87),
-                ),
-              );
-              Navigator.pop(context);
-            },
-            icon: const Icon(Icons.check, size: 16),
-            label: const Text('Simpan Perubahan Kamar', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            onPressed: _isSaving ? null : _submitUpdateRoom,
+            icon: _isSaving
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.check, size: 16),
+            label: Text(
+              _isSaving ? 'Menyimpan...' : 'Simpan Perubahan Kamar',
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF007A87),
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
             ),
           ),
         ),

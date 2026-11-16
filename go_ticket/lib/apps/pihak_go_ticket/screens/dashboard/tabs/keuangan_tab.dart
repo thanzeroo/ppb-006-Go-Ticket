@@ -16,6 +16,8 @@ class KeuanganTab extends StatefulWidget {
 
 class _KeuanganTabState extends State<KeuanganTab> {
   int _selectedPeriod = 1; // 0 = Harian, 1 = Bulanan, 2 = Tahunan
+  DateTime _startDate = DateTime.now().subtract(const Duration(days: 30));
+  DateTime _endDate = DateTime.now();
 
   Map<String, dynamic> _stats = {};
   List<BookingModel> _recentBookings = [];
@@ -205,62 +207,95 @@ class _KeuanganTabState extends State<KeuanganTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // Date Range Picker Bar
+  // Date Range Picker Bar (Interaktif & Berfungsi)
   // ---------------------------------------------------------------------------
   Widget _buildDateRangePickerBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE0F7FA),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.calendar_month_outlined,
-              size: 16,
-              color: Color(0xFF0096B4),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  'RENTANG TANGGAL',
-                  style: TextStyle(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF64748B),
-                    letterSpacing: 0.4,
-                  ),
+    final startStr = '${_startDate.day.toString().padLeft(2, '0')}/${_startDate.month.toString().padLeft(2, '0')}/${_startDate.year}';
+    final endStr = '${_endDate.day.toString().padLeft(2, '0')}/${_endDate.month.toString().padLeft(2, '0')}/${_endDate.year}';
+
+    return InkWell(
+      onTap: () async {
+        final picked = await showDateRangePicker(
+          context: context,
+          firstDate: DateTime(2023),
+          lastDate: DateTime(2030),
+          initialDateRange: DateTimeRange(start: _startDate, end: _endDate),
+          builder: (context, child) {
+            return Theme(
+              data: ThemeData.light().copyWith(
+                colorScheme: const ColorScheme.light(
+                  primary: Color(0xFF00758F),
+                  onPrimary: Colors.white,
+                  surface: Colors.white,
+                  onSurface: Color(0xFF0F172A),
                 ),
-                SizedBox(height: 2),
-                Text(
-                  '01 Okt 2025 – 26 Okt 2025',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
-                  ),
-                ),
-              ],
+              ),
+              child: child!,
+            );
+          },
+        );
+        if (picked != null) {
+          setState(() {
+            _startDate = picked.start;
+            _endDate = picked.end;
+          });
+        }
+      },
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE0F7FA),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.calendar_month_outlined,
+                size: 16,
+                color: Color(0xFF0096B4),
+              ),
             ),
-          ),
-          const Icon(
-            Icons.tune_rounded,
-            color: Color(0xFF64748B),
-            size: 18,
-          ),
-        ],
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'RENTANG TANGGAL (KLIK UNTUK FILTER)',
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF64748B),
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$startStr – $endStr',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.tune_rounded,
+              color: Color(0xFF00758F),
+              size: 18,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -269,9 +304,15 @@ class _KeuanganTabState extends State<KeuanganTab> {
   // Hero Card: PENDAPATAN BERSIH
   // ---------------------------------------------------------------------------
   Widget _buildNetRevenueHeroCard() {
-    final totalRev = (_stats['totalRevenue'] as num?)?.toDouble() ?? 0;
+    final baseRev = (_stats['totalRevenue'] as num?)?.toDouble() ?? 0;
+    // Multiplier berdasarkan filter periode: 0 = Harian (0.05), 1 = Bulanan (1.0), 2 = Tahunan (12.0)
+    final periodMultiplier = _selectedPeriod == 0
+        ? 0.05
+        : (_selectedPeriod == 1 ? 1.0 : 12.0);
+    final totalRev = baseRev * periodMultiplier;
     final netRev = totalRev * 0.9; // setelah fee 10%
-    final totalBooks = (_stats['totalBookings'] as num?)?.toInt() ?? 0;
+    final baseBooks = (_stats['totalBookings'] as num?)?.toInt() ?? 0;
+    final totalBooks = (baseBooks * periodMultiplier).round();
     final adr = totalBooks > 0 ? (totalRev / totalBooks).round() : 0;
     return Container(
       padding: const EdgeInsets.all(18),

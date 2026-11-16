@@ -86,18 +86,30 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
   List<Map<String, dynamic>> get _filteredHotels {
     final query = _searchQuery.trim().toLowerCase();
     final hotels = _hotels.where((hotel) {
+      final category = hotel['category']?.toString() ?? 'Semua';
       final matchesCategory =
-          _activeCategory == 'Semua' || hotel['category'] == _activeCategory;
+          _activeCategory == 'Semua' || category == _activeCategory;
+
+      final folders = (hotel['folders'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          <String>[];
       final matchesFolder =
-          _activeFolder == null ||
-          (hotel['folders'] as List<String>).contains(_activeFolder);
-      final searchableText =
-          '${hotel['name']} ${hotel['location']} ${hotel['type']}'
-              .toLowerCase();
+          _activeFolder == null || folders.contains(_activeFolder);
+
+      final name = hotel['name']?.toString() ?? '';
+      final location = hotel['location']?.toString() ?? '';
+      final type = hotel['type']?.toString() ?? '';
+      final searchableText = '$name $location $type'.toLowerCase();
       final matchesSearch = query.isEmpty || searchableText.contains(query);
-      final matchesPrice = (hotel['priceValue'] as int) <= _filters.maxPrice;
+
+      final priceVal = (hotel['priceValue'] as num?)?.toInt() ??
+          int.tryParse(hotel['priceValue']?.toString() ?? '0') ??
+          0;
+      final matchesPrice = priceVal <= _filters.maxPrice;
       final matchesPromotion =
           !_filters.promotionsOnly || hotel['discount'] != null;
+
       return matchesCategory &&
           matchesFolder &&
           matchesSearch &&
@@ -105,23 +117,23 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
           matchesPromotion;
     }).toList();
 
+    int parsePrice(Map<String, dynamic> h) =>
+        (h['priceValue'] as num?)?.toInt() ??
+        int.tryParse(h['priceValue']?.toString() ?? '0') ??
+        0;
+
+    double parseRating(Map<String, dynamic> h) =>
+        double.tryParse(h['rating']?.toString() ?? '0') ?? 0.0;
+
     switch (_filters.sortOrder) {
       case _HotelSortOrder.recommended:
         break;
       case _HotelSortOrder.priceLowToHigh:
-        hotels.sort(
-          (a, b) => (a['priceValue'] as int).compareTo(b['priceValue'] as int),
-        );
+        hotels.sort((a, b) => parsePrice(a).compareTo(parsePrice(b)));
       case _HotelSortOrder.priceHighToLow:
-        hotels.sort(
-          (a, b) => (b['priceValue'] as int).compareTo(a['priceValue'] as int),
-        );
+        hotels.sort((a, b) => parsePrice(b).compareTo(parsePrice(a)));
       case _HotelSortOrder.ratingHighToLow:
-        hotels.sort(
-          (a, b) => double.parse(
-            b['rating'] as String,
-          ).compareTo(double.parse(a['rating'] as String)),
-        );
+        hotels.sort((a, b) => parseRating(b).compareTo(parseRating(a)));
     }
     return hotels;
   }
@@ -709,6 +721,22 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
   }
 
   Widget _buildHotelCard(Map<String, dynamic> hotel) {
+    final imageUrl = hotel['imageUrl']?.toString() ??
+        'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600';
+    final typeName = hotel['type']?.toString() ?? 'Resor';
+    final locationText = hotel['location']?.toString() ?? '';
+    final hotelName = hotel['name']?.toString() ?? 'Penginapan';
+    final discount = hotel['discount']?.toString();
+    final features = (hotel['features'] as List?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        <String>['WiFi Cepat', 'Kolam Renang', 'AC'];
+    final extras = (hotel['extras'] as List?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        <String>[];
+    final availability = hotel['availability']?.toString();
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -732,7 +760,7 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
                   top: Radius.circular(16),
                 ),
                 child: Image.network(
-                  hotel['imageUrl'] as String,
+                  imageUrl,
                   height: 180,
                   width: double.infinity,
                   fit: BoxFit.cover,
@@ -764,7 +792,7 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
                       const Icon(Icons.terrain, color: Colors.white, size: 12),
                       const SizedBox(width: 4),
                       Text(
-                        hotel['type'] as String,
+                        typeName,
                         style: GoogleFonts.inter(
                           color: Colors.white,
                           fontSize: 11,
@@ -775,7 +803,7 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
                   ),
                 ),
               ),
-              if (hotel['discount'] != null)
+              if (discount != null && discount.isNotEmpty)
                 Positioned(
                   top: 10,
                   left: 10,
@@ -789,7 +817,7 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      '🔥 ${hotel['discount']}',
+                      '🔥 $discount',
                       style: GoogleFonts.inter(
                         color: Colors.white,
                         fontSize: 11,
@@ -832,7 +860,7 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
                     const SizedBox(width: 3),
                     Expanded(
                       child: Text(
-                        hotel['location'] as String,
+                        locationText,
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           color: const Color(0xFF6B7280),
@@ -844,7 +872,7 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  hotel['name'] as String,
+                  hotelName,
                   style: GoogleFonts.inter(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -856,7 +884,7 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
                   spacing: 8,
                   runSpacing: 4,
                   children: [
-                    ...(hotel['features'] as List<String>).map(
+                    ...features.map(
                       (f) => Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -876,7 +904,7 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
                         ],
                       ),
                     ),
-                    ...(hotel['extras'] as List<String>).map(
+                    ...extras.map(
                       (e) => Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -934,29 +962,23 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
                     ),
                     Row(
                       children: [
-                        if (hotel['availability'] != null)
+                        if (availability != null && availability.isNotEmpty)
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color:
-                                  (hotel['availability'] as String).contains(
-                                    'Tersedia',
-                                  )
+                              color: availability.contains('Tersedia')
                                   ? const Color(0xFFF0FDF4)
                                   : const Color(0xFFEFF6FF),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
-                              hotel['availability'] as String,
+                              availability,
                               style: GoogleFonts.inter(
                                 fontSize: 11,
-                                color:
-                                    (hotel['availability'] as String).contains(
-                                      'Tersedia',
-                                    )
+                                color: availability.contains('Tersedia')
                                     ? const Color(0xFF16A34A)
                                     : const Color(0xFF3B82F6),
                                 fontWeight: FontWeight.w600,

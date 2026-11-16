@@ -148,6 +148,10 @@ class HotelModel {
   final int? _originalPrice;
   final bool? _isRecommended;
   final bool? _isPopular;
+  final String? _whatsapp;
+  final String? _checkInTime;
+  final String? _checkOutTime;
+  final String? _cancellationPolicy;
 
   const HotelModel({
     required this.id,
@@ -178,6 +182,10 @@ class HotelModel {
     int? starRating,
     bool? isRecommended,
     bool? isPopular,
+    String? whatsapp,
+    String? checkInTime,
+    String? checkOutTime,
+    String? cancellationPolicy,
     this.totalRooms,
     this.registeredAt,
     this.approvedAt,
@@ -187,7 +195,11 @@ class HotelModel {
         _originalPrice = originalPrice,
         _starRating = starRating,
         _isRecommended = isRecommended,
-        _isPopular = isPopular;
+        _isPopular = isPopular,
+        _whatsapp = whatsapp,
+        _checkInTime = checkInTime,
+        _checkOutTime = checkOutTime,
+        _cancellationPolicy = cancellationPolicy;
 
   // ---------------------------------------------------------------------------
   // CONVENIENCE GETTERS
@@ -213,6 +225,13 @@ class HotelModel {
   int get starRating => _starRating ?? 4;
   bool get isRecommended => _isRecommended ?? true;
   bool get isPopular => _isPopular ?? (rating >= 4.5);
+
+  /// Getter alias untuk kontak & kebijakan
+  String? get phone => phoneNumber;
+  String? get whatsapp => _whatsapp ?? phoneNumber;
+  String? get checkInTime => _checkInTime;
+  String? get checkOutTime => _checkOutTime;
+  String? get cancellationPolicy => _cancellationPolicy;
 
   // ---------------------------------------------------------------------------
   // SERIALIZATION
@@ -268,6 +287,10 @@ class HotelModel {
           (json['harga_dasar'] as num?)?.toInt() ??
           350000,
       totalRooms: json['total_rooms'] ?? 20,
+      whatsapp: json['whatsapp']?.toString(),
+      checkInTime: json['waktu_checkin']?.toString() ?? json['check_in_time']?.toString(),
+      checkOutTime: json['waktu_checkout']?.toString() ?? json['check_out_time']?.toString(),
+      cancellationPolicy: json['kebijakan_batal']?.toString() ?? json['cancellation_policy']?.toString(),
       registeredAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'])
           : null,
@@ -301,6 +324,10 @@ class HotelModel {
       'admin_user_id': adminUserId,
       'starting_price': startingPrice,
       'total_rooms': totalRooms,
+      'whatsapp': _whatsapp,
+      'waktu_checkin': _checkInTime,
+      'waktu_checkout': _checkOutTime,
+      'kebijakan_batal': _cancellationPolicy,
     };
   }
 
@@ -316,6 +343,11 @@ class HotelModel {
     int? reviewCount,
     HotelStatus? status,
     int? startingPrice,
+    String? phoneNumber,
+    String? whatsapp,
+    String? checkInTime,
+    String? checkOutTime,
+    String? cancellationPolicy,
   }) {
     return HotelModel(
       id: id ?? this.id,
@@ -328,7 +360,7 @@ class HotelModel {
       postalCode: postalCode,
       latitude: latitude,
       longitude: longitude,
-      phoneNumber: phoneNumber,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
       email: email,
       website: website,
       mainImageUrl: mainImageUrl,
@@ -340,6 +372,10 @@ class HotelModel {
       adminUserId: adminUserId,
       startingPrice: startingPrice ?? this.startingPrice,
       totalRooms: totalRooms,
+      whatsapp: whatsapp ?? this.whatsapp,
+      checkInTime: checkInTime ?? this.checkInTime,
+      checkOutTime: checkOutTime ?? this.checkOutTime,
+      cancellationPolicy: cancellationPolicy ?? this.cancellationPolicy,
     );
   }
 

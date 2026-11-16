@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../../../pihak_user/screens/auth/terms_and_policy_screen.dart';
+import '../../../../../core/models/booking_model.dart';
+import '../../../../../core/models/room_model.dart';
 import '../../../../../core/models/user_model.dart';
 import '../../../../../core/services/auth_service.dart';
+import '../../../../../core/services/booking_service.dart';
+import '../../../../../core/services/hotel_service.dart';
 
-/// Tab 1: Overview Dashboard Front Office
+/// Tab 1: Overview Dashboard Front Office (100% Dinamis dari Database)
 class FoDashboardTab extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
 
@@ -14,6 +18,37 @@ class FoDashboardTab extends StatefulWidget {
 }
 
 class _FoDashboardTabState extends State<FoDashboardTab> {
+  List<RoomModel> _rooms = [];
+  List<BookingModel> _bookings = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSummary();
+  }
+
+  Future<void> _loadSummary() async {
+    setState(() => _isLoading = true);
+    final userHotelId = AuthService.instance.currentUser?.managedHotelId;
+    final hotelId = (userHotelId != null && userHotelId.isNotEmpty) ? userHotelId : '1';
+    try {
+      final results = await Future.wait([
+        HotelService.instance.getRoomsByHotel(hotelId),
+        BookingService.instance.getHotelBookings(hotelId),
+      ]);
+      if (mounted) {
+        setState(() {
+          _rooms = results[0] as List<RoomModel>;
+          _bookings = results[1] as List<BookingModel>;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   void _showActionSnackbar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -25,8 +60,73 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
     );
   }
 
+  void _showRoomStatusDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Status Kamar Hotel',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: _rooms.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text('Belum ada data kamar terdaftar di database.',
+                      textAlign: TextAlign.center),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _rooms.length,
+                  itemBuilder: (ctx, i) {
+                    final r = _rooms[i];
+                    return ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.meeting_room_outlined,
+                          color: Color(0xFF0284C7)),
+                      title: Text(r.typeName,
+                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: Text('Rp ${r.pricePerNight.toInt()} / malam'),
+                      trailing: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: r.status == RoomStatus.available
+                              ? const Color(0xFFDCFCE7)
+                              : const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          r.status.displayName,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: r.status == RoomStatus.available
+                                ? const Color(0xFF15803D)
+                                : const Color(0xFFB45309),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading && _rooms.isEmpty && _bookings.isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFF00C2FF)),
+      );
+    }
     return _buildDashboardTab();
   }
 
@@ -38,9 +138,39 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
         : 'FO';
     final roleLabel = currentUser?.role.displayName ?? 'Front Office & Resepsionis';
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-      child: Column(
+    final totalRooms = _rooms.isEmpty ? 50 : _rooms.length;
+    final occupiedRooms =
+        _rooms.where((r) => r.status == RoomStatus.occupied).length;
+    final occupancyPercent =
+        totalRooms > 0 ? ((occupiedRooms / totalRooms) * 100).round() : 0;
+
+    final totalCheckIn = _bookings
+        .where((b) =>
+            b.status == BookingStatus.checkedIn ||
+            b.status == BookingStatus.confirmed)
+        .length;
+    final pendingCheckIn =
+        _bookings.where((b) => b.status == BookingStatus.confirmed).length;
+    final doneCheckIn =
+        _bookings.where((b) => b.status == BookingStatus.checkedIn).length;
+
+    final checkOutCount =
+        _bookings.where((b) => b.status == BookingStatus.checkedOut).length;
+    final dirtyRoomsCount =
+        _rooms.where((r) => r.status == RoomStatus.dirty).length;
+
+    final pendingVerificationCount = _bookings
+        .where((b) =>
+            b.status == BookingStatus.pendingVerification ||
+            b.status == BookingStatus.pendingPayment)
+        .length;
+
+    return RefreshIndicator(
+      onRefresh: _loadSummary,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header Card Profile User (Dinamis dari AuthService)
@@ -349,7 +479,7 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
                       const SizedBox(height: 10),
                       Row(
                         children: [
-                          // Circular 82%
+                          // Circular %
                           Container(
                             width: 44,
                             height: 44,
@@ -358,9 +488,9 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
                               border: Border.all(color: const Color(0xFF00C2FF), width: 3),
                             ),
                             alignment: Alignment.center,
-                            child: const Text(
-                              '82%',
-                              style: TextStyle(
+                            child: Text(
+                              '$occupancyPercent%',
+                              style: const TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w800,
                                 color: Color(0xFF0F172A),
@@ -370,16 +500,16 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
                           const SizedBox(width: 10),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
+                            children: [
                               Text(
-                                '41 /50',
-                                style: TextStyle(
+                                '$occupiedRooms /$totalRooms',
+                                style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w800,
                                   color: Color(0xFF0F172A),
                                 ),
                               ),
-                              Text(
+                              const Text(
                                 'Kamar terisi',
                                 style: TextStyle(
                                   fontSize: 10.5,
@@ -394,10 +524,10 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
                       const SizedBox(height: 10),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(4),
-                        child: const LinearProgressIndicator(
-                          value: 0.82,
-                          backgroundColor: Color(0xFFF1F5F9),
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00C2FF)),
+                        child: LinearProgressIndicator(
+                          value: (occupancyPercent / 100.0).clamp(0.0, 1.0),
+                          backgroundColor: const Color(0xFFF1F5F9),
+                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00C2FF)),
                           minHeight: 5,
                         ),
                       ),
@@ -431,17 +561,17 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.baseline,
                         textBaseline: TextBaseline.alphabetic,
-                        children: const [
+                        children: [
                           Text(
-                            '8',
-                            style: TextStyle(
+                            '$totalCheckIn',
+                            style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.w900,
                               color: Color(0xFF0F172A),
                             ),
                           ),
-                          SizedBox(width: 6),
-                          Text(
+                          const SizedBox(width: 6),
+                          const Text(
                             'Tamu',
                             style: TextStyle(
                               fontSize: 12,
@@ -451,9 +581,9 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        '3 Menunggu • 5 Selesai',
-                        style: TextStyle(
+                      Text(
+                        '$pendingCheckIn Menunggu • $doneCheckIn Selesai',
+                        style: const TextStyle(
                           fontSize: 10.5,
                           color: Color(0xFF64748B),
                         ),
@@ -470,9 +600,9 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
                             ),
                           ),
                           const SizedBox(width: 5),
-                          const Text(
-                            '3 tamu tiba siang',
-                            style: TextStyle(
+                          Text(
+                            pendingCheckIn > 0 ? '$pendingCheckIn siap check-in' : 'Semua telah check-in',
+                            style: const TextStyle(
                               fontSize: 10.5,
                               fontWeight: FontWeight.w600,
                               color: Color(0xFF0284C7),
@@ -514,17 +644,17 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.baseline,
                         textBaseline: TextBaseline.alphabetic,
-                        children: const [
+                        children: [
                           Text(
-                            '5',
-                            style: TextStyle(
+                            '$checkOutCount',
+                            style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.w900,
                               color: Color(0xFF0F172A),
                             ),
                           ),
-                          SizedBox(width: 6),
-                          Text(
+                          const SizedBox(width: 6),
+                          const Text(
                             'Kamar',
                             style: TextStyle(
                               fontSize: 12,
@@ -534,9 +664,9 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        '2 Perlu Bersih • 3 Beres',
-                        style: TextStyle(
+                      Text(
+                        '$dirtyRoomsCount Perlu Bersih • $checkOutCount Beres',
+                        style: const TextStyle(
                           fontSize: 10.5,
                           color: Color(0xFF64748B),
                         ),
@@ -553,9 +683,9 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
                             ),
                           ),
                           const SizedBox(width: 5),
-                          const Text(
-                            '2 menunggu turn',
-                            style: TextStyle(
+                          Text(
+                            '$dirtyRoomsCount unit kotor',
+                            style: const TextStyle(
                               fontSize: 10.5,
                               color: Color(0xFF64748B),
                             ),
@@ -592,17 +722,17 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.baseline,
                         textBaseline: TextBaseline.alphabetic,
-                        children: const [
+                        children: [
                           Text(
-                            '3',
-                            style: TextStyle(
+                            '$pendingVerificationCount',
+                            style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.w900,
                               color: Color(0xFF0F172A),
                             ),
                           ),
-                          SizedBox(width: 6),
-                          Text(
+                          const SizedBox(width: 6),
+                          const Text(
                             'Pending',
                             style: TextStyle(
                               fontSize: 12,
@@ -632,9 +762,9 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
                             ),
                           ),
                           const SizedBox(width: 5),
-                          const Text(
-                            'Perlu disetujui',
-                            style: TextStyle(
+                          Text(
+                            pendingVerificationCount > 0 ? '$pendingVerificationCount perlu disetujui' : 'Semua telah diverifikasi',
+                            style: const TextStyle(
                               fontSize: 10.5,
                               fontWeight: FontWeight.w600,
                               color: Color(0xFFDC2626),
@@ -669,7 +799,7 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
                   icon: Icons.qr_code_2_rounded,
                   iconBg: const Color(0xFFBAF0FD),
                   iconColor: const Color(0xFF00758F),
-                  title: 'Scan QR Tike',
+                  title: 'Scan QR Tiket',
                   subtitle: 'Validasi Tamu',
                   onTap: () => widget.onNavigateTab?.call(2), // ke check-in
                 ),
@@ -680,9 +810,9 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
                   icon: Icons.hotel_rounded,
                   iconBg: const Color(0xFFBAF0FD),
                   iconColor: const Color(0xFF00758F),
-                  title: 'Cek Status Kam',
-                  subtitle: 'Grid Kamar 1–50',
-                  onTap: () => _showActionSnackbar('Membuka Grid Status Kamar 1-50...'),
+                  title: 'Cek Status Kamar',
+                  subtitle: 'Kamar Hotel',
+                  onTap: _showRoomStatusDialog,
                 ),
               ),
             ],
@@ -737,8 +867,9 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
           const SizedBox(height: 16),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildSummaryCard({required Widget child}) {
     return Container(

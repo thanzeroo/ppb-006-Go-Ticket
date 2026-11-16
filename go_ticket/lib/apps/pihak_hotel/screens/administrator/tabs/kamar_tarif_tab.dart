@@ -8,8 +8,9 @@ import 'edit_room_type_screen.dart';
 /// Tab 2: Master Kamar & Kelola Tarif Administrator
 class KamarTarifTab extends StatefulWidget {
   final List<RoomTypeData> rooms;
+  final VoidCallback? onRefresh;
 
-  const KamarTarifTab({super.key, required this.rooms});
+  const KamarTarifTab({super.key, required this.rooms, this.onRefresh});
 
   @override
   State<KamarTarifTab> createState() => _KamarTarifTabState();
@@ -38,11 +39,14 @@ class _KamarTarifTabState extends State<KamarTarifTab> {
 
         // Bright Cyan Pill Button: + Tambah Tipe Kamar Baru
         ElevatedButton.icon(
-          onPressed: () {
-            Navigator.push(
+          onPressed: () async {
+            final res = await Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const AddRoomTypeScreen()),
             );
+            if (res == true) {
+              widget.onRefresh?.call();
+            }
           },
           icon: const Icon(Icons.add_circle_outline, size: 16),
           label: const Text(
@@ -328,8 +332,8 @@ class _KamarTarifTabState extends State<KamarTarifTab> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
+                        onPressed: () async {
+                          final res = await Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) => EditRoomTypeScreen(
@@ -338,6 +342,9 @@ class _KamarTarifTabState extends State<KamarTarifTab> {
                               ),
                             ),
                           );
+                          if (res == true) {
+                            widget.onRefresh?.call();
+                          }
                         },
                         icon: const Icon(Icons.edit_outlined, size: 14),
                         label: const Text('Edit Kamar'),

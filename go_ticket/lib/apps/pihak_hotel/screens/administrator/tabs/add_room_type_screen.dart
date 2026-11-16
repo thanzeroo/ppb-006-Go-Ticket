@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../../../../core/models/room_model.dart';
+import '../../../../../../core/services/auth_service.dart';
+import '../../../../../../core/services/hotel_service.dart';
+
 class AddRoomTypeScreen extends StatefulWidget {
   const AddRoomTypeScreen({super.key});
 
@@ -16,6 +20,7 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
   bool _extraBed = true;
   bool _surgePricing = true;
   int _cancellationPolicy = 0;
+  bool _isSaving = false;
 
   late TextEditingController _nameController;
   late TextEditingController _weekdayPriceController;
@@ -52,10 +57,10 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: 'Standar Twin Suite');
-    _weekdayPriceController = TextEditingController(text: 'Rp 550.000');
-    _weekendPriceController = TextEditingController(text: 'Rp 680.000');
-    _depositController = TextEditingController(text: 'Rp 300.000');
+    _nameController = TextEditingController();
+    _weekdayPriceController = TextEditingController();
+    _weekendPriceController = TextEditingController();
+    _depositController = TextEditingController();
     _selectedFacilities = Set.from(_facilities);
   }
 
@@ -66,6 +71,64 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
     _weekendPriceController.dispose();
     _depositController.dispose();
     super.dispose();
+  }
+
+  Future<void> _submitRoom() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nama tipe kamar wajib diisi'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      final hotelId = AuthService.instance.currentUser?.managedHotelId ?? '1';
+      final rawWeekday =
+          _weekdayPriceController.text.replaceAll(RegExp(r'[^0-9]'), '');
+      final rawWeekend =
+          _weekendPriceController.text.replaceAll(RegExp(r'[^0-9]'), '');
+      final weekdayPrice = double.tryParse(rawWeekday) ?? 500000.0;
+      final weekendPrice =
+          double.tryParse(rawWeekend) ?? (weekdayPrice * 1.15);
+
+      final newRoom = RoomModel(
+        id: '',
+        hotelId: hotelId,
+        roomNumber: '101',
+        typeName: name,
+        pricePerNight: weekdayPrice.round(),
+        weekendPrice: weekendPrice.round(),
+        maxGuests: 2,
+        roomSizeM2: 28.0,
+        bedType: 'King Bed',
+        facilities: _selectedFacilities.toList(),
+      );
+
+      await HotelService.instance.addRoom(newRoom);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tipe kamar baru berhasil diterbitkan ke database!'),
+          backgroundColor: Color(0xFF007A87),
+        ),
+      );
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal menyimpan tipe kamar: $e'),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
@@ -145,25 +208,28 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
             const SizedBox(height: 24),
             // Bottom Action
             ElevatedButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Tipe kamar baru berhasil diterbitkan!'),
-                    backgroundColor: Color(0xFF007A87),
-                  ),
-                );
-                Navigator.pop(context);
-              },
-              icon: const Icon(Icons.publish, size: 18),
-              label: const Text(
-                'Terbitkan Tipe Kamar →',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+              onPressed: _isSaving ? null : _submitRoom,
+              icon: _isSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.publish, size: 18),
+              label: Text(
+                _isSaving ? 'Menyimpan...' : 'Terbitkan Tipe Kamar →',
+                style:
+                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
               ),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(50),
                 backgroundColor: const Color(0xFF007A87),
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
             ),
 

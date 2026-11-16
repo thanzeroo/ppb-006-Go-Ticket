@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'package:go_ticket/core/models/booking_args.dart';
+import 'package:go_ticket/core/models/review_model.dart';
+import 'package:go_ticket/core/services/customer_data_service.dart';
+import 'package:go_ticket/core/services/review_service.dart';
 import '../../router/customer_router.dart';
 import 'package:go_ticket/core/widgets/gt_ui.dart';
 
@@ -17,6 +20,53 @@ class HotelDetailScreen extends StatefulWidget {
 class _HotelDetailScreenState extends State<HotelDetailScreen> {
   late final BookingArgs _args = BookingArgs.fromHotel(widget.arguments);
   bool _fav = false;
+  List<ReviewModel> _reviews = [];
+  bool _loadingReviews = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkSavedAndLoadReviews();
+  }
+
+  Future<void> _checkSavedAndLoadReviews() async {
+    final isSaved =
+        await CustomerDataService.instance.isHotelSaved(_args.hotelId);
+    final reviews =
+        await ReviewService.instance.getReviewsByHotel(_args.hotelId);
+    if (mounted) {
+      setState(() {
+        _fav = isSaved;
+        _reviews = reviews;
+        _loadingReviews = false;
+      });
+    }
+  }
+
+  Future<void> _toggleFav() async {
+    final hotelMap = {
+      'id': _args.hotelId,
+      'name': _args.hotelName,
+      'location': _args.location,
+      'priceValue': _args.roomPrice,
+      'imageUrl': _args.imageUrl,
+      'type': 'Resor • ⭐ 5',
+    };
+    final isSaved =
+        await CustomerDataService.instance.toggleSavedHotel(hotelMap);
+    if (mounted) {
+      setState(() => _fav = isSaved);
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isSaved
+              ? '${_args.hotelName} disimpan ke favorit'
+              : '${_args.hotelName} dihapus dari favorit'),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
+  }
 
   static const _thumbs = [
     'https://images.unsplash.com/photo-1540541338287-41700207dee6?w=300',
@@ -81,31 +131,76 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
               ),
               GestureDetector(
                 onTap: _toReviews,
-                child: const GTChip('99% Puas',
-                    bg: GT.sky, fg: GT.teal),
+                child: GTChip(
+                    _reviews.isNotEmpty
+                        ? '${_reviews.length} Ulasan'
+                        : 'Belum Ada',
+                    bg: GT.sky,
+                    fg: GT.teal),
               ),
             ],
           ),
-          _review('NP', 'Nadia Pramestuti', 'Solo Traveler • Menginap 3 malam',
-              5,
-              '“Pelayanan staf di sini sangat luar biasa hangat. Kamarnya harum, '
-              'seprai sangat bersih, dan kolam renang saat sunset benar-benar magis. '
-              'Proses check-in lewat Go Ticket langsung sat-set tanpa antre!”',
-              ['Kebersihan 5/5', 'Staf Super Ramah']),
-          _review('RD', 'Rendra Darmawan',
-              'Liburan Keluarga • Menginap 2 malam', 4,
-              '“Buffet sarapannya enak dan banyak variasi. Akses ke pantai dekat '
-              'dan suasananya tenang walau di tengah Seminyak. Recommended banget '
-              'buat honeymoon atau liburan santai.”',
-              const []),
-          Center(
-            child: TextButton(
-              onPressed: _toReviews,
-              child: const Text('Lihat semua ulasan',
-                  style: TextStyle(
-                      color: GT.teal, fontWeight: FontWeight.w700)),
+          if (_loadingReviews)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                  child: CircularProgressIndicator(
+                      color: GT.teal, strokeWidth: 2)),
+            )
+          else if (_reviews.isEmpty)
+            GTCard(
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: const BoxDecoration(
+                      color: GT.sky,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.rate_review_outlined,
+                        color: GT.teal, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Belum Ada Ulasan',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700, color: GT.ink)),
+                        SizedBox(height: 2),
+                        Text(
+                            'Jadilah tamu pertama yang memberikan ulasan setelah check-out.',
+                            style: TextStyle(fontSize: 12, color: GT.muted)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            for (final r in _reviews.take(2))
+              _review(
+                (r.authorName.isNotEmpty
+                    ? r.authorName.substring(0, 1).toUpperCase()
+                    : 'G'),
+                r.authorName.isNotEmpty ? r.authorName : 'Tamu Go Ticket',
+                r.formattedDate.isNotEmpty
+                    ? r.formattedDate
+                    : 'Ulasan Terverifikasi',
+                r.overallRating.round(),
+                '“${r.comment}”',
+                const ['Ulasan Nyata Terverifikasi'],
+              ),
+            Center(
+              child: TextButton(
+                onPressed: _toReviews,
+                child: Text('Lihat semua ${_reviews.length} ulasan',
+                    style: const TextStyle(
+                        color: GT.teal, fontWeight: FontWeight.w700)),
+              ),
             ),
-          ),
+          ],
           const SizedBox(height: 10),
           _sectionTitle('Kebijakan Menginap',
               sub: 'Ketentuan penting untuk kenyamanan bersama'),
@@ -184,7 +279,7 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
           right: 12,
           top: 12,
           child: GestureDetector(
-            onTap: () => setState(() => _fav = !_fav),
+            onTap: _toggleFav,
             child: CircleAvatar(
               radius: 20,
               backgroundColor: Colors.white,

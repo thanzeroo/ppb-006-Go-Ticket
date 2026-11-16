@@ -39,17 +39,6 @@ class _MaintenanceOverviewTabState extends State<MaintenanceOverviewTab> {
     }
   }
 
-  void _showActionSnackbar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: const Color(0xFF00758F),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return _buildDashboardTab();

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:go_ticket/core/services/auth_service.dart';
+import 'package:go_ticket/core/services/customer_data_service.dart';
 import 'package:go_ticket/core/services/hotel_service.dart';
-import 'package:go_ticket/core/services/supabase_service.dart';
 import 'package:go_ticket/core/utils/currency_formatter.dart';
 import 'package:go_ticket/core/widgets/user_avatar.dart';
 import '../../../router/customer_router.dart';
@@ -32,21 +32,66 @@ class CariTab extends StatefulWidget {
 
 class _CariTabState extends State<CariTab> {
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   String _searchQuery = '';
   _CariFilters _filters = const _CariFilters();
 
   List<Map<String, dynamic>> _hotels = [];
+  final Set<String> _savedHotelIds = {};
   bool _isLoading = false;
   String _sort = 'Terpopuler';
+  int _currentLimit = 10;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _fetchHotels();
+  }
+
+  void _onScroll() {
+    if (_scrollController.hasClients &&
+        _scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 250) {
+      if (_currentLimit < _visibleHotels.length) {
+        setState(() {
+          _currentLimit += 10;
+        });
+      }
+    }
+  }
+
+  Future<void> _toggleSave(Map<String, dynamic> hotel) async {
+    final id = hotel['id']?.toString() ?? hotel['name']?.toString() ?? '';
+    final isSaved = await CustomerDataService.instance.toggleSavedHotel(hotel);
+    if (mounted) {
+      setState(() {
+        if (isSaved) {
+          _savedHotelIds.add(id);
+        } else {
+          _savedHotelIds.remove(id);
+        }
+        final idx = _hotels.indexWhere(
+            (h) => (h['id']?.toString() ?? h['name']?.toString()) == id);
+        if (idx >= 0) {
+          _hotels[idx]['isFavorite'] = isSaved;
+        }
+      });
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isSaved
+              ? '${hotel['name']} disimpan ke favorit'
+              : '${hotel['name']} dihapus dari favorit'),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
   }
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -118,7 +163,13 @@ class _CariTabState extends State<CariTab> {
     setState(() => _isLoading = true);
     try {
       final data = await HotelService.instance.getHotels(sortBy: _sort);
+      final savedList = await CustomerDataService.instance.getSavedHotels();
       if (mounted) {
+        _savedHotelIds.clear();
+        for (final s in savedList) {
+          final id = s['id']?.toString() ?? s['name']?.toString() ?? '';
+          if (id.isNotEmpty) _savedHotelIds.add(id);
+        }
         final promoIndex = data.indexWhere(
           (hotel) =>
               hotel.originalPrice != null &&
@@ -127,6 +178,8 @@ class _CariTabState extends State<CariTab> {
         setState(() {
           _hotels = data.asMap().entries.map((entry) {
             final h = entry.value;
+            final isFav = _savedHotelIds.contains(h.id) ||
+                _savedHotelIds.contains(h.name);
             final originalPrice =
                 entry.key == promoIndex ? h.originalPrice : null;
             final discountPercent = originalPrice == null
@@ -150,7 +203,7 @@ class _CariTabState extends State<CariTab> {
               'features': h.amenities,
               'tag': h.isRecommended ? 'Paling Diminati' : null,
               'tagColor': const Color(0xFF00B4D8),
-              'isFavorite': false,
+              'isFavorite': isFav,
               'isFree': false,
               'imageUrl': h.thumbnailUrl ??
                   (h.photoUrls.isNotEmpty ? h.photoUrls.first : ''),
@@ -337,6 +390,9 @@ class _CariTabState extends State<CariTab> {
   @override
   Widget build(BuildContext context) {
     final visibleHotels = _visibleHotels;
+    final displayedHotels = visibleHotels.take(_currentLimit).toList();
+    final hasMore = visibleHotels.length > displayedHotels.length;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       body: Stack(
@@ -345,7 +401,10 @@ class _CariTabState extends State<CariTab> {
             children: [
               _buildSearchHeader(),
               _buildFilterBar(),
-              _buildResultsInfo(),
+              _buildResultsInfo(
+                displayedCount: displayedHotels.length,
+                totalCount: visibleHotels.length,
+              ),
               Expanded(
                 child: _isLoading && _hotels.isEmpty
                     ? const Center(child: CircularProgressIndicator())
@@ -363,10 +422,42 @@ class _CariTabState extends State<CariTab> {
                             ),
                           )
                         : ListView.builder(
+                            controller: _scrollController,
                             padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                            itemCount: visibleHotels.length,
+                            itemCount: displayedHotels.length + (hasMore ? 1 : 0),
                             itemBuilder: (context, index) {
-                              return _buildHotelCard(visibleHotels[index]);
+                              if (index == displayedHotels.length) {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  child: Center(
+                                    child: OutlinedButton.icon(
+                                      onPressed: () {
+                                        setState(() {
+                                          _currentLimit += 10;
+                                        });
+                                      },
+                                      style: OutlinedButton.styleFrom(
+                                        side: const BorderSide(
+                                            color: Color(0xFF00B4D8)),
+                                        shape: const StadiumBorder(),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 18, vertical: 10),
+                                      ),
+                                      icon: const Icon(Icons.arrow_downward,
+                                          size: 16, color: Color(0xFF00B4D8)),
+                                      label: Text(
+                                        'Muat 10 Penginapan Berikutnya (${displayedHotels.length}/${visibleHotels.length})',
+                                        style: GoogleFonts.inter(
+                                          color: const Color(0xFF00B4D8),
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+                              return _buildHotelCard(displayedHotels[index]);
                             },
                           ),
               ),
@@ -454,8 +545,10 @@ class _CariTabState extends State<CariTab> {
                     Expanded(
                       child: TextField(
                         controller: _searchController,
-                        onChanged: (value) =>
-                            setState(() => _searchQuery = value),
+                        onChanged: (value) => setState(() {
+                          _searchQuery = value;
+                          _currentLimit = 10;
+                        }),
                         decoration: InputDecoration(
                           hintText: 'Cari nama hotel, kota, atau fasilitas...',
                           hintStyle: GoogleFonts.inter(
@@ -472,7 +565,10 @@ class _CariTabState extends State<CariTab> {
                                   tooltip: 'Hapus pencarian',
                                   onPressed: () {
                                     _searchController.clear();
-                                    setState(() => _searchQuery = '');
+                                    setState(() {
+                                      _searchQuery = '';
+                                      _currentLimit = 10;
+                                    });
                                   },
                                   icon: const Icon(Icons.close, size: 18),
                                 ),
@@ -577,8 +673,13 @@ class _CariTabState extends State<CariTab> {
     );
   }
 
-  Widget _buildResultsInfo() {
-    final resultCount = _visibleHotels.length;
+  Widget _buildResultsInfo({int? displayedCount, int? totalCount}) {
+    final resultCount = totalCount ?? _visibleHotels.length;
+    final shown = displayedCount ?? resultCount;
+    final countText = (resultCount > 10 && shown < resultCount)
+        ? '$shown dari $resultCount Penginapan '
+        : '$resultCount Penginapan ';
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Row(
@@ -588,7 +689,7 @@ class _CariTabState extends State<CariTab> {
             text: TextSpan(
               children: [
                 TextSpan(
-                  text: '$resultCount Penginapan ',
+                  text: countText,
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
@@ -695,21 +796,24 @@ class _CariTabState extends State<CariTab> {
               Positioned(
                 top: 10,
                 right: 10,
-                child: Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    hotel['isFavorite'] as bool
-                        ? Icons.favorite
-                        : Icons.favorite_border,
-                    color: hotel['isFavorite'] as bool
-                        ? Colors.red
-                        : const Color(0xFF9CA3AF),
-                    size: 18,
+                child: GestureDetector(
+                  onTap: () => _toggleSave(hotel),
+                  child: Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.9),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      hotel['isFavorite'] as bool
+                          ? Icons.favorite
+                          : Icons.favorite_border,
+                      color: hotel['isFavorite'] as bool
+                          ? Colors.red
+                          : const Color(0xFF9CA3AF),
+                      size: 18,
+                    ),
                   ),
                 ),
               ),

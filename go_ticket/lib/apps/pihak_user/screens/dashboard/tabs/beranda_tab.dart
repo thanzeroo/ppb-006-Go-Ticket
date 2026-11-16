@@ -71,7 +71,7 @@ class _BerandaTabState extends State<BerandaTab> {
     final user = AuthService.instance.currentUser;
     final firstName = (user != null && user.fullName.trim().isNotEmpty)
         ? user.fullName.trim().split(' ').first
-        : 'Aditya';
+        : (user?.email?.split('@').first ?? 'Traveler');
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -741,7 +741,7 @@ class _BerandaTabState extends State<BerandaTab> {
             ),
             const SizedBox(height: 12),
             Column(
-              children: list.map((h) => _buildHotelCard(h)).toList(),
+              children: list.take(5).map((h) => _buildHotelCard(h)).toList(),
             ),
           ],
         );

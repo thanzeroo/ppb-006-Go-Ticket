@@ -15,7 +15,6 @@ class FoCheckOutTab extends StatefulWidget {
 class _FoCheckOutTabState extends State<FoCheckOutTab> {
   List<BookingModel> _activeGuests = [];
   bool _isLoading = true;
-  BookingModel? _selectedGuest;
 
   @override
   void initState() {
@@ -32,7 +31,6 @@ class _FoCheckOutTabState extends State<FoCheckOutTab> {
       if (mounted) {
         setState(() {
           _activeGuests = list;
-          _selectedGuest = list.isNotEmpty ? list.first : null;
           _isLoading = false;
         });
       }
