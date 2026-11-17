@@ -197,7 +197,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
             TextField(
               controller: ctrl,
               decoration: const InputDecoration(
-                hintText: 'nama@email.com / 0812xxxx',
+                hintText: 'nama@gmail.com / 0812xxxx',
               ),
             ),
           ],
@@ -448,7 +448,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         _buildInputLabel('Email / Nomor WhatsApp'),
         _buildTextField(
           controller: _emailLoginController,
-          hintText: 'nama@email.com / 0812xxxx',
+          hintText: 'nama@gmail.com / 0812xxxx',
           prefixIcon: Icons.alternate_email_rounded,
           keyboardType: TextInputType.emailAddress,
           validator: _vEmailOrPhone,
@@ -498,30 +498,6 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
 
         // Tombol Masuk ke Akun
         _buildPrimaryButton(title: 'Masuk ke Akun', onTap: _submit),
-        const SizedBox(height: 22),
-
-        // Divider: ATAU LANJUTKAN DENGAN
-        _buildOrDivider(),
-        const SizedBox(height: 16),
-
-        // Tombol Google & Apple
-        Row(
-          children: [
-            Expanded(
-              child: _buildSocialButton(
-                title: 'Google',
-                onTap: () => _showSnack('Masuk dengan Google segera hadir'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildSocialButton(
-                title: 'Apple',
-                onTap: () => _showSnack('Masuk dengan Apple segera hadir'),
-              ),
-            ),
-          ],
-        ),
       ],
       ),
     );
@@ -546,7 +522,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         _buildInputLabel('Email'),
         _buildTextField(
           controller: _emailRegisterController,
-          hintText: 'nama@email.com',
+          hintText: 'nama@gmail.com',
           prefixIcon: Icons.alternate_email_rounded,
           keyboardType: TextInputType.emailAddress,
           validator: _vEmail,
@@ -787,54 +763,6 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                   ),
                 ],
               ),
-      ),
-    );
-  }
-
-  Widget _buildOrDivider() {
-    return Row(
-      children: [
-        const Expanded(child: Divider(color: Color(0xFFE2E8F0))),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Text(
-            'ATAU LANJUTKAN DENGAN',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: const Color(0xFF94A3B8),
-              letterSpacing: 0.8,
-            ),
-          ),
-        ),
-        const Expanded(child: Divider(color: Color(0xFFE2E8F0))),
-      ],
-    );
-  }
-
-  Widget _buildSocialButton({
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        height: 46,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Center(
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF334155),
-            ),
-          ),
-        ),
       ),
     );
   }

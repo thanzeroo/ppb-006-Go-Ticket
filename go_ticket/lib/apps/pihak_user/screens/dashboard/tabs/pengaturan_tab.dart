@@ -6,7 +6,6 @@ import 'package:go_ticket/core/services/customer_data_service.dart';
 import 'package:go_ticket/core/services/promo_service.dart';
 import 'package:go_ticket/core/widgets/user_avatar.dart';
 import '../../auth/customer_login_screen.dart';
-import '../../auth/terms_screen.dart';
 import '../../settings/profile_screen.dart';
 import '../../settings/saved_guests_screen.dart';
 import '../../settings/security_screen.dart';
@@ -23,8 +22,6 @@ class PengaturanTab extends StatefulWidget {
 }
 
 class _PengaturanTabState extends State<PengaturanTab> {
-  bool _notifEnabled = true;
-  String _language = 'Bahasa Indonesia';
   int _savedGuestsCount = 0;
   int _savedHotelsCount = 0;
   int _voucherCount = 0;
@@ -316,44 +313,6 @@ class _PengaturanTabState extends State<PengaturanTab> {
                       badge: '$_voucherCount Baru',
                       badgeColor: const Color(0xFF00B4D8),
                       onTap: () => _go(const VoucherScreen()),
-                    ),
-                  ]),
-                  const SizedBox(height: 20),
-                  _buildSectionLabel('PENGATURAN APLIKASI'),
-                  _buildMenuCard([
-                    _buildMenuItemSwitch(
-                      icon: Icons.notifications_outlined,
-                      title: 'Notifikasi Booking & Promo',
-                      subtitle: 'Pemberitahuan check-in & diskon kilat',
-                      value: _notifEnabled,
-                      onChanged: (val) => setState(() => _notifEnabled = val),
-                    ),
-                    const Divider(
-                        height: 1, indent: 56, color: Color(0xFFF1F5F9)),
-                    _buildMenuItemValue(
-                      icon: Icons.translate,
-                      title: 'Pilihan Bahasa',
-                      subtitle: 'Bahasa tampilan sistem',
-                      value: _language,
-                      onTap: () {},
-                    ),
-                  ]),
-                  const SizedBox(height: 20),
-                  _buildSectionLabel('BANTUAN & KEBIJAKAN'),
-                  _buildMenuCard([
-                    _buildMenuItemDot(
-                      icon: Icons.headset_mic_outlined,
-                      title: 'Pusat Bantuan & CS 24/7',
-                      subtitle: 'Respon cepat via WhatsApp resmi',
-                      onTap: () => _snack('Menghubungkan ke CS WhatsApp…'),
-                    ),
-                    const Divider(
-                        height: 1, indent: 56, color: Color(0xFFF1F5F9)),
-                    _buildMenuItem(
-                      icon: Icons.policy_outlined,
-                      title: 'Kebijakan Privasi & Ketentuan',
-                      subtitle: 'Syarat penggunaan Go Ticket',
-                      onTap: () => _go(const TermsScreen()),
                     ),
                   ]),
                   const SizedBox(height: 24),
@@ -737,147 +696,6 @@ class _PengaturanTabState extends State<PengaturanTab> {
           const Icon(Icons.chevron_right, size: 18, color: Color(0xFF94A3B8)),
         ],
       ),
-    );
-  }
-
-  Widget _buildMenuItemSwitch({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return ListTile(
-      leading: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: const Color(0xFF0077B6), size: 20),
-      ),
-      title: Text(
-        title,
-        style: GoogleFonts.inter(
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-          color: const Color(0xFF0F172A),
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: GoogleFonts.inter(
-          fontSize: 11,
-          color: const Color(0xFF64748B),
-        ),
-      ),
-      trailing: Switch(
-        value: value,
-        onChanged: onChanged,
-        activeColor: const Color(0xFF00B4D8),
-      ),
-    );
-  }
-
-  Widget _buildMenuItemValue({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required String value,
-    required VoidCallback onTap,
-  }) {
-    return ListTile(
-      onTap: onTap,
-      leading: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: const Color(0xFF0077B6), size: 20),
-      ),
-      title: Text(
-        title,
-        style: GoogleFonts.inter(
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-          color: const Color(0xFF0F172A),
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: GoogleFonts.inter(
-          fontSize: 11,
-          color: const Color(0xFF64748B),
-        ),
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            value,
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              color: const Color(0xFF64748B),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(width: 4),
-          const Icon(Icons.chevron_right, size: 18, color: Color(0xFF94A3B8)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMenuItemDot({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return ListTile(
-      onTap: onTap,
-      leading: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: const Color(0xFF0077B6), size: 20),
-      ),
-      title: Row(
-        children: [
-          Text(
-            title,
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF0F172A),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Container(
-            width: 7,
-            height: 7,
-            decoration: const BoxDecoration(
-              color: Color(0xFF00B4D8),
-              shape: BoxShape.circle,
-            ),
-          ),
-        ],
-      ),
-      subtitle: Text(
-        subtitle,
-        style: GoogleFonts.inter(
-          fontSize: 11,
-          color: const Color(0xFF64748B),
-        ),
-      ),
-      trailing: const Icon(Icons.chevron_right,
-          size: 18, color: Color(0xFF94A3B8)),
     );
   }
 

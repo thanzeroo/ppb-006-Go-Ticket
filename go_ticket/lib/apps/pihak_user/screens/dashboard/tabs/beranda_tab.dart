@@ -21,7 +21,6 @@ class BerandaTab extends StatefulWidget {
 }
 
 class _BerandaTabState extends State<BerandaTab> {
-  int _selectedCategoryIndex = 0;
   final Set<String> _savedHotelIds = {};
 
   @override
@@ -85,16 +84,11 @@ class _BerandaTabState extends State<BerandaTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildSearchCard(),
-                  const SizedBox(height: 16),
                   _buildPromoCard(),
-                  const SizedBox(height: 24),
-                  _buildKategoriSection(),
                   const SizedBox(height: 24),
                   _buildRekomendasiSection(),
                   const SizedBox(height: 24),
                   _buildWhyGoTicket(),
-                  const SizedBox(height: 100),
                 ],
               ),
             ),
@@ -226,187 +220,6 @@ class _BerandaTabState extends State<BerandaTab> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // SEARCH CARD
-  // ---------------------------------------------------------------------------
-  Widget _buildSearchCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F172A).withOpacity(0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          // Tujuan atau Properti
-          InkWell(
-            onTap: () => CustomerDashboardScreen.tabNotifier.value = 1,
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.location_on,
-                      color: Color(0xFF0077B6), size: 20),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Tujuan atau Properti',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: const Color(0xFF94A3B8),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      Text(
-                        'Bali, Indonesia',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF0F172A),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          // Tanggal & Tamu Row
-          Row(
-            children: [
-              // Tanggal
-              Expanded(
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.calendar_today_outlined,
-                          color: Color(0xFF0077B6), size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Tanggal',
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                color: const Color(0xFF94A3B8),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            Text(
-                              '24 - 26 Okt',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF0F172A),
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              // Tamu & Kamar
-              Expanded(
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.people_outline,
-                          color: Color(0xFF0077B6), size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Tamu & Kamar',
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                color: const Color(0xFF94A3B8),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            Text(
-                              '2 Tamu, 1 Kamar',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF0F172A),
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          // Button Cari Penginapan Sekarang
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: () => CustomerDashboardScreen.tabNotifier.value = 1,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00B4D8),
-                shape: const StadiumBorder(),
-                elevation: 0,
-              ),
-              icon: const Icon(Icons.search, color: Colors.white, size: 20),
-              label: Text(
-                'Cari Penginapan Sekarang',
-                style: GoogleFonts.inter(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -578,108 +391,6 @@ class _BerandaTabState extends State<BerandaTab> {
           ),
         );
       },
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // KATEGORI PILIHAN
-  // ---------------------------------------------------------------------------
-  Widget _buildKategoriSection() {
-    final categories = [
-      {'icon': Icons.hotel_outlined, 'label': 'Hotel Bintang 5'},
-      {'icon': Icons.home_outlined, 'label': 'Villa Tropis'},
-      {'icon': Icons.beach_access_outlined, 'label': 'Resor Pantai'},
-      {'icon': Icons.apartment_outlined, 'label': 'Hotel Kota'},
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Kategori Pilihan',
-              style: GoogleFonts.inter(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFF0F172A),
-              ),
-            ),
-            TextButton(
-              onPressed: () => CustomerDashboardScreen.tabNotifier.value = 1,
-              child: Text(
-                'Lihat Semua',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: const Color(0xFF0077B6),
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: List.generate(categories.length, (idx) {
-              final cat = categories[idx];
-              final isSelected = idx == _selectedCategoryIndex;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: InkWell(
-                  onTap: () {
-                    setState(() => _selectedCategoryIndex = idx);
-                    CustomerDashboardScreen.tabNotifier.value = 1;
-                  },
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 9),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? const Color(0xFFC8F0FA)
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isSelected
-                            ? const Color(0xFF00B4D8)
-                            : const Color(0xFFE2E8F0),
-                        width: 1.2,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          cat['icon'] as IconData,
-                          size: 16,
-                          color: isSelected
-                              ? const Color(0xFF0077B6)
-                              : const Color(0xFF475569),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          cat['label'] as String,
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: isSelected
-                                ? FontWeight.w800
-                                : FontWeight.w600,
-                            color: isSelected
-                                ? const Color(0xFF0077B6)
-                                : const Color(0xFF334155),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ),
-        ),
-      ],
     );
   }
 

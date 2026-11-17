@@ -17,8 +17,6 @@ class _SecurityScreenState extends State<SecurityScreen> {
   final _new = TextEditingController();
   final _confirm = TextEditingController();
   bool _hideOld = true, _hideNew = true, _hideConfirm = true;
-  bool _twoFa = true;
-  bool _bio = true;
   bool _passwordUpdated = false;
 
   @override
@@ -38,9 +36,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
       RegExp(r'[^A-Za-z0-9]').hasMatch(_new.text);
 
   double get _score {
-    var s = 0.55;
-    if (_twoFa) s += 0.15;
-    if (_bio) s += 0.1;
+    var s = 0.8;
     if (_passwordUpdated) s += 0.15;
     return s.clamp(0.0, 1.0);
   }
@@ -77,33 +73,6 @@ class _SecurityScreenState extends State<SecurityScreen> {
       if (!mounted) return;
       _snack('Gagal memperbarui kata sandi: $e');
     }
-  }
-
-  Future<void> _changePin() async {
-    final c = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Ubah PIN Transaksi'),
-        content: TextField(
-          controller: c,
-          keyboardType: TextInputType.number,
-          obscureText: true,
-          maxLength: 6,
-          decoration: const InputDecoration(hintText: 'PIN baru (6 digit)'),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Batal')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, c.text.length == 6),
-              child: const Text('Simpan')),
-        ],
-      ),
-    );
-    c.dispose();
-    if (ok == true) _snack('PIN transaksi berhasil diubah');
   }
 
   Future<void> _confirm2(String title, String body, String action,
@@ -234,137 +203,6 @@ class _SecurityScreenState extends State<SecurityScreen> {
           ),
           GTCard(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              _header(Icons.shield_outlined, 'Autentikasi & Verifikasi',
-                  'Lapisan proteksi ekstra saat transaksi'),
-              _toggle(Icons.sms_outlined, 'Verifikasi 2 Langkah (2FA)',
-                  'Kode OTP WhatsApp & SMS', _twoFa,
-                  (v) => setState(() => _twoFa = v)),
-              const SizedBox(height: 10),
-              _toggle(Icons.fingerprint, 'Login Biometrik',
-                  'Face ID atau sensor sidik jari', _bio,
-                  (v) => setState(() => _bio = v)),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                    color: GT.soft.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(14)),
-                child: Row(children: [
-                  const Icon(Icons.pin_outlined, color: GT.teal),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Wrap(spacing: 6, children: [
-                          Text('PIN Transaksi & E-Tiket',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  color: GT.ink)),
-                          GTChip('6 Digit Aktif', bg: GT.sky),
-                        ]),
-                        Text('Digunakan saat cetak & klaim tiket',
-                            style:
-                                TextStyle(fontSize: 11, color: GT.muted)),
-                      ],
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: _changePin,
-                    child: const GTChip('Ubah PIN',
-                        bg: GT.soft, fg: GT.teal),
-                  ),
-                ]),
-              ),
-            ]),
-          ),
-          GTCard(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Expanded(
-                  child: _header(Icons.devices_other, 'Perangkat Terhubung',
-                      'Sesi login aktif saat ini'),
-                ),
-                const GTChip('2 Perangkat', bg: GT.soft, fg: GT.muted),
-              ]),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                    color: GT.soft.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(14)),
-                child: Row(children: [
-                  const CircleAvatar(
-                      radius: 22,
-                      backgroundColor: GT.sky,
-                      child: Icon(Icons.smartphone, color: GT.teal)),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Wrap(spacing: 6, children: [
-                          Text('iPhone 15 Pro',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  color: GT.ink)),
-                          GTChip('Perangkat Ini', bg: GT.sky),
-                        ]),
-                        Text('Jakarta, Indonesia • Aktif sekarang',
-                            style:
-                                TextStyle(fontSize: 11, color: GT.muted)),
-                      ],
-                    ),
-                  ),
-                ]),
-              ),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                    color: GT.soft.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(14)),
-                child: Row(children: [
-                  const CircleAvatar(
-                      radius: 22,
-                      backgroundColor: GT.soft,
-                      child: Icon(Icons.laptop_mac, color: GT.teal)),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Chrome Mac OS',
-                            style: TextStyle(
-                                fontWeight: FontWeight.w800, color: GT.ink)),
-                        Text('Bali, Indonesia • 2 hari lalu',
-                            style:
-                                TextStyle(fontSize: 11, color: GT.muted)),
-                      ],
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () => _snack('Sesi Chrome Mac OS dikeluarkan'),
-                    child: const GTChip('Keluar', bg: GT.soft, fg: GT.ink),
-                  ),
-                ]),
-              ),
-              const SizedBox(height: 10),
-              Center(
-                child: TextButton.icon(
-                  onPressed: () => _snack(
-                      'Berhasil keluar dari semua perangkat lain'),
-                  icon: const Icon(Icons.logout, size: 16, color: GT.teal),
-                  label: const Text('Keluar dari Semua Perangkat Lain',
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: GT.teal)),
-                ),
-              ),
-            ]),
-          ),
-          GTCard(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: const [
                 Icon(Icons.warning_amber_rounded, color: GT.red),
                 SizedBox(width: 8),
@@ -475,33 +313,4 @@ class _SecurityScreenState extends State<SecurityScreen> {
         ]),
       );
 
-  Widget _toggle(IconData i, String t, String s, bool v, ValueChanged<bool> c) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-          color: GT.soft.withValues(alpha: 0.6),
-          borderRadius: BorderRadius.circular(14)),
-      child: Row(children: [
-        Icon(i, color: GT.teal),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(t,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w800, color: GT.ink)),
-              Text(s, style: const TextStyle(fontSize: 11, color: GT.muted)),
-            ],
-          ),
-        ),
-        Switch(
-          value: v,
-          activeColor: Colors.white,
-          activeTrackColor: GT.primary,
-          onChanged: c,
-        ),
-      ]),
-    );
-  }
 }

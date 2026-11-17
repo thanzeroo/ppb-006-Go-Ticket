@@ -7,6 +7,7 @@ import 'package:go_ticket/core/services/hotel_service.dart';
 import 'package:go_ticket/core/utils/currency_formatter.dart';
 import 'package:go_ticket/core/widgets/user_avatar.dart';
 import '../../../router/customer_router.dart';
+import '../customer_dashboard_screen.dart';
 
 class _CariFilters {
   const _CariFilters({
@@ -359,34 +360,6 @@ class _CariTabState extends State<CariTab> {
     }
   }
 
-  void _toggleFilter(String filter) {
-    setState(() {
-      switch (filter) {
-        case 'Promo Kilat':
-          _filters = _CariFilters(
-            promotionsOnly: !_filters.promotionsOnly,
-            rating45Plus: _filters.rating45Plus,
-            poolOnly: _filters.poolOnly,
-            maxPrice: _filters.maxPrice,
-          );
-        case '⭐ 4.5+':
-          _filters = _CariFilters(
-            promotionsOnly: _filters.promotionsOnly,
-            rating45Plus: !_filters.rating45Plus,
-            poolOnly: _filters.poolOnly,
-            maxPrice: _filters.maxPrice,
-          );
-        case '🏊 Kolam Renang':
-          _filters = _CariFilters(
-            promotionsOnly: _filters.promotionsOnly,
-            rating45Plus: _filters.rating45Plus,
-            poolOnly: !_filters.poolOnly,
-            maxPrice: _filters.maxPrice,
-          );
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final visibleHotels = _visibleHotels;
@@ -400,11 +373,6 @@ class _CariTabState extends State<CariTab> {
           Column(
             children: [
               _buildSearchHeader(),
-              _buildFilterBar(),
-              _buildResultsInfo(
-                displayedCount: displayedHotels.length,
-                totalCount: visibleHotels.length,
-              ),
               Expanded(
                 child: _isLoading && _hotels.isEmpty
                     ? const Center(child: CircularProgressIndicator())
@@ -519,12 +487,11 @@ class _CariTabState extends State<CariTab> {
                   const Spacer(),
                   Row(
                     children: [
-                      const Icon(Icons.notifications_none_outlined,
-                          color: Color(0xFF111827), size: 22),
-                      const SizedBox(width: 12),
                       UserAvatar(
                         name: AuthService.instance.currentUser?.fullName,
                         radius: 17,
+                        onTap: () =>
+                            CustomerDashboardScreen.tabNotifier.value = 3,
                       ),
                     ],
                   ),
@@ -581,146 +548,6 @@ class _CariTabState extends State<CariTab> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildFilterBar() {
-    const filters = [
-      'Promo Kilat',
-      'Harga',
-      '⭐ 4.5+',
-      '🏊 Kolam Renang',
-    ];
-    return Container(
-      color: Colors.white,
-      child: Column(
-        children: [
-          const Divider(height: 1, color: Color(0xFFE5E7EB)),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: filters.map((filter) {
-                final selected = switch (filter) {
-                  'Promo Kilat' => _filters.promotionsOnly,
-                  '⭐ 4.5+' => _filters.rating45Plus,
-                  '🏊 Kolam Renang' => _filters.poolOnly,
-                  _ => _filters.maxPrice < 5000000,
-                };
-                return Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  child: OutlinedButton(
-                    onPressed: filter == 'Harga'
-                        ? _showFilter
-                        : () => _toggleFilter(filter),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: selected
-                          ? Colors.white
-                          : const Color(0xFF111827),
-                      backgroundColor: selected
-                          ? const Color(0xFF00B4D8)
-                          : Colors.white,
-                      side: BorderSide(
-                        color: selected
-                            ? const Color(0xFF00B4D8)
-                            : const Color(0xFFE5E7EB),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      minimumSize: Size.zero,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20)),
-                    ),
-                    child: Text(
-                      filter,
-                      style: GoogleFonts.inter(
-                          fontSize: 12, fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          const Divider(height: 1, color: Color(0xFFE5E7EB)),
-          InkWell(
-            onTap: _showFilter,
-            child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.location_on,
-                      color: Color(0xFF00B4D8), size: 16),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      'Seminyak, Bali  •  2 Tamu, 1 Kamar',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: const Color(0xFF374151),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  const Icon(Icons.tune, color: Color(0xFF00B4D8), size: 18),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildResultsInfo({int? displayedCount, int? totalCount}) {
-    final resultCount = totalCount ?? _visibleHotels.length;
-    final shown = displayedCount ?? resultCount;
-    final countText = (resultCount > 10 && shown < resultCount)
-        ? '$shown dari $resultCount Penginapan '
-        : '$resultCount Penginapan ';
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          RichText(
-            text: TextSpan(
-              children: [
-                TextSpan(
-                  text: countText,
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF111827),
-                  ),
-                ),
-                TextSpan(
-                  text: 'di Seminyak',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    color: const Color(0xFF6B7280),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Row(
-            children: [
-              const Icon(Icons.sort, color: Color(0xFF00B4D8), size: 16),
-              const SizedBox(width: 4),
-              Text(
-                _sort,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: const Color(0xFF00B4D8),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

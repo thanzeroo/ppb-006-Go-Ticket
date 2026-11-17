@@ -221,12 +221,11 @@ class _PesananTabState extends State<PesananTab>
                   ),
                   Row(
                     children: [
-                      const Icon(Icons.notifications_none_outlined,
-                          color: Color(0xFF111827), size: 22),
-                      const SizedBox(width: 12),
                       UserAvatar(
                         name: AuthService.instance.currentUser?.fullName,
                         radius: 17,
+                        onTap: () =>
+                            CustomerDashboardScreen.tabNotifier.value = 3,
                       ),
                     ],
                   ),

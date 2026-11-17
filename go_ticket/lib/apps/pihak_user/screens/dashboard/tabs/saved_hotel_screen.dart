@@ -418,12 +418,6 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
                   ),
                   Row(
                     children: [
-                      const Icon(
-                        Icons.notifications_none_outlined,
-                        color: Color(0xFF111827),
-                        size: 22,
-                      ),
-                      const SizedBox(width: 12),
                       UserAvatar(
                         name: AuthService.instance.currentUser?.fullName,
                         radius: 17,
