@@ -7,6 +7,7 @@ import 'package:go_ticket/core/services/auth_service.dart';
 import 'package:go_ticket/core/services/booking_service.dart';
 import 'package:go_ticket/core/utils/currency_formatter.dart';
 import 'package:go_ticket/core/widgets/user_avatar.dart';
+import '../../../../pihak_hotel/services/hotel_operations_store.dart';
 import '../../../router/customer_router.dart';
 import '../../../services/user_booking_storage.dart';
 import '../customer_dashboard_screen.dart';
@@ -41,6 +42,14 @@ class _PesananTabState extends State<PesananTab>
     _subPageController =
         PageController(initialPage: PesananTab.subTabNotifier.value);
     PesananTab.subTabNotifier.addListener(_onSubTabChanged);
+
+    try {
+      HotelOperationsStore.instance.addListener(_onOperationsUpdated);
+    } catch (_) {}
+  }
+
+  void _onOperationsUpdated() {
+    if (mounted) setState(() {});
   }
 
   void _onSubTabChanged() {
@@ -59,6 +68,9 @@ class _PesananTabState extends State<PesananTab>
 
   @override
   void dispose() {
+    try {
+      HotelOperationsStore.instance.removeListener(_onOperationsUpdated);
+    } catch (_) {}
     PesananTab.subTabNotifier.removeListener(_onSubTabChanged);
     _subPageController.dispose();
     _searchController.dispose();
@@ -116,11 +128,57 @@ class _PesananTabState extends State<PesananTab>
     for (final b in localList) {
       final key = b.bookingCode.isNotEmpty ? b.bookingCode : b.id;
       if (map.containsKey(key)) {
-        if (b.status == BookingStatus.cancelled) {
-          map[key] = map[key]!.copyWith(status: BookingStatus.cancelled);
+        final remote = map[key]!;
+        if (remote.status == BookingStatus.checkedIn ||
+            remote.status == BookingStatus.checkedOut) {
+          map[key] = remote.copyWith(
+            roomNumber: b.roomNumber ?? remote.roomNumber,
+          );
+        } else if (b.status == BookingStatus.cancelled) {
+          map[key] = remote.copyWith(
+            status: BookingStatus.cancelled,
+            roomNumber: b.roomNumber ?? remote.roomNumber,
+          );
+        } else if (b.status == BookingStatus.pendingVerification) {
+          // Status baru payment tetap "Menunggu Konfirmasi" sampai staf hotel scan e-tiket
+          bool isVerifiedByStaff = false;
+          try {
+            isVerifiedByStaff =
+                HotelOperationsStore.instance.isETicketVerified(remote.id) ||
+                HotelOperationsStore.instance.isETicketVerified(b.id) ||
+                HotelOperationsStore.instance.isETicketVerified(remote.bookingCode) ||
+                HotelOperationsStore.instance.isETicketVerified(b.bookingCode);
+          } catch (_) {}
+
+          if (isVerifiedByStaff) {
+            map[key] = remote.copyWith(
+              status: BookingStatus.confirmed,
+              roomNumber: b.roomNumber ?? remote.roomNumber,
+            );
+          } else {
+            map[key] = remote.copyWith(
+              status: BookingStatus.pendingVerification,
+              roomNumber: b.roomNumber ?? remote.roomNumber,
+            );
+          }
+        } else {
+          map[key] = remote.copyWith(
+            status: b.status,
+            roomNumber: b.roomNumber ?? remote.roomNumber,
+          );
         }
       } else {
-        map[key] = b;
+        bool isVerifiedByStaff = false;
+        try {
+          isVerifiedByStaff =
+              HotelOperationsStore.instance.isETicketVerified(b.id) ||
+              HotelOperationsStore.instance.isETicketVerified(b.bookingCode);
+        } catch (_) {}
+        if (isVerifiedByStaff && b.status == BookingStatus.pendingVerification) {
+          map[key] = b.copyWith(status: BookingStatus.confirmed);
+        } else {
+          map[key] = b;
+        }
       }
     }
 
@@ -520,11 +578,6 @@ class _PesananTabState extends State<PesananTab>
       dotColor = const Color(0xFFEF4444);
     }
 
-    final createdAt = b.paidAt ?? b.createdAt ?? DateTime.now();
-    final elapsedHours = DateTime.now().difference(createdAt).inHours;
-    final canReject = elapsedHours < 24;
-    final hoursRemaining = (24 - elapsedHours).clamp(0, 24);
-
     return InkWell(
       onTap: () {
         Navigator.pushNamed(
@@ -794,54 +847,6 @@ class _PesananTabState extends State<PesananTab>
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              canReject
-                                  ? Icons.timer_outlined
-                                  : Icons.timer_off_outlined,
-                              size: 13,
-                              color: canReject
-                                  ? const Color(0xFFD97706)
-                                  : Colors.red,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              canReject
-                                  ? 'Toleransi reject: sisa $hoursRemaining jam'
-                                  : 'Toleransi reject berakhir (hangus jika tidak check-in)',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: canReject
-                                    ? const Color(0xFFD97706)
-                                    : Colors.red,
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (canReject)
-                          InkWell(
-                            onTap: () => Navigator.pushNamed(
-                              context,
-                              CustomerRouter.reservationDetail,
-                              arguments: b,
-                            ).then((_) => setState(() {})),
-                            child: Text(
-                              'Reject Tiket >',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.red,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
                   ] else if (isConfirmed) ...[
                     Row(
                       children: [
@@ -851,7 +856,7 @@ class _PesananTabState extends State<PesananTab>
                               context,
                               CustomerRouter.reservationDetail,
                               arguments: b,
-                            ),
+                            ).then((_) => setState(() {})),
                             icon: const Icon(Icons.receipt_long,
                                 size: 15, color: Color(0xFF00B4D8)),
                             label: Text(
@@ -894,6 +899,48 @@ class _PesananTabState extends State<PesananTab>
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final res = await Navigator.pushNamed(
+                            context,
+                            CustomerRouter.rejectReason,
+                            arguments: b,
+                          );
+                          if (res == true && mounted) {
+                            setState(() {
+                              _tabController.animateTo(4);
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Pesanan berhasil di-reject / dibatalkan.'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.cancel_outlined,
+                            size: 15, color: Color(0xFFEF4444)),
+                        label: Text(
+                          'Reject Pesanan',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFFEF4444),
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFEF4444)),
+                          backgroundColor: const Color(0xFFFEF2F2),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
                     ),
                   ] else if (isCompleted) ...[
                     Row(

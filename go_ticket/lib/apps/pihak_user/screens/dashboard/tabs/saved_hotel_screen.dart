@@ -827,6 +827,7 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
                   onTap: () async {
                     await CustomerDataService.instance.toggleSavedHotel(hotel);
                     await _loadHotels();
+                    CustomerDataService.savedHotelsCountNotifier.value = _hotels.length;
                     if (mounted) {
                       ScaffoldMessenger.of(context).hideCurrentSnackBar();
                       ScaffoldMessenger.of(context).showSnackBar(

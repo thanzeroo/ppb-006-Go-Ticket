@@ -25,6 +25,7 @@ import '../screens/settings/security_screen.dart';
 import '../screens/settings/voucher_screen.dart';
 import '../screens/ticket/e_ticket_detail_screen.dart';
 import '../screens/ticket/post_checkout_review_screen.dart';
+import '../screens/ticket/reject_reason_screen.dart';
 import '../screens/ticket/reservation_detail_screen.dart';
 
 /// Router utama Customer App Go Ticket.
@@ -78,6 +79,9 @@ class CustomerRouter {
 
   /// Halaman Detail Reservasi
   static const String reservationDetail = '/ticket/reservation-detail';
+
+  /// Halaman Form Alasan Reject Pesanan
+  static const String rejectReason = '/ticket/reject-reason';
 
   /// Halaman review setelah checkout
   static const String postCheckoutReview = '/ticket/review';
@@ -171,6 +175,12 @@ class CustomerRouter {
       case reservationDetail:
         return _buildRoute(
           ReservationDetailScreen(arguments: settings.arguments),
+          settings,
+        );
+
+      case rejectReason:
+        return _buildRoute(
+          RejectReasonScreen(arguments: settings.arguments),
           settings,
         );
 

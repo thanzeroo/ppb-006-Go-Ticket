@@ -22,11 +22,32 @@ class BerandaTab extends StatefulWidget {
 
 class _BerandaTabState extends State<BerandaTab> {
   final Set<String> _savedHotelIds = {};
+  late Future<List<Map<String, dynamic>>> _promosFuture;
+  late Future<List<HotelModel>> _featuredHotelsFuture;
 
   @override
   void initState() {
     super.initState();
+    _promosFuture = PromoService.instance.getPromos();
+    _featuredHotelsFuture = HotelService.instance.getFeaturedHotels();
     _loadSavedHotels();
+
+    CustomerDashboardScreen.tabNotifier.addListener(_onTabChanged);
+    CustomerDataService.savedHotelsCountNotifier.addListener(_loadSavedHotels);
+  }
+
+  void _onTabChanged() {
+    if (!mounted) return;
+    if (CustomerDashboardScreen.tabNotifier.value == 0) {
+      _loadSavedHotels();
+    }
+  }
+
+  @override
+  void dispose() {
+    CustomerDashboardScreen.tabNotifier.removeListener(_onTabChanged);
+    CustomerDataService.savedHotelsCountNotifier.removeListener(_loadSavedHotels);
+    super.dispose();
   }
 
   Future<void> _loadSavedHotels() async {
@@ -229,7 +250,7 @@ class _BerandaTabState extends State<BerandaTab> {
   // ---------------------------------------------------------------------------
   Widget _buildPromoCard() {
     return FutureBuilder<List<Map<String, dynamic>>>(
-      future: PromoService.instance.getPromos(),
+      future: _promosFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SizedBox.shrink();
@@ -399,7 +420,7 @@ class _BerandaTabState extends State<BerandaTab> {
   // ---------------------------------------------------------------------------
   Widget _buildRekomendasiSection() {
     return FutureBuilder<List<HotelModel>>(
-      future: HotelService.instance.getFeaturedHotels(),
+      future: _featuredHotelsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SizedBox.shrink();

@@ -3,10 +3,8 @@ import 'package:flutter/services.dart';
 
 import 'package:go_ticket/core/models/booking_args.dart';
 import 'package:go_ticket/core/models/booking_model.dart';
-import 'package:go_ticket/core/services/booking_service.dart';
 import 'package:go_ticket/core/utils/currency_formatter.dart';
 import '../../router/customer_router.dart';
-import '../../services/user_booking_storage.dart';
 
 /// Halaman Detail Reservasi Lengkap untuk User/Tamu.
 /// Menampilkan rincian reservasi, alokasi kamar, status, toleransi reject (1 hari),
@@ -82,98 +80,25 @@ class _ReservationDetailScreenState extends State<ReservationDetailScreen> {
 
   bool get _canReject {
     if (_isCancelled) return false;
-    // Tamu hanya bisa me-reject ketika status masih Menunggu Konfirmasi (sebelum check-in/scan)
-    final isPending = _currentStatus == BookingStatus.pendingVerification ||
-        _currentStatus == BookingStatus.pendingPayment;
-    return isPending && _isWithinRejectTolerance;
+    return _currentStatus == BookingStatus.confirmed;
   }
 
   Future<void> _handleReject() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: const [
-            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 24),
-            SizedBox(width: 8),
-            Text('Konfirmasi Reject Tiket', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Apakah Anda yakin ingin me-reject / membatalkan reservasi ini?',
-              style: TextStyle(fontSize: 13, height: 1.4),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEF2F2),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFFCA5A5)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text('Ketentuan Pembatalan:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.red)),
-                  SizedBox(height: 4),
-                  Text('• Pembatalan dalam batas toleransi 1 hari.', style: TextStyle(fontSize: 11, color: Colors.black87)),
-                  Text('• E-Tiket akan dibatalkan & tidak dapat digunakan.', style: TextStyle(fontSize: 11, color: Colors.black87)),
-                  Text('• Dana dikembalikan sesuai metode pembayaran.', style: TextStyle(fontSize: 11, color: Colors.black87)),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Batal', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text('Ya, Reject Pesanan', style: TextStyle(fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ),
+    final res = await Navigator.pushNamed(
+      context,
+      CustomerRouter.rejectReason,
+      arguments: _booking ?? _args,
     );
-
-    if (confirmed != true) return;
-
-    setState(() => _isLoading = true);
-
-    try {
-      final bId = _booking?.id ?? _bookingCode;
-      await BookingService.instance.cancelBooking(bId);
-      await UserBookingStorage.instance.cancelBooking(bId);
-      if (mounted) {
-        setState(() {
-          _isCancelled = true;
-          _isLoading = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Pesanan berhasil di-reject / dibatalkan.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal membatalkan pesanan: $e')),
-        );
-      }
+    if (res == true && mounted) {
+      setState(() {
+        _isCancelled = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pesanan berhasil di-reject / dibatalkan.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
     }
   }
 

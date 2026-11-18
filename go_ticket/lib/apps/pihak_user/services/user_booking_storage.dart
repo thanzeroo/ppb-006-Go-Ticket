@@ -55,7 +55,11 @@ class UserBookingStorage {
   }
 
   /// Batalkan / Reject booking lokal
-  Future<bool> cancelBooking(String idOrCode) async {
+  Future<bool> cancelBooking(
+    String idOrCode, {
+    String? reason,
+    BookingModel? fallbackBooking,
+  }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final list = await getBookings();
@@ -70,6 +74,16 @@ class UserBookingStorage {
         }
         return b;
       }).toList();
+
+      if (!found && fallbackBooking != null) {
+        updated.insert(
+          0,
+          fallbackBooking.copyWith(
+            status: BookingStatus.cancelled,
+          ),
+        );
+        found = true;
+      }
 
       if (found) {
         final jsonList = updated.map((b) => b.toJson()).toList();
