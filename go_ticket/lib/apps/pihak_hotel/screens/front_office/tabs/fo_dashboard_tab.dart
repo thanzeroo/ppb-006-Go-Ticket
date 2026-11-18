@@ -6,6 +6,7 @@ import '../../../../../core/models/user_model.dart';
 import '../../../../../core/services/auth_service.dart';
 import '../../../../../core/services/booking_service.dart';
 import '../../../../../core/services/hotel_service.dart';
+import '../widgets/fo_barcode_scanner_modal.dart';
 
 /// Tab 1: Overview Dashboard Front Office (100% Dinamis dari Database)
 class FoDashboardTab extends StatefulWidget {
@@ -396,8 +397,14 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
                   width: double.infinity,
                   height: 44,
                   child: ElevatedButton(
-                    onPressed: () {
-                      _showActionSnackbar('Membuka Kamera Pemindai QR E-Tiket...');
+                    onPressed: () async {
+                      final res = await FoBarcodeScannerModal.show(
+                        context,
+                        availableBookings: _bookings,
+                      );
+                      if (res != null) {
+                        _loadSummary();
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF00C2FF),
@@ -801,7 +808,15 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
                   iconColor: const Color(0xFF00758F),
                   title: 'Scan QR Tiket',
                   subtitle: 'Validasi Tamu',
-                  onTap: () => widget.onNavigateTab?.call(2), // ke check-in
+                  onTap: () async {
+                    final res = await FoBarcodeScannerModal.show(
+                      context,
+                      availableBookings: _bookings,
+                    );
+                    if (res != null) {
+                      _loadSummary();
+                    }
+                  },
                 ),
               ),
               const SizedBox(width: 12),

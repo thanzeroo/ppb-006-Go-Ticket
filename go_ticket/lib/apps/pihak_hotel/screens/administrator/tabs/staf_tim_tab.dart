@@ -7,6 +7,7 @@ import '../../../../../core/models/hotel_admin_model.dart';
 import '../../../../../core/theme/hotel_admin_theme.dart';
 import 'add_staff_screen.dart';
 import 'edit_staff_screen.dart';
+import '../widgets/request_admin_email_sheet.dart';
 
 /// Tab 3: Manajemen Staf & Hak Akses Administrator
 /// Menampilkan daftar karyawan dengan filter 3 Role Utama:
@@ -122,6 +123,22 @@ class _StafTimTabState extends State<StafTimTab> {
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
             elevation: 0,
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // Outlined Button: Request Penambahan Akun Administrator via Email ke Go Ticket
+        OutlinedButton.icon(
+          onPressed: () => showRequestAdminEmailModal(context),
+          icon: const Icon(Icons.mark_email_unread_outlined, size: 16, color: Color(0xFF00758F)),
+          label: const Text(
+            'Ajukan Akun Admin Baru (Email ke Go Ticket)',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF00758F)),
+          ),
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: Color(0xFFBAE6FD)),
+            minimumSize: const Size.fromHeight(40),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           ),
         ),
         const SizedBox(height: 16),

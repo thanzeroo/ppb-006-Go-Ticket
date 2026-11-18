@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../widgets/lapor_kerusakan_sheet.dart';
 import '../../../../../core/models/maintenance_ticket_model.dart';
@@ -343,9 +344,45 @@ class _KerusakanTabState extends State<KerusakanTab> {
                     ],
                   ),
                 ],
+                const SizedBox(height: 6),
+                // Time log submit otomatis saat dikirimkan
+                Row(
+                  children: [
+                    const Icon(Icons.access_time_rounded, size: 13, color: Color(0xFF0284C7)),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Waktu Submit Lapor: ${t.createdAt.day}/${t.createdAt.month}/${t.createdAt.year} • ${t.createdAt.hour.toString().padLeft(2, '0')}:${t.createdAt.minute.toString().padLeft(2, '0')} WIB',
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF00758F), fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
+
+          // Tampilkan Bukti Foto Kerusakan jika ada
+          if (t.damagePhotoUrls.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: t.damagePhotoUrls.first.startsWith('http')
+                  ? Image.network(
+                      t.damagePhotoUrls.first,
+                      height: 120,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox(),
+                    )
+                  : (File(t.damagePhotoUrls.first).existsSync()
+                      ? Image.file(
+                          File(t.damagePhotoUrls.first),
+                          height: 120,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        )
+                      : const SizedBox()),
+            ),
+          ],
           const SizedBox(height: 12),
 
           // Action buttons

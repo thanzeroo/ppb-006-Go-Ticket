@@ -7,6 +7,43 @@ import '../administrator/administrator_dashboard_screen.dart';
 import '../front_office/fo_dashboard_screen.dart';
 import '../maintenance/maintenance_dashboard_screen.dart';
 
+/// Formatter otomatis untuk ID Petugas: <role-tahun_bekerja_urutan pegawai keberapa>
+/// Contoh: ADM-2025-001 atau STF-2025-084.
+/// Otomatis menyisipkan tanda '-' tanpa perlu diketik manual.
+class StaffIdInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text;
+    // Jika user mengetikkan email (mengandung @), biarkan format teks email biasa
+    if (text.contains('@')) {
+      return newValue;
+    }
+
+    final clean = text.replaceAll('-', '').toUpperCase();
+    if (clean.isEmpty) {
+      return newValue.copyWith(text: '');
+    }
+
+    // Format: 3 huruf role - 4 digit tahun - urutan pegawai
+    final buffer = StringBuffer();
+    for (int i = 0; i < clean.length && i < 11; i++) {
+      if (i == 3 || i == 7) {
+        buffer.write('-');
+      }
+      buffer.write(clean[i]);
+    }
+
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
 /// Layar Login untuk Pihak Hotel.
 /// Menggabungkan role Maintenance & Staf menjadi role tunggal: "Staf"
 /// Serta role "Administrator" sesuai desain visual foto.
@@ -424,6 +461,8 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
           controller: _staffIdController,
           hint: _selectedStaffRole == 0 ? 'STF-2025-084' : 'MTC-2025-012',
           icon: Icons.badge_outlined,
+          inputFormatters: [StaffIdInputFormatter()],
+          textCapitalization: TextCapitalization.characters,
         ),
         const SizedBox(height: 14),
 
@@ -683,8 +722,10 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
         _buildRequiredLabel('ID Petugas / Email Admin'),
         _buildInputField(
           controller: _adminIdController,
-          hint: 'admin@grandamora.hotel',
+          hint: 'Contoh: ADM-2025-001 (atau email)',
           icon: Icons.person_outline_rounded,
+          inputFormatters: [StaffIdInputFormatter()],
+          textCapitalization: TextCapitalization.characters,
         ),
         const SizedBox(height: 14),
 
@@ -946,6 +987,9 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
     required IconData icon,
     bool obscureText = false,
     Widget? suffixIcon,
+    List<TextInputFormatter>? inputFormatters,
+    TextCapitalization textCapitalization = TextCapitalization.none,
+    TextInputType? keyboardType,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -955,6 +999,9 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
       child: TextField(
         controller: controller,
         obscureText: obscureText,
+        inputFormatters: inputFormatters,
+        textCapitalization: textCapitalization,
+        keyboardType: keyboardType,
         style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
         decoration: InputDecoration(
           hintText: hint,

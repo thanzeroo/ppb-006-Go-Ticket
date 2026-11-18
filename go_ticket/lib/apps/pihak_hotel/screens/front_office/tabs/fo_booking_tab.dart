@@ -4,8 +4,13 @@ import '../../../../../core/models/booking_model.dart';
 import '../../../../../core/services/auth_service.dart';
 import '../../../../../core/services/booking_service.dart';
 import '../../../../../core/utils/currency_formatter.dart';
+import '../../../services/hotel_operations_store.dart';
+import '../widgets/fo_barcode_scanner_modal.dart';
 
-/// Tab 2: Booking / Verifikasi Reservasi Front Office (100% Dinamis dari Database)
+/// Tab 2: Booking / Verifikasi Reservasi Front Office
+/// Menampilkan:
+/// 1. Antrean booking tamu yang SUDAH BAYAR tapi E-Tiket belum di-scan/diverifikasi.
+/// 2. Menu Disetujui: tamu yang E-Tiket-nya sudah di-scan/diverifikasi (siap/telah check-in).
 class FoBookingTab extends StatefulWidget {
   const FoBookingTab({super.key});
 
@@ -14,7 +19,8 @@ class FoBookingTab extends StatefulWidget {
 }
 
 class _FoBookingTabState extends State<FoBookingTab> {
-  int _bookingFilterIndex = 0; // 0: Semua, 1: Menunggu Verifikasi, 2: Disetujui
+  // 0: Menunggu Scan E-Tiket (Sudah Bayar), 1: Disetujui (Tiket Terverifikasi), 2: Semua Reservasi
+  int _bookingFilterIndex = 0;
   final TextEditingController _searchBookingController = TextEditingController();
   String _searchQuery = '';
   List<BookingModel> _bookings = [];
@@ -24,6 +30,18 @@ class _FoBookingTabState extends State<FoBookingTab> {
   void initState() {
     super.initState();
     _loadBookings();
+    HotelOperationsStore.instance.addListener(_onStoreUpdated);
+  }
+
+  @override
+  void dispose() {
+    HotelOperationsStore.instance.removeListener(_onStoreUpdated);
+    _searchBookingController.dispose();
+    super.dispose();
+  }
+
+  void _onStoreUpdated() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadBookings() async {
@@ -47,50 +65,69 @@ class _FoBookingTabState extends State<FoBookingTab> {
     }
   }
 
-  @override
-  void dispose() {
-    _searchBookingController.dispose();
-    super.dispose();
-  }
-
-  void _showActionSnackbar(String message) {
+  void _showActionSnackbar(String message, {bool isSuccess = true}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: const Color(0xFF00758F),
+        backgroundColor: isSuccess ? const Color(0xFF00758F) : const Color(0xFFEF4444),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ),
     );
   }
 
-  Future<void> _verify(String id, String code) async {
-    final ok = await BookingService.instance.verifyPayment(id);
-    if (ok) {
-      _showActionSnackbar('Booking $code Berhasil Disetujui! E-Tiket Terbit.');
+  /// Buka modal scanner kamera untuk reservasi ini
+  Future<void> _openCameraScanner([BookingModel? targetBooking]) async {
+    final result = await FoBarcodeScannerModal.show(
+      context,
+      availableBookings: targetBooking != null ? [targetBooking] : _bookings,
+    );
+    if (result != null) {
       _loadBookings();
+    }
+  }
+
+  /// Verifikasi manual jika kamera tidak tersedia
+  Future<void> _verifyManual(BookingModel b) async {
+    try {
+      final ok = await BookingService.instance.verifyPayment(b.id);
+      if (ok) {
+        HotelOperationsStore.instance.verifyETicket(b.id);
+        _showActionSnackbar('E-Tiket booking ${b.bookingCode} berhasil diverifikasi & disetujui!');
+        _loadBookings();
+      }
+    } catch (e) {
+      _showActionSnackbar('Gagal verifikasi: $e', isSuccess: false);
     }
   }
 
   Future<void> _reject(String id, String code) async {
     final ok = await BookingService.instance.cancelBooking(id);
     if (ok) {
-      _showActionSnackbar('Booking $code telah dibatalkan/ditolak.');
+      _showActionSnackbar('Booking $code telah dibatalkan.');
       _loadBookings();
     }
   }
 
   List<BookingModel> get _filteredBookings {
     final q = _searchQuery.trim().toLowerCase();
+    final store = HotelOperationsStore.instance;
+
     return _bookings.where((b) {
-      if (_bookingFilterIndex == 1) {
-        return b.status == BookingStatus.pendingVerification ||
-            b.status == BookingStatus.pendingPayment;
+      final isVerified = store.isETicketVerified(b.id) || b.status == BookingStatus.checkedIn;
+      final isPaidAndWaitingScan = (b.isPaid ||
+              b.status == BookingStatus.confirmed ||
+              b.status == BookingStatus.pendingVerification) &&
+          !isVerified;
+
+      if (_bookingFilterIndex == 0) {
+        // Tamu sudah bayar tapi e-tiket belum di-scan/diverifikasi
+        return isPaidAndWaitingScan;
+      } else if (_bookingFilterIndex == 1) {
+        // Menu Disetujui: E-Tiket sudah di-scan / diverifikasi
+        return isVerified;
       }
-      if (_bookingFilterIndex == 2) {
-        return b.status == BookingStatus.confirmed ||
-            b.status == BookingStatus.checkedIn;
-      }
+      // Semua
       return true;
     }).where((b) {
       if (q.isEmpty) return true;
@@ -103,11 +140,18 @@ class _FoBookingTabState extends State<FoBookingTab> {
 
   @override
   Widget build(BuildContext context) {
-    final pendingCount = _bookings
-        .where((b) =>
-            b.status == BookingStatus.pendingVerification ||
-            b.status == BookingStatus.pendingPayment)
-        .length;
+    final store = HotelOperationsStore.instance;
+    final waitingScanCount = _bookings.where((b) {
+      final isVerified = store.isETicketVerified(b.id) || b.status == BookingStatus.checkedIn;
+      return (b.isPaid ||
+              b.status == BookingStatus.confirmed ||
+              b.status == BookingStatus.pendingVerification) &&
+          !isVerified;
+    }).length;
+
+    final approvedCount = _bookings.where((b) {
+      return store.isETicketVerified(b.id) || b.status == BookingStatus.checkedIn;
+    }).length;
 
     return RefreshIndicator(
       onRefresh: _loadBookings,
@@ -117,25 +161,56 @@ class _FoBookingTabState extends State<FoBookingTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Banner: Verifikasi Reservasi Tamu
+            // Header Banner
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
                 color: const Color(0xFFE8F6FD),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: const Color(0xFFBAE6FD)),
               ),
               child: Row(
-                children: const [
-                  Icon(Icons.verified_user_rounded,
-                      color: Color(0xFF0284C7), size: 18),
-                  SizedBox(width: 8),
-                  Text(
-                    'Verifikasi Reservasi Tamu',
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0F172A),
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00C2FF).withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.qr_code_scanner_rounded,
+                        color: Color(0xFF00758F), size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'Verifikasi Reservasi & E-Tiket Tamu',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Scan barcode e-tiket tamu yang sudah lunas bayar',
+                          style: TextStyle(fontSize: 11, color: Color(0xFF475569)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () => _openCameraScanner(),
+                    icon: const Icon(Icons.camera_alt, size: 14),
+                    label: const Text('Scan Tiket', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF007A87),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     ),
                   ),
                 ],
@@ -143,22 +218,30 @@ class _FoBookingTabState extends State<FoBookingTab> {
             ),
             const SizedBox(height: 14),
 
-            // Filter Tabs
+            // Filter Tabs (Sesuai instruksi: 1. Sudah bayar belum scan, 2. Disetujui/Sudah scan)
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
                   _buildFilterPill(
-                      title: 'Semua Booking',
-                      count: _bookings.length,
-                      index: 0),
+                    title: 'Menunggu Scan E-Tiket',
+                    badgeCount: waitingScanCount,
+                    index: 0,
+                    subtitle: 'Sudah Bayar',
+                  ),
                   const SizedBox(width: 8),
                   _buildFilterPill(
-                      title: 'Menunggu Verifikasi',
-                      badgeCount: pendingCount,
-                      index: 1),
+                    title: 'Disetujui',
+                    count: approvedCount,
+                    index: 1,
+                    subtitle: 'Tiket Terverifikasi',
+                  ),
                   const SizedBox(width: 8),
-                  _buildFilterPill(title: 'Disetujui', index: 2),
+                  _buildFilterPill(
+                    title: 'Semua Booking',
+                    count: _bookings.length,
+                    index: 2,
+                  ),
                 ],
               ),
             ),
@@ -177,10 +260,9 @@ class _FoBookingTabState extends State<FoBookingTab> {
                 onChanged: (val) => setState(() => _searchQuery = val),
                 style: const TextStyle(fontSize: 12.5),
                 decoration: const InputDecoration(
-                  hintText: 'Cari ID Booking / Nama Tamu / No HP',
+                  hintText: 'Cari ID Booking / Nama Tamu / No HP / Tipe Kamar',
                   hintStyle: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                  prefixIcon: Icon(Icons.search_rounded,
-                      size: 19, color: Color(0xFF94A3B8)),
+                  prefixIcon: Icon(Icons.search_rounded, size: 19, color: Color(0xFF94A3B8)),
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(vertical: 12),
                 ),
@@ -198,23 +280,34 @@ class _FoBookingTabState extends State<FoBookingTab> {
                 padding: const EdgeInsets.symmetric(vertical: 48),
                 child: Center(
                   child: Column(
-                    children: const [
-                      Icon(Icons.receipt_long_outlined,
-                          size: 48, color: Color(0xFF94A3B8)),
-                      SizedBox(height: 12),
+                    children: [
+                      Icon(
+                        _bookingFilterIndex == 0
+                            ? Icons.check_circle_outline
+                            : Icons.receipt_long_outlined,
+                        size: 48,
+                        color: const Color(0xFF94A3B8),
+                      ),
+                      const SizedBox(height: 12),
                       Text(
-                        'Tidak ada antrean reservasi saat ini',
-                        style: TextStyle(
+                        _bookingFilterIndex == 0
+                            ? 'Tidak ada tiket yang menunggu verifikasi'
+                            : (_bookingFilterIndex == 1
+                                ? 'Belum ada tiket yang disetujui / diverifikasi'
+                                : 'Tidak ada data reservasi ditemukan'),
+                        style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFF64748B),
                         ),
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
-                        'Reservasi baru dari tamu akan langsung muncul di sini',
-                        style: TextStyle(
-                            fontSize: 12, color: Color(0xFF94A3B8)),
+                        _bookingFilterIndex == 0
+                            ? 'Semua reservasi tamu yang sudah bayar telah diverifikasi.'
+                            : 'Gunakan tombol Scan Tiket untuk memverifikasi tamu.',
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
@@ -222,7 +315,7 @@ class _FoBookingTabState extends State<FoBookingTab> {
               )
             else
               for (final b in _filteredBookings) ...[
-                _buildDynamicBookingCard(b),
+                _buildBookingItemCard(b),
                 const SizedBox(height: 14),
               ],
 
@@ -235,6 +328,7 @@ class _FoBookingTabState extends State<FoBookingTab> {
 
   Widget _buildFilterPill({
     required String title,
+    String? subtitle,
     int? count,
     int? badgeCount,
     required int index,
@@ -246,77 +340,78 @@ class _FoBookingTabState extends State<FoBookingTab> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF00C2FF) : const Color(0xFFEEF2F6),
+          color: isSelected ? const Color(0xFF007A87) : const Color(0xFFEEF2F6),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              count != null ? '$title ($count)' : title,
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                color: isSelected ? Colors.white : const Color(0xFF475569),
-              ),
-            ),
-            if (badgeCount != null && badgeCount > 0) ...[
-              const SizedBox(width: 6),
-              Container(
-                width: 18,
-                height: 18,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFDC2626),
-                  shape: BoxShape.circle,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      count != null ? '$title ($count)' : title,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                        color: isSelected ? Colors.white : const Color(0xFF475569),
+                      ),
+                    ),
+                    if (badgeCount != null && badgeCount > 0) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isSelected ? const Color(0xFF00D1FF) : const Color(0xFFDC2626),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '$badgeCount',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: isSelected ? const Color(0xFF003847) : Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-                alignment: Alignment.center,
-                child: Text(
-                  '$badgeCount',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                if (subtitle != null)
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      color: isSelected ? Colors.white70 : const Color(0xFF94A3B8),
+                    ),
                   ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDynamicBookingCard(BookingModel b) {
-    final isPending = b.status == BookingStatus.pendingVerification ||
-        b.status == BookingStatus.pendingPayment;
-    final isConfirmed = b.status == BookingStatus.confirmed ||
-        b.status == BookingStatus.checkedIn;
-    final isCancelled = b.status == BookingStatus.cancelled ||
-        b.status == BookingStatus.expired;
-
-    Color badgeBg = const Color(0xFFFEF3C7);
-    Color badgeFg = const Color(0xFFD97706);
-    if (isConfirmed) {
-      badgeBg = const Color(0xFFCCFBEF);
-      badgeFg = const Color(0xFF0D9488);
-    } else if (isCancelled) {
-      badgeBg = const Color(0xFFFEE2E2);
-      badgeFg = const Color(0xFFDC2626);
-    }
-
-    final priceStr = CurrencyFormatter.toRupiah(b.totalAmount);
-    final dates =
-        '${b.checkInDate.day}/${b.checkInDate.month} – ${b.checkOutDate.day}/${b.checkOutDate.month}/${b.checkOutDate.year}';
+  Widget _buildBookingItemCard(BookingModel b) {
+    final store = HotelOperationsStore.instance;
+    final isVerified = store.isETicketVerified(b.id) || b.status == BookingStatus.checkedIn;
+    final isPaid = b.isPaid || b.status == BookingStatus.confirmed;
 
     return Container(
-      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(
+          color: isVerified ? const Color(0xFFBAE6FD) : const Color(0xFFE2E8F0),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -325,172 +420,183 @@ class _FoBookingTabState extends State<FoBookingTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    b.bookingCode,
-                    style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF00758F)),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: badgeBg,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      b.status.displayName,
-                      style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: badgeFg),
-                    ),
-                  ),
-                ],
-              ),
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.account_balance_outlined,
-                    size: 18, color: Color(0xFF0284C7)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Metode: ${b.paymentMethod ?? 'Online'} • $dates',
-            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-          ),
-          const SizedBox(height: 12),
-
-          // Guest info
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 19,
-                backgroundColor: const Color(0xFFBAF0FD),
-                child: Text(
-                  b.customerName.isNotEmpty
-                      ? b.customerName.substring(0, 1).toUpperCase()
-                      : 'T',
-                  style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF00758F)),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          // Header Card
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: isVerified
+                  ? const Color(0xFFE0F4FB)
+                  : (isPaid ? const Color(0xFFECFDF5) : const Color(0xFFF8FAFC)),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
                   children: [
-                    Text(
-                      b.customerName,
-                      style: const TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0F172A)),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    Icon(
+                      isVerified
+                          ? Icons.check_circle_rounded
+                          : (isPaid ? Icons.payment_rounded : Icons.schedule_rounded),
+                      size: 16,
+                      color: isVerified
+                          ? const Color(0xFF00758F)
+                          : (isPaid ? const Color(0xFF16A34A) : const Color(0xFFD97706)),
                     ),
+                    const SizedBox(width: 6),
                     Text(
-                      '${b.roomTypeName} (${b.totalNights} Malam • ${b.guestCount} Tamu)',
+                      b.bookingCode,
                       style: const TextStyle(
-                          fontSize: 11, color: Color(0xFF64748B)),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                      ),
                     ),
                   ],
                 ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    priceStr,
-                    style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF0F172A)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isVerified
+                        ? const Color(0xFF007A87)
+                        : (isPaid ? const Color(0xFF16A34A) : const Color(0xFFFEF3C7)),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  Text(
-                    b.isPaid ? 'Lunas' : 'Menunggu',
+                  child: Text(
+                    isVerified
+                        ? 'Disetujui • E-Tiket Valid'
+                        : (isPaid ? 'Sudah Bayar • Menunggu Scan' : 'Menunggu Bayar'),
                     style: TextStyle(
                       fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: b.isPaid
-                          ? const Color(0xFF16A34A)
-                          : const Color(0xFFD97706),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          if (isPending) ...[
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: SizedBox(
-                    height: 38,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _reject(b.id, b.bookingCode),
-                      icon: const Icon(Icons.cancel_outlined,
-                          color: Color(0xFFDC2626), size: 15),
-                      label: const Text('Tolak',
-                          style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFFDC2626))),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFEE2E2),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16)),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 5,
-                  child: SizedBox(
-                    height: 38,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _verify(b.id, b.bookingCode),
-                      icon: const Icon(Icons.verified_outlined,
-                          color: Colors.white, size: 16),
-                      label: const Text('Setujui & E-Tiket',
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00C2FF),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16)),
-                      ),
+                      fontWeight: FontWeight.bold,
+                      color: (isVerified || isPaid) ? Colors.white : const Color(0xFFB45309),
                     ),
                   ),
                 ),
               ],
             ),
-          ],
+          ),
+
+          // Body Rincian Tamu
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        b.customerName,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                    ),
+                    Text(
+                      CurrencyFormatter.toRupiah(b.totalAmount),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0284C7),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${b.roomTypeName} • ${b.totalNights} Malam',
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF475569), fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Tanggal: ${b.checkInDate.day}/${b.checkInDate.month}/${b.checkInDate.year} – ${b.checkOutDate.day}/${b.checkOutDate.month}/${b.checkOutDate.year}',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                ),
+                if (b.customerPhone != null && b.customerPhone!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text('No. HP: ${b.customerPhone}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                ],
+
+                const SizedBox(height: 12),
+                const Divider(height: 1),
+                const SizedBox(height: 12),
+
+                // Action Buttons
+                Row(
+                  children: [
+                    if (!isVerified) ...[
+                      // Tombol Scan Barcode Kamera Langsung
+                      Expanded(
+                        flex: 3,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _openCameraScanner(b),
+                          icon: const Icon(Icons.qr_code_scanner_rounded, size: 16),
+                          label: const Text(
+                            'Scan Kamera & Konfirmasi',
+                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF00C2FF),
+                            foregroundColor: const Color(0xFF003847),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Tombol Verifikasi Cepat
+                      Expanded(
+                        flex: 2,
+                        child: OutlinedButton(
+                          onPressed: () => _verifyManual(b),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFFBAE6FD)),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: const Text(
+                            'Verifikasi',
+                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF007A87)),
+                          ),
+                        ),
+                      ),
+                    ] else ...[
+                      // Badge info tiket telah disetujui & check-in
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDCFCE7),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(Icons.verified, size: 16, color: Color(0xFF16A34A)),
+                              SizedBox(width: 6),
+                              Text(
+                                'E-Tiket Tamu Terverifikasi & Disetujui',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF16A34A),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

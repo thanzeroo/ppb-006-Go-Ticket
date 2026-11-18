@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../../../core/config/supabase_config.dart';
 import '../../../../../../core/services/auth_service.dart';
+import '../widgets/request_admin_email_sheet.dart';
 
 /// Halaman Tambah Karyawan Baru untuk Administrator Hotel
 /// Mendukung 3 Role:
@@ -91,6 +92,19 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
   }
 
   void _onRoleChanged(int newRole) {
+    if (newRole == 2) {
+      showRequestAdminEmailModal(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Akun Administrator hanya dapat dibuat oleh Super Admin/Pihak Go Ticket. Silakan ajukan via formulir email.',
+          ),
+          backgroundColor: Color(0xFF007A87),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
     setState(() {
       _selectedRole = newRole;
     });
@@ -1061,16 +1075,16 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
           ),
           const SizedBox(height: 10),
 
-          // 3. Role Administrator
+          // 3. Role Administrator (Hanya via Go Ticket)
           _buildRoleOption(
             index: 2,
             title: 'Administrator',
-            dept: 'Departemen Manajemen Hotel & Keuangan',
-            badge: 'Portal Admin',
-            badgeBg: const Color(0xFFDCFCE7),
-            badgeFg: const Color(0xFF15803D),
+            dept: 'Wewenang Pihak Go Ticket',
+            badge: 'Via Email Go Ticket',
+            badgeBg: const Color(0xFFFEF3C7),
+            badgeFg: const Color(0xFFB45309),
             desc:
-                'Mengelola akun staf & maintenance, master kamar & kalender tarif, audit buku kas keuangan, serta performa properti.',
+                'Hanya Super Admin / Pihak Go Ticket yang dapat membuatkan akun Administrator. Klik untuk mengajukan via email.',
             icon: Icons.admin_panel_settings_outlined,
           ),
           const SizedBox(height: 16),

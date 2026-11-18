@@ -1,8 +1,21 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../../../core/models/room_model.dart';
 import '../../../../../../core/services/auth_service.dart';
 import '../../../../../../core/services/hotel_service.dart';
+
+/// Item foto di galeri kamar (bisa berasal dari file lokal kamera/galeri atau URL internet)
+class RoomPhotoItem {
+  final File? file;
+  final String? url;
+  String label;
+
+  RoomPhotoItem({this.file, this.url, required this.label});
+
+  String get displayPath => url ?? file?.path ?? '';
+}
 
 class AddRoomTypeScreen extends StatefulWidget {
   const AddRoomTypeScreen({super.key});
@@ -28,6 +41,20 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
   late TextEditingController _depositController;
   String _selectedCategory = 'Suite Mewah (Luxury Suite)';
 
+  // Controllers untuk Alokasi Kuota, Jumlah Lantai, dan Nomor Kamar
+  late TextEditingController _unitCountController;
+  late TextEditingController _floorCountController;
+  int _unitCount = 10;
+  int _floorCount = 2;
+
+  // 0: Otomatis dari 001, dst | 1: Otomatis per Lantai (101, 201..) | 2: Manual 1 per 1
+  int _numberingMode = 0;
+  List<String> _roomNumbers = [];
+
+  // Galeri Foto Resolusi Tinggi
+  final ImagePicker _picker = ImagePicker();
+  final List<RoomPhotoItem> _galleryPhotos = [];
+
   final List<String> _categories = [
     'Suite Mewah (Luxury Suite)',
     'Deluxe Room (Executive)',
@@ -47,21 +74,36 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
   ];
   late Set<String> _selectedFacilities;
 
-  final List<Map<String, dynamic>> _roomsFloor2 = [
-    {'num': '#201'}, {'num': '#202'}, {'num': '#203'}, {'num': '#204'},
-  ];
-  final List<Map<String, dynamic>> _roomsFloor3 = [
-    {'num': '#301'}, {'num': '#302'}, {'num': '#303'}, {'num': '#304'},
-  ];
-
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController();
-    _weekdayPriceController = TextEditingController();
-    _weekendPriceController = TextEditingController();
-    _depositController = TextEditingController();
+    _weekdayPriceController = TextEditingController(text: '750.000');
+    _weekendPriceController = TextEditingController(text: '850.000');
+    _depositController = TextEditingController(text: '200.000');
     _selectedFacilities = Set.from(_facilities);
+
+    _unitCountController = TextEditingController(text: '$_unitCount');
+    _floorCountController = TextEditingController(text: '$_floorCount');
+
+    // Inisialisasi nomor kamar awal
+    _generateRoomNumbers();
+
+    // Inisialisasi sampel galeri foto resolusi tinggi
+    _galleryPhotos.addAll([
+      RoomPhotoItem(
+        url: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800&auto=format&fit=crop',
+        label: 'Cover Utama',
+      ),
+      RoomPhotoItem(
+        url: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&auto=format&fit=crop',
+        label: 'Kamar Mandi',
+      ),
+      RoomPhotoItem(
+        url: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=400&auto=format&fit=crop',
+        label: 'Balkon / Teras',
+      ),
+    ]);
   }
 
   @override
@@ -70,7 +112,211 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
     _weekdayPriceController.dispose();
     _weekendPriceController.dispose();
     _depositController.dispose();
+    _unitCountController.dispose();
+    _floorCountController.dispose();
     super.dispose();
+  }
+
+  /// Generator nomor kamar dinamis sesuai pilihan mode:
+  /// Mode 0: Otomatis dari 001, 002, 003, dst.
+  /// Mode 1: Otomatis Berdasarkan Lantai (Lantai 1: 101, 102..; Lantai 2: 201, 202..)
+  /// Mode 2: Input manual 1 per 1
+  void _generateRoomNumbers() {
+    if (_numberingMode == 2) return; // Mode manual tidak di-overwrite
+
+    final List<String> list = [];
+    if (_numberingMode == 0) {
+      // 001, 002, 003, dst
+      for (int i = 1; i <= _unitCount; i++) {
+        list.add(i.toString().padLeft(3, '0'));
+      }
+    } else if (_numberingMode == 1) {
+      // Sesuai pembagian lantai
+      final floors = _floorCount > 0 ? _floorCount : 1;
+      final unitsPerFloor = (_unitCount / floors).ceil();
+      int currentUnit = 0;
+
+      for (int fl = 1; fl <= floors; fl++) {
+        for (int u = 1; u <= unitsPerFloor && currentUnit < _unitCount; u++) {
+          final roomNum = '$fl${u.toString().padLeft(2, '0')}';
+          list.add(roomNum);
+          currentUnit++;
+        }
+      }
+    }
+
+    setState(() {
+      _roomNumbers = list;
+    });
+  }
+
+  void _updateUnitCount(int delta) {
+    int val = _unitCount + delta;
+    if (val < 1) val = 1;
+    if (val > 200) val = 200;
+    setState(() {
+      _unitCount = val;
+      _unitCountController.text = '$val';
+      _generateRoomNumbers();
+    });
+  }
+
+  void _updateFloorCount(int delta) {
+    int val = _floorCount + delta;
+    if (val < 1) val = 1;
+    if (val > 50) val = 50;
+    setState(() {
+      _floorCount = val;
+      _floorCountController.text = '$val';
+      _generateRoomNumbers();
+    });
+  }
+
+  /// Tambah nomor kamar manual 1 per 1
+  void _showAddManualRoomDialog() {
+    final controller = TextEditingController(
+      text: '${_roomNumbers.length + 1}'.padLeft(3, '0'),
+    );
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Tambah Nomor Kamar Manual', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'Contoh: 101, 204A, Penthouse-1',
+            labelText: 'Nomor Kamar Fisik',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          ElevatedButton(
+            onPressed: () {
+              final text = controller.text.trim();
+              if (text.isNotEmpty) {
+                setState(() {
+                  _roomNumbers.add(text);
+                  _unitCount = _roomNumbers.length;
+                  _unitCountController.text = '$_unitCount';
+                });
+              }
+              Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF007A87)),
+            child: const Text('Tambah', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Edit nomor kamar yang sudah ada
+  void _editRoomNumberDialog(int index) {
+    final controller = TextEditingController(text: _roomNumbers[index]);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Edit Nomor Kamar #${_roomNumbers[index]}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(labelText: 'Nomor Kamar Baru'),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _roomNumbers.removeAt(index);
+                _unitCount = _roomNumbers.length;
+                _unitCountController.text = '$_unitCount';
+              });
+              Navigator.pop(ctx);
+            },
+            child: const Text('Hapus Kamar', style: TextStyle(color: Color(0xFFDC2626))),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final text = controller.text.trim();
+              if (text.isNotEmpty) {
+                setState(() {
+                  _roomNumbers[index] = text;
+                });
+              }
+              Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF007A87)),
+            child: const Text('Simpan', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Buka kamera atau galeri untuk tambah foto kamar resolusi tinggi
+  Future<void> _pickGalleryImage(ImageSource source) async {
+    try {
+      final XFile? file = await _picker.pickImage(
+        source: source,
+        imageQuality: 90,
+      );
+      if (file != null) {
+        setState(() {
+          final count = _galleryPhotos.length + 1;
+          _galleryPhotos.add(
+            RoomPhotoItem(
+              file: File(file.path),
+              label: count == 1 ? 'Cover Utama' : 'Foto Kamar #$count',
+            ),
+          );
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal mengambil foto: $e'), backgroundColor: const Color(0xFFEF4444)),
+      );
+    }
+  }
+
+  /// Tambah foto kamar via URL web
+  void _showAddPhotoUrlDialog() {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Tambah URL Foto Resolusi Tinggi', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'https://images.unsplash.com/...',
+            labelText: 'URL Gambar',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          ElevatedButton(
+            onPressed: () {
+              final text = controller.text.trim();
+              if (text.isNotEmpty) {
+                setState(() {
+                  final count = _galleryPhotos.length + 1;
+                  _galleryPhotos.add(
+                    RoomPhotoItem(
+                      url: text,
+                      label: count == 1 ? 'Cover Utama' : 'Foto Kamar #$count',
+                    ),
+                  );
+                });
+              }
+              Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF007A87)),
+            child: const Text('Tambah', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _submitRoom() async {
@@ -96,25 +342,33 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
       final weekendPrice =
           double.tryParse(rawWeekend) ?? (weekdayPrice * 1.15);
 
+      final photosList = _galleryPhotos.map((p) => p.displayPath).where((s) => s.isNotEmpty).toList();
+      final mainPhoto = photosList.isNotEmpty ? photosList.first : null;
+      final roomNo = _roomNumbers.isNotEmpty ? _roomNumbers.first : '101';
+
       final newRoom = RoomModel(
         id: '',
         hotelId: hotelId,
-        roomNumber: '101',
+        roomNumber: roomNo,
         typeName: name,
         pricePerNight: weekdayPrice.round(),
         weekendPrice: weekendPrice.round(),
         maxGuests: 2,
         roomSizeM2: 28.0,
         bedType: 'King Bed',
+        totalUnits: _unitCount > 0 ? _unitCount : 10,
+        floorNumber: _floorCount,
         facilities: _selectedFacilities.toList(),
+        mainImageUrl: mainPhoto,
+        imageUrls: photosList,
       );
 
       await HotelService.instance.addRoom(newRoom);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tipe kamar baru berhasil diterbitkan ke database!'),
-          backgroundColor: Color(0xFF007A87),
+        SnackBar(
+          content: Text('Tipe kamar "$name" ($roomNo, $_unitCount unit di $_floorCount lantai) berhasil diterbitkan!'),
+          backgroundColor: const Color(0xFF007A87),
         ),
       );
       Navigator.pop(context, true);
@@ -163,49 +417,38 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.more_vert, color: Color(0xFF475569)),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Top Badges
-            _buildTopBadges(),
-
-            const SizedBox(height: 12),
-            // Sub Tabs
-            _buildTabSwitcher(),
-
+            _buildTabSelector(),
             const SizedBox(height: 16),
-            // Card 1: Informasi Dasar & Spesifikasi
+
+            // Card 1: Informasi Dasar
             _buildBasicInfoCard(),
-
             const SizedBox(height: 16),
-            // Card 2: Alokasi Kuota & Inventaris
+
+            // Card 2: Alokasi Kuota & Inventaris (Sesuai instruksi: Simpel, input unit -/+, lantai -/+, nomor kamar auto/manual)
             _buildQuotaInventoryCard(),
-
             const SizedBox(height: 16),
-            // Card 3: Pengaturan Tarif & Dynamic Pricing
+
+            // Card 3: Pengaturan Tarif & Pricing
             _buildPricingCard(),
-
             const SizedBox(height: 16),
-            // Card 4: Fasilitas Kamar
+
+            // Card 4: Fasilitas & Kenyamanan
             _buildFacilitiesCard(),
-
             const SizedBox(height: 16),
-            // Card 5: Galeri Foto Resolusi Tinggi
+
+            // Card 5: Galeri Foto Resolusi Tinggi (Sesuai instruksi: Berfungsi dengan kamera/galeri)
             _buildPhotoGalleryCard(),
-
             const SizedBox(height: 16),
+
             // Card 6: Kebijakan & Deposit
             _buildPolicyDepositCard(),
-
             const SizedBox(height: 24),
+
             // Bottom Action
             ElevatedButton.icon(
               onPressed: _isSaving ? null : _submitRoom,
@@ -220,19 +463,16 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
                     )
                   : const Icon(Icons.publish, size: 18),
               label: Text(
-                _isSaving ? 'Menyimpan...' : 'Terbitkan Tipe Kamar →',
-                style:
-                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                _isSaving ? 'Menerbitkan...' : 'Terbitkan Tipe Kamar',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
               ),
               style: ElevatedButton.styleFrom(
-                minimumSize: const Size.fromHeight(50),
-                backgroundColor: const Color(0xFF007A87),
+                backgroundColor: _teal,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                minimumSize: const Size.fromHeight(48),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
-
             const SizedBox(height: 24),
           ],
         ),
@@ -240,385 +480,306 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
     );
   }
 
-  Widget _buildTopBadges() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: const Color(0xFFBAE6FD).withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            children: const [
-              Icon(Icons.circle, size: 6, color: Color(0xFF0284C7)),
-              SizedBox(width: 6),
-              Text(
-                'Mode Setup Properti & Master Kamar',
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF0369A1)),
-              ),
-            ],
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE2E8F0),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            children: const [
-              Icon(Icons.description_outlined, size: 12, color: Color(0xFF64748B)),
-              SizedBox(width: 4),
-              Text(
-                'Draft #RMT-2025-04',
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF475569)),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTabSwitcher() {
+  Widget _buildTabSelector() {
     return Container(
-      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFE2E8F0).withValues(alpha: 0.6),
+        color: const Color(0xFFE2E8F0),
         borderRadius: BorderRadius.circular(12),
       ),
+      padding: const EdgeInsets.all(4),
       child: Row(
         children: [
           Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _selectedTab = 0),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: _selectedTab == 0 ? _teal : Colors.transparent,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.info_outline, size: 14, color: _selectedTab == 0 ? Colors.white : const Color(0xFF475569)),
-                    const SizedBox(width: 6),
-                    Text(
-                      '1. Info & Kapasitas',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: _selectedTab == 0 ? Colors.white : const Color(0xFF475569),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            child: _buildTabButton(0, 'Info & Kapasitas'),
           ),
-          const SizedBox(width: 4),
           Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _selectedTab = 1),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: _selectedTab == 1 ? _teal : Colors.transparent,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.receipt_long_outlined, size: 14, color: _selectedTab == 1 ? Colors.white : const Color(0xFF475569)),
-                    const SizedBox(width: 6),
-                    Text(
-                      '2. Kuota & Tarif',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: _selectedTab == 1 ? Colors.white : const Color(0xFF475569),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            child: _buildTabButton(1, 'Kuota & Tarif'),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTabButton(int index, String title) {
+    final isSel = _selectedTab == index;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedTab = index),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: isSel ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: isSel
+              ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]
+              : null,
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          title,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+            color: isSel ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildBasicInfoCard() {
     return _buildSectionContainer(
-      icon: Icons.hotel,
-      title: 'Informasi Dasar & Spesifikasi',
-      subtitle: 'Atribut fisik dan klasifikasi kamar hotel',
+      icon: Icons.hotel_outlined,
+      title: 'Informasi Dasar Kamar',
+      subtitle: 'Nama kategori dan spesifikasi fisik',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Nama Tipe Kamar
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text('Nama Tipe Kamar', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155))),
-              Text('*Wajib', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFFDC2626))),
-            ],
-          ),
-          const SizedBox(height: 6),
-          TextFormField(
+          _buildFieldLabel('Nama Tipe Kamar *'),
+          _buildInput(
             controller: _nameController,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: const Color(0xFFF8FAFC),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-            ),
+            hint: 'Contoh: Deluxe Ocean View Suite',
           ),
-          const SizedBox(height: 4),
-          Row(
-            children: const [
-              Icon(Icons.info_outline, size: 12, color: Color(0xFF007A87)),
-              SizedBox(width: 4),
-              Text('Nama yang akan ditampilkan di aplikasi tamu Go Ticket', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
-            ],
-          ),
-
-          const SizedBox(height: 14),
-          const Text('Kategori Kamar', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155))),
-          const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedCategory,
-                isExpanded: true,
-                icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF64748B)),
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => _selectedCategory = val);
-                },
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 14),
-          // 3 Column Specs
+          const SizedBox(height: 12),
+          _buildFieldLabel('Kategori Kamar'),
+          _buildDropdown(),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
-                child: _buildSpecBox(icon: Icons.square_foot, title: 'Luas', value: '52 m²'),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildFieldLabel('Luas Kamar (m²)'),
+                    _buildInput(
+                      hint: '36',
+                      prefixText: '',
+                      suffixText: 'm²',
+                      keyboardType: TextInputType.number,
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
               Expanded(
-                child: _buildSpecBox(icon: Icons.bed, title: 'Ranjang', value: '1 Super King'),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildSpecBox(icon: Icons.bathtub, title: 'Mandi', value: '1 Bathtub'),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildFieldLabel('Tipe Ranjang'),
+                    _buildBedDropdown(),
+                  ],
+                ),
               ),
             ],
-          ),
-
-          const SizedBox(height: 16),
-          // Kapasitas Tamu Maksimal
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: const [
-                  Icon(Icons.group_outlined, size: 16, color: Color(0xFF007A87)),
-                  SizedBox(width: 6),
-                  Text('Kapasitas Maksimal\nTamu', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF334155))),
-                ],
-              ),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0FDFE),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFBAE6FD)),
-                    ),
-                    child: const Text('2 Dewasa', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF007A87))),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0FDFE),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFBAE6FD)),
-                    ),
-                    child: const Text('1 Anak', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF007A87))),
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 14),
-          // Opsi Extra Bed
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text('Opsi Extra Bed (Kasur Tambahan)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF334155))),
-                      Text('+ Rp 350.000 / malam', style: TextStyle(fontSize: 10, color: Color(0xFF16A34A), fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                ),
-                Switch(
-                  value: _extraBed,
-                  onChanged: (val) => setState(() => _extraBed = val),
-                  activeThumbColor: Colors.white,
-                  activeTrackColor: const Color(0xFF007A87),
-                ),
-              ],
-            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSpecBox({required IconData icon, required String title, required String value}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0FDFE),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFCCFBF1)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, size: 18, color: const Color(0xFF007A87)),
-          const SizedBox(height: 4),
-          Text(title, style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
-          const SizedBox(height: 2),
-          Text(value, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)), textAlign: TextAlign.center),
-        ],
-      ),
-    );
-  }
-
+  /// -------------------------------------------------------------------------
+  /// CARD ALOKASI KUOTA & INVENTARIS
+  /// Sesuai instruksi:
+  /// - Total input berapa unit dengan -()+ atau ketik manual
+  /// - Input berapa lantai dengan -()+ atau ketik manual
+  /// - Nomor kamar bisa otomatis dari 001, dst atau manual 1 per 1
+  /// -------------------------------------------------------------------------
   Widget _buildQuotaInventoryCard() {
     return _buildSectionContainer(
       icon: Icons.layers_outlined,
       title: 'Alokasi Kuota & Inventaris',
-      subtitle: 'Sinkronisasi nomor kamar dan OTA',
+      subtitle: 'Kelola lantai, jumlah unit, dan nomor kamar fisik',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF0FDFE),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFBAE6FD)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: const [
-                          Text('Dijual di Go Ticket', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0284C7))),
-                          Icon(Icons.public, size: 14, color: Color(0xFF0284C7)),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      RichText(
-                        text: const TextSpan(
-                          children: [
-                            TextSpan(text: '10 Unit', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      const Text('Kuota Online Terbuka', style: TextStyle(fontSize: 9, color: Color(0xFF16A34A), fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: const [
-                          Text('Cadangan FO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
-                          Icon(Icons.lock_outline, size: 14, color: Color(0xFF475569)),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      RichText(
-                        text: const TextSpan(
-                          children: [
-                            TextSpan(text: '2 Unit', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      const Text('Buffer Direct Booking', style: TextStyle(fontSize: 9, color: Color(0xFF94A3B8))),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 14),
+          // 1. INPUT BERAPA LANTAI HOTEL
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text('Hubungkan Nomor Kamar Fisik', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
-              Text('8 terpasang', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    'Jumlah Lantai / Loteng',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  ),
+                  Text('Kamar tersebar di berapa lantai?', style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B))),
+                ],
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.remove, size: 16),
+                      onPressed: () => _updateFloorCount(-1),
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    ),
+                    SizedBox(
+                      width: 44,
+                      child: TextField(
+                        controller: _floorCountController,
+                        textAlign: TextAlign.center,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        decoration: const InputDecoration(border: InputBorder.none, isDense: true),
+                        onSubmitted: (val) {
+                          final parsed = int.tryParse(val) ?? 1;
+                          _updateFloorCount(parsed - _floorCount);
+                        },
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.add, size: 16),
+                      onPressed: () => _updateFloorCount(1),
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 14),
 
-          _buildFloorRoomsPills('Lt. 2:', _roomsFloor2),
+          // 2. INPUT TOTAL UNIT KAMAR
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    'Total Unit Kamar *',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  ),
+                  Text('Berapa unit tipe kamar ini tersedia?', style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B))),
+                ],
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.remove, size: 16),
+                      onPressed: () => _updateUnitCount(-1),
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    ),
+                    SizedBox(
+                      width: 44,
+                      child: TextField(
+                        controller: _unitCountController,
+                        textAlign: TextAlign.center,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        decoration: const InputDecoration(border: InputBorder.none, isDense: true),
+                        onSubmitted: (val) {
+                          final parsed = int.tryParse(val) ?? 1;
+                          _updateUnitCount(parsed - _unitCount);
+                        },
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.add, size: 16),
+                      onPressed: () => _updateUnitCount(1),
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // 3. PILIHAN MODE PENOMORAN KAMAR
+          const Text(
+            'Format Nomor Kamar',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+          ),
           const SizedBox(height: 6),
-          _buildFloorRoomsPills('Lt. 3:', _roomsFloor3),
+          Row(
+            children: [
+              _buildNumberingModeChip('Otomatis (001, dst)', 0),
+              const SizedBox(width: 6),
+              _buildNumberingModeChip('Per Lantai (101, 201)', 1),
+              const SizedBox(width: 6),
+              _buildNumberingModeChip('Manual 1 per 1', 2),
+            ],
+          ),
+          const SizedBox(height: 14),
 
-          const SizedBox(height: 10),
+          // Summary Pill
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDFE),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFBAE6FD)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Total: $_unitCount Unit di $_floorCount Lantai',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF00758F)),
+                ),
+                Text(
+                  '${_roomNumbers.length} nomor aktif',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF0284C7), fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // DAFTAR CHIPS NOMOR KAMAR FISIK
+          const Text(
+            'Daftar Nomor Kamar (Ketuk nomor untuk ubah/hapus):',
+            style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (int i = 0; i < _roomNumbers.length; i++)
+                InkWell(
+                  onTap: () => _editRoomNumberDialog(i),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '#${_roomNumbers[i]}',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.edit, size: 10, color: Color(0xFF64748B)),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Tombol + Tambah Nomor Kamar Manual
           OutlinedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.add, size: 14, color: Color(0xFF007A87)),
-            label: const Text('Tambah No. Kamar', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF007A87))),
+            onPressed: _showAddManualRoomDialog,
+            icon: const Icon(Icons.add, size: 15, color: Color(0xFF007A87)),
+            label: const Text('Tambah No. Kamar Manual', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF007A87))),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(36),
               side: const BorderSide(color: Color(0xFFBAE6FD)),
@@ -630,30 +791,206 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
     );
   }
 
-  Widget _buildFloorRoomsPills(String floorTitle, List<Map<String, dynamic>> rooms) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 45,
-          child: Text(floorTitle, style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
-        ),
-        Expanded(
-          child: Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            children: rooms.map((r) {
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEEF2F6),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(r['num'] as String, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
-              );
-            }).toList(),
+  Widget _buildNumberingModeChip(String label, int mode) {
+    final isSel = _numberingMode == mode;
+    return Expanded(
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _numberingMode = mode;
+            _generateRoomNumbers();
+          });
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          decoration: BoxDecoration(
+            color: isSel ? const Color(0xFF007A87) : const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: isSel ? const Color(0xFF007A87) : const Color(0xFFCBD5E1)),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: isSel ? Colors.white : const Color(0xFF475569),
+            ),
           ),
         ),
-      ],
+      ),
+    );
+  }
+
+  /// -------------------------------------------------------------------------
+  /// CARD GALERI FOTO RESOLUSI TINGGI
+  /// Sesuai instruksi:
+  /// - Berfungsi upload foto via kamera atau galeri
+  /// - Menampilkan thumbnail dengan aksi cover & delete
+  /// -------------------------------------------------------------------------
+  Widget _buildPhotoGalleryCard() {
+    return _buildSectionContainer(
+      icon: Icons.photo_camera_back_outlined,
+      title: 'Galeri Foto Resolusi Tinggi',
+      subtitle: 'Upload foto kamar via kamera atau berkas galeri',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Banner Upload Area
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE6FAFF),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF00D1FF).withValues(alpha: 0.4)),
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.cloud_upload_outlined, size: 30, color: Color(0xFF005E73)),
+                const SizedBox(height: 6),
+                const Text(
+                  'Unggah Foto Kamar Beresolusi Tinggi',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Telah terunggah ${_galleryPhotos.length} foto kamar.',
+                  style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () => _pickGalleryImage(ImageSource.camera),
+                      icon: const Icon(Icons.camera_alt, size: 14),
+                      label: const Text('Kamera', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF007A87),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: () => _pickGalleryImage(ImageSource.gallery),
+                      icon: const Icon(Icons.photo_library, size: 14),
+                      label: const Text('Galeri HP', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00C2FF),
+                        foregroundColor: const Color(0xFF003847),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: _showAddPhotoUrlDialog,
+                      icon: const Icon(Icons.link, size: 14),
+                      label: const Text('URL Link', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFF007A87)),
+                        foregroundColor: const Color(0xFF007A87),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Tampilan Foto yang Sudah Ada di Galeri
+          const Text(
+            'Pratinjau Foto Kamar (Foto pertama akan menjadi cover):',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+          ),
+          const SizedBox(height: 8),
+
+          SizedBox(
+            height: 100,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _galleryPhotos.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (ctx, i) {
+                final photo = _galleryPhotos[i];
+                final isCover = i == 0;
+
+                return Stack(
+                  children: [
+                    Container(
+                      width: 120,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF334155),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isCover ? const Color(0xFF00C2FF) : Colors.transparent,
+                          width: 2,
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: photo.url != null
+                            ? Image.network(
+                                photo.url!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const Center(
+                                  child: Icon(Icons.broken_image, color: Colors.white38),
+                                ),
+                              )
+                            : Image.file(
+                                photo.file!,
+                                fit: BoxFit.cover,
+                              ),
+                      ),
+                    ),
+
+                    // Label Cover
+                    if (isCover)
+                      Positioned(
+                        top: 4,
+                        left: 4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF007A87),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text('Cover', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white)),
+                        ),
+                      ),
+
+                    // Tombol Hapus Foto
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _galleryPhotos.removeAt(i);
+                          });
+                        },
+                        child: const CircleAvatar(
+                          radius: 10,
+                          backgroundColor: Colors.black54,
+                          child: Icon(Icons.close, size: 12, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -661,109 +998,58 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
     return _buildSectionContainer(
       icon: Icons.monetization_on_outlined,
       title: 'Pengaturan Tarif & Dynamic Pricing',
-      subtitle: 'Strategi pendapatan & AI yield manager',
+      subtitle: 'Strategi harga hari kerja dan akhir pekan',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Tarif Dasar Weekday (Sen – Kam)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
-          const SizedBox(height: 6),
-          TextFormField(
-            controller: _weekdayPriceController,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: const Color(0xFFF8FAFC),
-              suffixText: '/malam',
-              suffixStyle: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-            ),
-          ),
-
-          const SizedBox(height: 12),
-          const Text('Tarif Weekend (Jum – Min)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
-          const SizedBox(height: 6),
-          TextFormField(
-            controller: _weekendPriceController,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: const Color(0xFFF8FAFC),
-              suffixText: '/malam',
-              suffixStyle: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-            ),
-          ),
-
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0FDFE),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFBAE6FD)),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
-                    Text('Estimasi Komisi Go Ticket OTA (10%):', style: TextStyle(fontSize: 11, color: Color(0xFFEF4444))),
-                    Text('-Rp 145.000', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFEF4444))),
-                  ],
-                ),
-                const Divider(height: 14, color: Color(0xFFE0F2FE)),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: const [
-                        Icon(Icons.account_balance_wallet_outlined, size: 14, color: Color(0xFF007A87)),
-                        SizedBox(width: 4),
-                        Text('Penerimaan Bersih Hotel:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF007A87))),
-                      ],
+                    _buildFieldLabel('Tarif Weekday (Sen-Kam) *'),
+                    _buildInput(
+                      controller: _weekdayPriceController,
+                      prefixText: 'Rp ',
+                      keyboardType: TextInputType.number,
                     ),
-                    const Text('Rp 1.305.000', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFF007A87))),
                   ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildFieldLabel('Tarif Weekend (Jum-Min) *'),
+                    _buildInput(
+                      controller: _weekendPriceController,
+                      prefixText: 'Rp ',
+                      keyboardType: TextInputType.number,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-
           const SizedBox(height: 12),
-          // Smart Surge Pricing
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0FDFE),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFBAE6FD)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.trending_up, size: 18, color: Color(0xFF007A87)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text('Smart Surge Pricing Otomatis', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF007A87))),
-                      Text('Ditenagai AI Demand Predictor', style: TextStyle(fontSize: 9, color: Color(0xFF64748B))),
-                      Text('Naikkan harga +15% otomatis saat okupansi resort > 85%', style: TextStyle(fontSize: 9, color: Color(0xFF0369A1))),
-                    ],
-                  ),
-                ),
-                Switch(
-                  value: _surgePricing,
-                  onChanged: (val) => setState(() => _surgePricing = val),
-                  activeThumbColor: Colors.white,
-                  activeTrackColor: const Color(0xFF007A87),
-                ),
-              ],
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text('Dynamic Pricing AI Go Ticket', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                  Text('Auto-surge saat peak season liburan', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                ],
+              ),
+              Switch(
+                value: _surgePricing,
+                onChanged: (val) => setState(() => _surgePricing = val),
+                activeColor: const Color(0xFF007A87),
+              ),
+            ],
           ),
         ],
       ),
@@ -772,264 +1058,74 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
 
   Widget _buildFacilitiesCard() {
     return _buildSectionContainer(
-      icon: Icons.star_border,
-      title: 'Fasilitas Kamar',
-      subtitle: 'Pilih fasilitas utama tipe kamar ini',
-      trailing: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: const Color(0xFFE0F7FA),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Text('8 Terpilih', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF007A87))),
-      ),
-      child: Column(
-        children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _facilities.map((fac) {
-              final isSel = _selectedFacilities.contains(fac);
-              return FilterChip(
-                label: Text(fac),
-                selected: isSel,
-                onSelected: (val) {
-                  setState(() {
-                    if (val) {
-                      _selectedFacilities.add(fac);
-                    } else {
-                      _selectedFacilities.remove(fac);
-                    }
-                  });
-                },
-                selectedColor: const Color(0xFFE0F7FA),
-                checkmarkColor: const Color(0xFF007A87),
-                backgroundColor: const Color(0xFFF1F5F9),
-                labelStyle: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: isSel ? const Color(0xFF007A87) : const Color(0xFF475569),
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  side: BorderSide(color: isSel ? const Color(0xFF80DEEA) : Colors.transparent),
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.add, size: 14, color: Color(0xFF007A87)),
-            label: const Text('Tambah Fasilitas Kustom', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF007A87))),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(36),
-              side: const BorderSide(color: Color(0xFFBAE6FD)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      icon: Icons.room_service_outlined,
+      title: 'Fasilitas & Layanan Kamar',
+      subtitle: 'Pilih kenyamanan yang tersedia di tipe ini',
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: _facilities.map((f) {
+          final isSel = _selectedFacilities.contains(f);
+          return FilterChip(
+            label: Text(f),
+            selected: isSel,
+            selectedColor: const Color(0xFFE0F4FB),
+            labelStyle: TextStyle(
+              fontSize: 11,
+              fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+              color: isSel ? const Color(0xFF007A87) : const Color(0xFF475569),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPhotoGalleryCard() {
-    return _buildSectionContainer(
-      icon: Icons.photo_camera_back_outlined,
-      title: 'Galeri Foto Resolusi Tinggi',
-      subtitle: 'Upload minimal 3 foto kamar beresolusi tinggi',
-      child: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE6FAFF),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF00D1FF).withValues(alpha: 0.4)),
-            ),
-            child: Column(
-              children: const [
-                Icon(Icons.cloud_upload_outlined, size: 32, color: Color(0xFF005E73)),
-                SizedBox(height: 6),
-                Text('Tarik & Lepaskan foto kamar di sini', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
-                SizedBox(height: 2),
-                Text('Minimal 3 foto: sudut kamar tidur, kamar mandi, atau pemandangan teras', style: TextStyle(fontSize: 9, color: Color(0xFF64748B)), textAlign: TextAlign.center),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildPhotoThumb(
-                  'Cover',
-                  Icons.bed,
-                  'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800&auto=format&fit=crop',
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildPhotoThumb(
-                  'K. Mandi',
-                  Icons.bathtub,
-                  'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&auto=format&fit=crop',
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildPhotoThumb(
-                  'Balkon',
-                  Icons.deck,
-                  'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=400&auto=format&fit=crop',
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPhotoThumb(String label, IconData icon, String imageUrl) {
-    return Container(
-      height: 75,
-      decoration: BoxDecoration(
-        color: const Color(0xFF334155),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Image.network(
-              imageUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Center(
-                child: Icon(icon, color: Colors.white.withValues(alpha: 0.4), size: 32),
-              ),
-              loadingBuilder: (context, child, progress) {
-                if (progress == null) return child;
-                return Center(
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    value: progress.expectedTotalBytes != null
-                        ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
-                        : null,
-                  ),
-                );
-              },
-            ),
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.3),
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.65),
-                  ],
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: 4,
-              left: 4,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.6),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(label, style: const TextStyle(fontSize: 8, color: Colors.white, fontWeight: FontWeight.w600)),
-              ),
-            ),
-            Positioned(
-              top: 4,
-              right: 4,
-              child: Container(
-                padding: const EdgeInsets.all(2),
-                decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), shape: BoxShape.circle),
-                child: const Icon(Icons.close, size: 10, color: Colors.white),
-              ),
-            ),
-          ],
-        ),
+            checkmarkColor: const Color(0xFF007A87),
+            onSelected: (val) {
+              setState(() {
+                if (val) {
+                  _selectedFacilities.add(f);
+                } else {
+                  _selectedFacilities.remove(f);
+                }
+              });
+            },
+          );
+        }).toList(),
       ),
     );
   }
 
   Widget _buildPolicyDepositCard() {
     return _buildSectionContainer(
-      icon: Icons.shield_outlined,
-      title: 'Kebijakan & Deposit',
-      subtitle: 'Aturan pembatalan dan keamanan kamar',
+      icon: Icons.policy_outlined,
+      title: 'Kebijakan Reservasi & Deposit',
+      subtitle: 'Ketentuan pembatalan dan jaminan check-in',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildPolicyRadio(
-            index: 0,
-            title: 'Fleksibel: Bebas Pembatalan H-2',
-            desc: 'Standard Amora - Tamu dapat refund penuh hingga 48 jam sebelum check-in',
+          _buildFieldLabel('Deposit Jaminan Check-in (Rp)'),
+          _buildInput(
+            controller: _depositController,
+            prefixText: 'Rp ',
+            keyboardType: TextInputType.number,
           ),
-          const SizedBox(height: 8),
-          _buildPolicyRadio(
-            index: 1,
-            title: 'Non-Refundable: Diskon Khusus 10%',
-            desc: 'Tanpa opsi refund atau perubahan tanggal setelah reservasi dibuat',
-          ),
-          const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text('Deposit Jaminan Kerusakan', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
-              Text('Rp 300.000', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+          const SizedBox(height: 12),
+          _buildFieldLabel('Kebijakan Pembatalan'),
+          DropdownButtonFormField<int>(
+            value: _cancellationPolicy,
+            items: const [
+              DropdownMenuItem(value: 0, child: Text('Gratis Batal s/d H-1 Check-in')),
+              DropdownMenuItem(value: 1, child: Text('Non-Refundable (Tidak Dapat Dibatalkan)')),
+              DropdownMenuItem(value: 2, child: Text('Biaya 50% jika batal di bawah H-3')),
             ],
-          ),
-          const SizedBox(height: 2),
-          const Text(
-            'Pre-auth kartu kredit / tunai FO',
-            style: TextStyle(fontSize: 9, color: Color(0xFF94A3B8)),
+            onChanged: (val) => setState(() => _cancellationPolicy = val ?? 0),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: const Color(0xFFF8FAFD),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildPolicyRadio({required int index, required String title, required String desc}) {
-    final isSel = _cancellationPolicy == index;
-    return GestureDetector(
-      onTap: () => setState(() => _cancellationPolicy = index),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isSel ? const Color(0xFFF0FDFE) : const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: isSel ? const Color(0xFF38BDF8) : const Color(0xFFE2E8F0)),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              isSel ? Icons.radio_button_checked : Icons.radio_button_off,
-              size: 16,
-              color: isSel ? const Color(0xFF007A87) : const Color(0xFF94A3B8),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
-                  const SizedBox(height: 2),
-                  Text(desc, style: const TextStyle(fontSize: 9, color: Color(0xFF64748B))),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -1039,60 +1135,114 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
     required String title,
     required String subtitle,
     required Widget child,
-    Widget? trailing,
   }) {
     return Container(
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _cardBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
       ),
-      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                width: 32,
-                height: 32,
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE0F7FA),
-                  borderRadius: BorderRadius.circular(8),
+                  color: const Color(0xFFE0F4FB),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, color: const Color(0xFF007A87), size: 18),
+                child: Icon(icon, color: const Color(0xFF007A87), size: 20),
               ),
               const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                    ),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
-                    ),
-                  ],
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                  Text(subtitle, style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B))),
+                ],
               ),
-              ?trailing,
             ],
           ),
           const SizedBox(height: 14),
-          const Divider(height: 1, color: Color(0xFFF1F5F9)),
-          const SizedBox(height: 14),
           child,
         ],
+      ),
+    );
+  }
+
+  Widget _buildFieldLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        label,
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+      ),
+    );
+  }
+
+  Widget _buildInput({
+    TextEditingController? controller,
+    String? hint,
+    String? prefixText,
+    String? suffixText,
+    TextInputType? keyboardType,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+      decoration: InputDecoration(
+        hintText: hint,
+        prefixText: prefixText,
+        suffixText: suffixText,
+        filled: true,
+        fillColor: const Color(0xFFF8FAFD),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      ),
+    );
+  }
+
+  Widget _buildDropdown() {
+    return DropdownButtonFormField<String>(
+      value: _selectedCategory,
+      items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12.5)))).toList(),
+      onChanged: (val) => setState(() => _selectedCategory = val ?? _selectedCategory),
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: const Color(0xFFF8FAFD),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      ),
+    );
+  }
+
+  Widget _buildBedDropdown() {
+    return DropdownButtonFormField<String>(
+      value: '1 King Bed',
+      items: const [
+        DropdownMenuItem(value: '1 King Bed', child: Text('1 King Bed (200x200)', style: TextStyle(fontSize: 12))),
+        DropdownMenuItem(value: '2 Twin Bed', child: Text('2 Twin Bed (100x200)', style: TextStyle(fontSize: 12))),
+        DropdownMenuItem(value: '1 Queen Bed', child: Text('1 Queen Bed (160x200)', style: TextStyle(fontSize: 12))),
+      ],
+      onChanged: (_) {},
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: const Color(0xFFF8FAFD),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       ),
     );
   }
