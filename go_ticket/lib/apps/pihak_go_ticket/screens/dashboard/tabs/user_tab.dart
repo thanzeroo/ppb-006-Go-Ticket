@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../../../core/models/hotel_model.dart';
 import '../../../../../core/models/user_model.dart';
+import '../../../../../core/services/hotel_service.dart';
 import '../../../../../core/services/super_admin_service.dart';
 
 /// Tab 4: Direktori Pengguna & Staf Super Admin (100% Dinamis dari Database)
@@ -18,6 +20,8 @@ class _UserTabState extends State<UserTab> {
   String _selectedStatusFilter = 'Semua'; // 'Semua', 'Aktif', 'Tersuspend'
 
   List<UserModel> _users = [];
+  List<HotelModel> _hotels = [];
+  Map<String, HotelModel> _hotelMap = {};
   bool _isLoading = true;
 
   @override
@@ -29,10 +33,19 @@ class _UserTabState extends State<UserTab> {
   Future<void> _loadUsers() async {
     setState(() => _isLoading = true);
     try {
-      final list = await SuperAdminService.instance.getAllUsers();
+      final results = await Future.wait([
+        SuperAdminService.instance.getAllUsers(),
+        HotelService.instance.getHotels(),
+      ]);
+      final list = results[0] as List<UserModel>;
+      final hotelList = results[1] as List<HotelModel>;
+      final map = {for (final h in hotelList) h.id: h};
+
       if (mounted) {
         setState(() {
           _users = list;
+          _hotels = hotelList;
+          _hotelMap = map;
           _isLoading = false;
         });
       }
@@ -281,9 +294,17 @@ class _UserTabState extends State<UserTab> {
   }
 
   void _showAddUserModal() {
+    int accountType = 0; // 0 = Administrator Hotel, 1 = Tamu
+    String? selectedHotelId = _hotels.isNotEmpty ? _hotels.first.id : null;
+    String selectedRoleJabatan = 'administrator'; // administrator, front_office, maintenance
+    String selectedShift = 'General';
+    bool obscurePassword = true;
+
     final nameCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
+    final passCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
+    final nikCtrl = TextEditingController();
 
     showModalBottomSheet(
       context: context,
@@ -291,128 +312,418 @@ class _UserTabState extends State<UserTab> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Tambah Pengguna Baru',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(ctx),
-                ),
-              ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 20,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: nameCtrl,
-              decoration: InputDecoration(
-                labelText: 'Nama Lengkap *',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: emailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              decoration: InputDecoration(
-                labelText: 'Email *',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: phoneCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: InputDecoration(
-                labelText: 'Nomor WhatsApp / HP',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 44,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00C2FF),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: () async {
-                  if (nameCtrl.text.trim().isEmpty ||
-                      emailCtrl.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Nama dan Email wajib diisi'),
-                        backgroundColor: Colors.red,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Tambah Pengguna Baru',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
-                    );
-                    return;
-                  }
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
 
-                  final ok = await SuperAdminService.instance.createUser(
-                    fullName: nameCtrl.text.trim(),
-                    email: emailCtrl.text.trim(),
-                    phoneNumber: phoneCtrl.text.trim(),
-                  );
-                  if (mounted) {
-                    Navigator.pop(ctx);
-                    if (ok) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Pengguna baru berhasil ditambahkan!'),
-                          backgroundColor: Color(0xFF16A34A),
+                  // Segmented Switcher: Administrator Hotel vs Tamu
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setModalState(() => accountType = 0),
+                            borderRadius: BorderRadius.circular(9),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: accountType == 0 ? Colors.white : Colors.transparent,
+                                borderRadius: BorderRadius.circular(9),
+                                boxShadow: accountType == 0
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.06),
+                                          blurRadius: 4,
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: Text(
+                                'Administrator / Staf Hotel',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: accountType == 0 ? FontWeight.w800 : FontWeight.w600,
+                                  color: accountType == 0 ? const Color(0xFF00758F) : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
-                      );
-                      _loadUsers();
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Gagal menambahkan pengguna baru'),
-                          backgroundColor: Colors.red,
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setModalState(() => accountType = 1),
+                            borderRadius: BorderRadius.circular(9),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: accountType == 1 ? Colors.white : Colors.transparent,
+                                borderRadius: BorderRadius.circular(9),
+                                boxShadow: accountType == 1
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.06),
+                                          blurRadius: 4,
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: Text(
+                                'Tamu / Pelanggan',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: accountType == 1 ? FontWeight.w800 : FontWeight.w600,
+                                  color: accountType == 1 ? const Color(0xFF00758F) : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
-                      );
-                    }
-                  }
-                },
-                child: const Text('+ Daftarkan Pengguna',
-                    style: TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  if (accountType == 0) ...[
+                    // Info Banner
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFBBF7D0)),
+                      ),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.info_outline, size: 16, color: Color(0xFF16A34A)),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Akun Administrator Hotel dibuat agar mitra dapat mengelola properti, kamar, dan menambahkan karyawan hotel.',
+                              style: TextStyle(fontSize: 10.5, color: Color(0xFF15803D)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Pilih Hotel
+                    if (_hotels.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFFECACA)),
+                        ),
+                        child: const Text(
+                          'Belum ada data mitra penginapan/hotel di database. Silakan buat mitra hotel terlebih dahulu di tab Kelola Hotel.',
+                          style: TextStyle(fontSize: 11, color: Color(0xFFDC2626)),
+                        ),
+                      )
+                    else
+                      DropdownButtonFormField<String>(
+                        value: selectedHotelId,
+                        decoration: InputDecoration(
+                          labelText: 'Mitra Penginapan / Hotel *',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                        items: _hotels.map((h) {
+                          return DropdownMenuItem<String>(
+                            value: h.id,
+                            child: Text(
+                              '${h.name} (${h.city})',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) setModalState(() => selectedHotelId = val);
+                        },
+                      ),
+                    const SizedBox(height: 12),
+
+                    // Role / Jabatan
+                    DropdownButtonFormField<String>(
+                      value: selectedRoleJabatan,
+                      decoration: InputDecoration(
+                        labelText: 'Jabatan / Posisi *',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'administrator',
+                          child: Text('Administrator Hotel (Owner / General Manager)',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                        ),
+                        DropdownMenuItem(
+                          value: 'front_office',
+                          child: Text('Front Office (Resepsionis / Kasir)',
+                              style: TextStyle(fontSize: 12)),
+                        ),
+                        DropdownMenuItem(
+                          value: 'maintenance',
+                          child: Text('Maintenance (Housekeeping / Teknisi)',
+                              style: TextStyle(fontSize: 12)),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setModalState(() => selectedRoleJabatan = val);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Nama Lengkap
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Nama Lengkap *',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Email
+                  TextField(
+                    controller: emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      labelText: 'Alamat Email Login *',
+                      hintText: accountType == 0 ? 'admin@hotel.com' : 'user@gmail.com',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Password
+                  TextField(
+                    controller: passCtrl,
+                    obscureText: obscurePassword,
+                    decoration: InputDecoration(
+                      labelText: 'Kata Sandi / Password *',
+                      hintText: 'Minimal 6 karakter',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          obscurePassword ? Icons.visibility_off : Icons.visibility,
+                          size: 18,
+                        ),
+                        onPressed: () => setModalState(() => obscurePassword = !obscurePassword),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // No Telepon
+                  TextField(
+                    controller: phoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      labelText: 'Nomor WhatsApp / HP',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                  ),
+
+                  if (accountType == 0) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: nikCtrl,
+                            decoration: InputDecoration(
+                              labelText: 'NIK Karyawan (Opsional)',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: selectedShift,
+                            decoration: InputDecoration(
+                              labelText: 'Shift Tugas',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 'General', child: Text('General (Normal)', style: TextStyle(fontSize: 11.5))),
+                              DropdownMenuItem(value: 'Pagi', child: Text('Pagi (07-15)', style: TextStyle(fontSize: 11.5))),
+                              DropdownMenuItem(value: 'Siang', child: Text('Siang (15-23)', style: TextStyle(fontSize: 11.5))),
+                              DropdownMenuItem(value: 'Malam', child: Text('Malam (23-07)', style: TextStyle(fontSize: 11.5))),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) setModalState(() => selectedShift = val);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00758F),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () async {
+                        final name = nameCtrl.text.trim();
+                        final email = emailCtrl.text.trim();
+                        final pass = passCtrl.text.trim();
+
+                        if (name.isEmpty || email.isEmpty || pass.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Nama lengkap, email login, dan kata sandi wajib diisi'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+
+                        if (pass.length < 6) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Kata sandi minimal 6 karakter'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+
+                        final scaffold = ScaffoldMessenger.of(context);
+                        final nav = Navigator.of(ctx);
+
+                        if (accountType == 0) {
+                          if (selectedHotelId == null || selectedHotelId!.isEmpty) {
+                            scaffold.showSnackBar(
+                              const SnackBar(
+                                content: Text('Pilih mitra hotel tempat administrator bertugas'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+
+                          final hIdInt = int.tryParse(selectedHotelId!) ?? 1;
+                          final hotelName = _hotelMap[selectedHotelId]?.name ?? 'Hotel';
+
+                          try {
+                            final ok = await SuperAdminService.instance.createHotelStaff(
+                              hotelId: hIdInt,
+                              fullName: name,
+                              email: email,
+                              password: pass,
+                              phoneNumber: phoneCtrl.text.trim(),
+                              nik: nikCtrl.text.trim(),
+                              roleJabatan: selectedRoleJabatan,
+                              shiftTugas: selectedShift,
+                            );
+
+                            nav.pop();
+                            if (ok) {
+                              scaffold.showSnackBar(
+                                SnackBar(
+                                  content: Text('Akun $selectedRoleJabatan untuk $hotelName berhasil dibuat!'),
+                                  backgroundColor: const Color(0xFF16A34A),
+                                ),
+                              );
+                              _loadUsers();
+                            }
+                          } catch (e) {
+                            scaffold.showSnackBar(
+                              SnackBar(
+                                content: Text('Gagal membuat akun hotel staff: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        } else {
+                          // Tamu
+                          final ok = await SuperAdminService.instance.createUser(
+                            fullName: name,
+                            email: email,
+                            password: pass,
+                            phoneNumber: phoneCtrl.text.trim(),
+                          );
+                          nav.pop();
+                          if (ok) {
+                            scaffold.showSnackBar(
+                              const SnackBar(
+                                content: Text('Pengguna tamu baru berhasil ditambahkan!'),
+                                backgroundColor: Color(0xFF16A34A),
+                              ),
+                            );
+                            _loadUsers();
+                          } else {
+                            scaffold.showSnackBar(
+                              const SnackBar(
+                                content: Text('Gagal menambahkan pengguna baru'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      child: Text(
+                        accountType == 0 ? '+ Daftarkan Akun Staf Hotel' : '+ Daftarkan Pengguna Tamu',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          );
+        },
       ),
-    ),
-  );
-}
+    );
+  }
 
   void _showUserDetail(UserModel u) {
     showDialog(
@@ -451,6 +762,12 @@ class _UserTabState extends State<UserTab> {
             _buildDetailRow('Email', u.email ?? '-'),
             _buildDetailRow('No. Telepon', u.phoneNumber ?? '-'),
             _buildDetailRow('Role Sistem', u.role.displayName),
+            if (u.isHotelStaff)
+              _buildDetailRow(
+                'Mitra Hotel',
+                _hotelMap[u.managedHotelId]?.name ??
+                    (u.managedHotelId != null ? 'Hotel #${u.managedHotelId}' : '-'),
+              ),
             _buildDetailRow('Status Akun', u.isActive ? 'Aktif' : 'Tersuspend'),
             if (u.createdAt != null)
               _buildDetailRow(
@@ -771,11 +1088,9 @@ class _UserTabState extends State<UserTab> {
                 ],
               ),
             )
-          else
-            for (final u in _filteredUsers) ...[
-              _buildUserItem(u),
-              const SizedBox(height: 10),
-            ],
+          else ...[
+            ..._buildGroupedUserList(),
+          ],
 
           const SizedBox(height: 24),
         ],
@@ -846,6 +1161,428 @@ class _UserTabState extends State<UserTab> {
           ),
         ),
       ),
+    );
+  }
+
+  List<Widget> _buildGroupedUserList() {
+    final widgets = <Widget>[];
+
+    final hotelStaffList =
+        _filteredUsers.where((u) => u.isHotelStaff).toList();
+    final customerList =
+        _filteredUsers.where((u) => u.role == UserRole.customer).toList();
+
+    // 1. Tampilkan Karyawan Hotel (Dikelompokkan berdasarkan Mitra Hotel)
+    if (_selectedRoleFilter != 'Tamu' && hotelStaffList.isNotEmpty) {
+      widgets.add(
+        Row(
+          children: [
+            const Icon(Icons.apartment_rounded,
+                size: 16, color: Color(0xFF00758F)),
+            const SizedBox(width: 6),
+            Text(
+              'KARYAWAN HOTEL BERDASARKAN MITRA (${hotelStaffList.length})',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF00758F),
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        ),
+      );
+      widgets.add(const SizedBox(height: 8));
+
+      // Kelompokkan per hotel
+      final Map<String, List<UserModel>> staffByHotel = {};
+      final List<UserModel> unassignedStaff = [];
+
+      for (final staff in hotelStaffList) {
+        final hId = staff.managedHotelId;
+        if (hId != null && hId.isNotEmpty) {
+          staffByHotel.putIfAbsent(hId, () => []).add(staff);
+        } else {
+          unassignedStaff.add(staff);
+        }
+      }
+
+      // Render setiap hotel group
+      staffByHotel.forEach((hotelId, staffList) {
+        final hotel = _hotelMap[hotelId];
+        final hotelName = hotel?.name ?? 'Mitra Penginapan #$hotelId';
+        final hotelCity = hotel?.city ?? '';
+
+        // Urutkan: Administrator pertama, lalu front_office, lalu maintenance
+        staffList.sort((a, b) {
+          int priority(UserRole r) {
+            if (r == UserRole.adminHotel) return 0;
+            if (r == UserRole.staffFo) return 1;
+            if (r == UserRole.maintenance) return 2;
+            return 3;
+          }
+
+          return priority(a.role).compareTo(priority(b.role));
+        });
+
+        widgets.add(_buildHotelStaffGroupCard(
+          hotelName: hotelName,
+          hotelCity: hotelCity,
+          staffList: staffList,
+        ));
+        widgets.add(const SizedBox(height: 12));
+      });
+
+      // Jika ada staf tanpa hotel
+      if (unassignedStaff.isNotEmpty) {
+        widgets.add(_buildHotelStaffGroupCard(
+          hotelName: 'Karyawan Tanpa Penginapan Terdaftar',
+          hotelCity: '',
+          staffList: unassignedStaff,
+        ));
+        widgets.add(const SizedBox(height: 12));
+      }
+    }
+
+    // 2. Tampilkan Tamu / Customer
+    if (_selectedRoleFilter != 'Staf Hotel' && customerList.isNotEmpty) {
+      if (_selectedRoleFilter == 'Semua' && hotelStaffList.isNotEmpty) {
+        widgets.add(const SizedBox(height: 10));
+        widgets.add(
+          Row(
+            children: [
+              const Icon(Icons.people_outline_rounded,
+                  size: 16, color: Color(0xFF64748B)),
+              const SizedBox(width: 6),
+              Text(
+                'DAFTAR TAMU / PELANGGAN (${customerList.length})',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF64748B),
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+        );
+        widgets.add(const SizedBox(height: 8));
+      }
+
+      for (final u in customerList) {
+        widgets.add(_buildUserItem(u));
+        widgets.add(const SizedBox(height: 10));
+      }
+    }
+
+    return widgets;
+  }
+
+  Widget _buildHotelStaffGroupCard({
+    required String hotelName,
+    required String hotelCity,
+    required List<UserModel> staffList,
+  }) {
+    final adminCount =
+        staffList.where((u) => u.role == UserRole.adminHotel).length;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Hotel Header Banner
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(15)),
+              border: Border(
+                bottom: BorderSide(color: Color(0xFFDCFCE7), width: 1),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: const Color(0x1F16A34A),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.apartment_rounded,
+                          size: 18,
+                          color: Color(0xFF16A34A),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              hotelName,
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF0F172A),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (hotelCity.isNotEmpty)
+                              Text(
+                                hotelCity,
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  color: Color(0xFF64748B),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: adminCount > 0
+                        ? const Color(0xFF16A34A)
+                        : Colors.orange,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${staffList.length} Karyawan${adminCount > 0 ? " • Ada Admin" : " • Belum Ada Admin"}',
+                    style: const TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // List of Staff within this Hotel
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(12),
+            itemCount: staffList.length,
+            separatorBuilder: (_, _) =>
+                const Divider(height: 16, color: Color(0xFFF1F5F9)),
+            itemBuilder: (ctx, idx) => _buildHotelStaffRow(staffList[idx]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHotelStaffRow(UserModel u) {
+    Color roleBadgeBg;
+    Color roleBadgeText;
+    String roleLabel;
+
+    if (u.role == UserRole.adminHotel) {
+      roleBadgeBg = const Color(0xFFCFFAFE);
+      roleBadgeText = const Color(0xFF0891B2);
+      roleLabel = 'Administrator';
+    } else if (u.role == UserRole.staffFo) {
+      roleBadgeBg = const Color(0xFFDBEAFE);
+      roleBadgeText = const Color(0xFF2563EB);
+      roleLabel = 'Front Office';
+    } else {
+      roleBadgeBg = const Color(0xFFFEF3C7);
+      roleBadgeText = const Color(0xFFD97706);
+      roleLabel = 'Maintenance';
+    }
+
+    return Row(
+      children: [
+        // Avatar
+        GestureDetector(
+          onTap: () => _showUserDetail(u),
+          child: CircleAvatar(
+            radius: 18,
+            backgroundColor: roleBadgeBg,
+            child: Text(
+              u.fullName.isNotEmpty ? u.fullName[0].toUpperCase() : 'S',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: roleBadgeText,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+
+        // Name & Email
+        Expanded(
+          child: GestureDetector(
+            onTap: () => _showUserDetail(u),
+            behavior: HitTestBehavior.opaque,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        u.fullName,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0F172A),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: roleBadgeBg,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        roleLabel,
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: roleBadgeText,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${u.email ?? '-'} • ${u.phoneNumber ?? '-'} (ID: ${u.id})',
+                  style:
+                      const TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: u.isActive
+                            ? const Color(0xFF16A34A)
+                            : const Color(0xFFDC2626),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      u.isActive ? 'Aktif' : 'Nonaktif / Tersuspend',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                        color: u.isActive
+                            ? const Color(0xFF16A34A)
+                            : const Color(0xFFDC2626),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Popup Menu
+        PopupMenuButton<String>(
+          icon:
+              const Icon(Icons.more_vert, size: 18, color: Color(0xFF64748B)),
+          onSelected: (val) {
+            if (val == 'detail') {
+              _showUserDetail(u);
+            } else if (val == 'edit') {
+              _showEditUserModal(u);
+            } else if (val == 'toggle') {
+              _toggleStatus(u);
+            } else if (val == 'delete') {
+              _deleteUser(u);
+            }
+          },
+          itemBuilder: (ctx) => [
+            const PopupMenuItem(
+              value: 'detail',
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, size: 16, color: Color(0xFF00758F)),
+                  SizedBox(width: 8),
+                  Text('Lihat Detail', style: TextStyle(fontSize: 12)),
+                ],
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'edit',
+              child: Row(
+                children: [
+                  Icon(Icons.edit_outlined, size: 16, color: Color(0xFF0284C7)),
+                  SizedBox(width: 8),
+                  Text('Edit Akun', style: TextStyle(fontSize: 12)),
+                ],
+              ),
+            ),
+            PopupMenuItem(
+              value: 'toggle',
+              child: Row(
+                children: [
+                  Icon(
+                    u.isActive ? Icons.block : Icons.check_circle_outline,
+                    size: 16,
+                    color: u.isActive
+                        ? const Color(0xFFD97706)
+                        : const Color(0xFF16A34A),
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    u.isActive ? 'Nonaktifkan Akun' : 'Aktifkan Akun',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'delete',
+              child: Row(
+                children: [
+                  Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                  SizedBox(width: 8),
+                  Text('Hapus Akun',
+                      style: TextStyle(fontSize: 12, color: Colors.red)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 

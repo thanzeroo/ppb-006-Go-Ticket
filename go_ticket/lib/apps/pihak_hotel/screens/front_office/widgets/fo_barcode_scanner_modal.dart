@@ -619,7 +619,7 @@ class _FoBarcodeScannerModalState extends State<FoBarcodeScannerModal>
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF007A87),
                                 foregroundColor: Colors.white,
-                                height: 42,
+                                minimumSize: const Size(0, 42),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),

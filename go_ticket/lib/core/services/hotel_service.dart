@@ -359,6 +359,10 @@ class HotelService {
     double? deposit,
     String? cancellationPolicy,
     List<String>? facilities,
+    double? latitude,
+    double? longitude,
+    String? mainImageUrl,
+    List<String>? imageUrls,
     // Spesifikasi kamar awal
     String? roomName,
     int? roomCapacity,
@@ -390,6 +394,9 @@ class HotelService {
       'status_operasional': 'Aktif',
       'saldo_escrow': 0.0,
       'persentase_komisi': 10.0,
+      if (latitude != null) 'latitude': latitude,
+      if (longitude != null) 'longitude': longitude,
+      if (mainImageUrl != null && mainImageUrl.isNotEmpty) 'foto_utama': mainImageUrl,
     };
 
     final insertedHotel = await sb
@@ -499,6 +506,12 @@ class HotelService {
     String? checkOutTime,
     double? deposit,
     String? cancellationPolicy,
+    double? latitude,
+    double? longitude,
+    String? mainImageUrl,
+    String? ptName,
+    String? npwp,
+    String? nib,
   }) async {
     final sb = SupabaseService.instance;
     if (!sb.isReady || sb.client == null) return false;
@@ -524,6 +537,14 @@ class HotelService {
       if (cancellationPolicy != null) {
         updateData['kebijakan_batal'] = cancellationPolicy.trim();
       }
+      if (latitude != null) updateData['latitude'] = latitude;
+      if (longitude != null) updateData['longitude'] = longitude;
+      if (mainImageUrl != null && mainImageUrl.isNotEmpty) {
+        updateData['foto_utama'] = mainImageUrl;
+      }
+      if (ptName != null) updateData['nama_pt'] = ptName.trim();
+      if (npwp != null) updateData['npwp_perusahaan'] = npwp.trim();
+      if (nib != null) updateData['nib_perusahaan'] = nib.trim();
 
       var q = sb.table(SupabaseConfig.tableMitraPenginapan)?.update(updateData);
       if (parsedId != null) {

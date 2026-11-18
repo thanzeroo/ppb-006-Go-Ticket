@@ -203,7 +203,9 @@ class UserModel {
       managedHotelName: json['managed_hotel_name'],
       isActive: json['is_active'] ??
           json['status_aktif'] ??
-          (json['status_akun'] == 'aktif' || json['status_duty'] == 'aktif'),
+          (json['status_karyawan'] != null
+              ? json['status_karyawan'].toString().toLowerCase() == 'aktif'
+              : (json['status_akun'] == null || json['status_akun'].toString().toLowerCase() == 'aktif')),
       isVerified: json['is_verified'] ?? true,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'])

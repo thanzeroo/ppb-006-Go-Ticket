@@ -151,253 +151,16 @@ class _KelolaHotelTabState extends State<KelolaHotelTab> {
     }
   }
 
-  void _showEditHotelModal(HotelModel h) {
-    final nameCtrl = TextEditingController(text: h.name);
-    final cityCtrl = TextEditingController(text: h.city);
-    final addressCtrl = TextEditingController(text: h.address);
-    final phoneCtrl = TextEditingController(text: h.phone ?? '');
-    final waCtrl = TextEditingController(text: h.whatsapp ?? '');
-    final checkInCtrl = TextEditingController(text: h.checkInTime ?? '14:00');
-    final checkOutCtrl = TextEditingController(text: h.checkOutTime ?? '12:00');
-    final cancelCtrl = TextEditingController(text: h.cancellationPolicy ?? 'Bebas Pembatalan (H-3)');
-    bool isActive = h.status == HotelStatus.active;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) {
-          return Padding(
-            padding: EdgeInsets.only(
-              left: 20,
-              right: 20,
-              top: 20,
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Edit Mitra Penginapan',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(ctx),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: nameCtrl,
-                    decoration: InputDecoration(
-                      labelText: 'Nama Properti / Hotel *',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: cityCtrl,
-                          decoration: InputDecoration(
-                            labelText: 'Kota / Wilayah *',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 12),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: addressCtrl,
-                    maxLines: 2,
-                    decoration: InputDecoration(
-                      labelText: 'Alamat Lengkap *',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: phoneCtrl,
-                          decoration: InputDecoration(
-                            labelText: 'No. Telepon',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 12),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: TextField(
-                          controller: waCtrl,
-                          decoration: InputDecoration(
-                            labelText: 'WhatsApp',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 12),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: checkInCtrl,
-                          decoration: InputDecoration(
-                            labelText: 'Waktu Check-In',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 12),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: TextField(
-                          controller: checkOutCtrl,
-                          decoration: InputDecoration(
-                            labelText: 'Waktu Check-Out',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 12),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: cancelCtrl,
-                    decoration: InputDecoration(
-                      labelText: 'Kebijakan Pembatalan',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Status Operasional Aktif',
-                          style: TextStyle(fontWeight: FontWeight.w600)),
-                      Switch(
-                        value: isActive,
-                        activeColor: const Color(0xFF00C2FF),
-                        onChanged: (val) {
-                          setModalState(() => isActive = val);
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 44,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00758F),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () async {
-                        if (nameCtrl.text.trim().isEmpty ||
-                            cityCtrl.text.trim().isEmpty ||
-                            addressCtrl.text.trim().isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Nama, Kota, dan Alamat wajib diisi'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                          return;
-                        }
-
-                        final ok = await HotelService.instance.updateHotel(
-                          hotelId: h.id,
-                          name: nameCtrl.text.trim(),
-                          city: cityCtrl.text.trim(),
-                          address: addressCtrl.text.trim(),
-                          phone: phoneCtrl.text.trim(),
-                          whatsapp: waCtrl.text.trim(),
-                          checkInTime: checkInCtrl.text.trim(),
-                          checkOutTime: checkOutCtrl.text.trim(),
-                          cancellationPolicy: cancelCtrl.text.trim(),
-                          statusOperasional: isActive ? 'Aktif' : 'Nonaktif',
-                        );
-
-                        if (mounted) {
-                          Navigator.pop(ctx);
-                          if (ok) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Data hotel berhasil diperbarui ke database!'),
-                                backgroundColor: Color(0xFF16A34A),
-                              ),
-                            );
-                            _loadHotels();
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Gagal memperbarui data hotel'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        }
-                      },
-                      child: const Text('Simpan Perubahan',
-                          style: TextStyle(
-                              color: Colors.white, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
+  Future<void> _openEditHotelScreen(HotelModel h) async {
+    final res = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => InputHotelScreen(hotelToEdit: h),
       ),
     );
+    if (res == true && mounted) {
+      _loadHotels();
+    }
   }
 
   void _showHotelDetail(HotelModel h) {
@@ -453,7 +216,7 @@ class _KelolaHotelTabState extends State<KelolaHotelTab> {
             ),
             onPressed: () {
               Navigator.pop(ctx);
-              _showEditHotelModal(h);
+              _openEditHotelScreen(h);
             },
             child: const Text('Edit', style: TextStyle(color: Colors.white)),
           ),
@@ -994,7 +757,7 @@ class _KelolaHotelTabState extends State<KelolaHotelTab> {
                   if (val == 'detail') {
                     _showHotelDetail(h);
                   } else if (val == 'edit') {
-                    _showEditHotelModal(h);
+                    _openEditHotelScreen(h);
                   } else if (val == 'toggle') {
                     _toggleHotelStatus(h);
                   } else if (val == 'delete') {
@@ -1094,7 +857,7 @@ class _KelolaHotelTabState extends State<KelolaHotelTab> {
                 ),
               ),
               InkWell(
-                onTap: () => _showEditHotelModal(h),
+                onTap: () => _openEditHotelScreen(h),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(

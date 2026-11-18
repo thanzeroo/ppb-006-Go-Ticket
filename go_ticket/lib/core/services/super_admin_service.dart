@@ -228,6 +228,7 @@ class SuperAdminService {
   Future<bool> createUser({
     required String fullName,
     required String email,
+    String? password,
     String? phoneNumber,
     String role = 'customer',
   }) async {
@@ -235,9 +236,22 @@ class SuperAdminService {
 
     if (sb.isReady) {
       try {
+        final cleanEmail = email.trim().toLowerCase();
+        if (password != null && password.trim().isNotEmpty && sb.client != null) {
+          try {
+            await sb.client!.auth.signUp(
+              email: cleanEmail,
+              password: password.trim(),
+              data: {'full_name': fullName.trim()},
+            );
+          } catch (authErr) {
+            debugPrint('⚠️ [SuperAdminService] createUser auth signUp notice: $authErr');
+          }
+        }
+
         final payload = <String, dynamic>{
           'nama_lengkap': fullName.trim(),
-          'email': email.trim(),
+          'email': cleanEmail,
           'no_telepon': phoneNumber?.trim() ?? '',
           'password': '',
           'status_akun': 'aktif',
@@ -254,6 +268,68 @@ class SuperAdminService {
     }
 
     return false;
+  }
+
+  /// Menambah akun administrator atau staf hotel baru ke Supabase
+  Future<bool> createHotelStaff({
+    required int hotelId,
+    required String fullName,
+    required String email,
+    required String password,
+    String? phoneNumber,
+    String? nik,
+    String roleJabatan = 'administrator',
+    String shiftTugas = 'General',
+  }) async {
+    final sb = SupabaseService.instance;
+    if (!sb.isReady || sb.client == null) return false;
+
+    try {
+      final cleanEmail = email.trim().toLowerCase();
+
+      // 1. Daftarkan akun auth ke Supabase Auth agar bisa login signInWithPassword
+      try {
+        await sb.client!.auth.signUp(
+          email: cleanEmail,
+          password: password,
+          data: {
+            'full_name': fullName.trim(),
+            'role': roleJabatan,
+          },
+        );
+      } catch (authErr) {
+        debugPrint('⚠️ [SuperAdminService] createHotelStaff auth signUp notice: $authErr');
+      }
+
+      // 2. Generate ID Staf terstruktur (contoh: ADM-2025-102)
+      final prefix = roleJabatan == 'administrator'
+          ? 'ADM'
+          : (roleJabatan == 'front_office' ? 'FO' : 'MTC');
+      final year = DateTime.now().year;
+      final randSuffix = (DateTime.now().millisecondsSinceEpoch % 900 + 100).toString();
+      final idStaf = '$prefix-$year-$randSuffix';
+
+      // 3. Masukkan ke tabel staf_hotel
+      final payload = <String, dynamic>{
+        'id_staf': idStaf,
+        'id_penginapan': hotelId,
+        'nama_staf': fullName.trim(),
+        'email': cleanEmail,
+        'password': '',
+        'no_telepon': phoneNumber?.trim() ?? '',
+        'nik_staf': (nik != null && nik.trim().isNotEmpty) ? nik.trim() : 'NIK-$randSuffix',
+        'role_jabatan': roleJabatan,
+        'shift_tugas': shiftTugas,
+        'status_karyawan': 'Aktif',
+        'status_duty': 'Off',
+      };
+
+      await sb.table(SupabaseConfig.tableStafHotel)?.insert(payload);
+      return true;
+    } catch (e) {
+      debugPrint('⚠️ [SuperAdminService] createHotelStaff error: $e');
+      rethrow;
+    }
   }
 
   /// Mengambil semua permohonan pencairan dana (Payout)

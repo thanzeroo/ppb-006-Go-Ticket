@@ -2,33 +2,32 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../../core/services/promo_service.dart';
+import 'formatters.dart';
 
-/// Form Tambah Promo (6 Sections)
+/// Form Tambah/Edit Promo (6 Sections)
 /// Sesuai dengan desain visual pada Gambar 2 (Tambah Promo).
 class TambahPromoScreen extends StatefulWidget {
-  const TambahPromoScreen({super.key});
+  final Map<String, dynamic>? promoToEdit;
+
+  const TambahPromoScreen({super.key, this.promoToEdit});
 
   @override
   State<TambahPromoScreen> createState() => _TambahPromoScreenState();
 }
 
 class _TambahPromoScreenState extends State<TambahPromoScreen> {
+  bool get _isEditMode => widget.promoToEdit != null;
   bool _isSubmitting = false;
 
   // Section 1: Identitas & Kode Promo
-  final _promoNameController = TextEditingController(
-    text: 'Flash Sale Liburan Akhir Pekan (Weekend Getaway)',
-  );
-  final _promoCodeController = TextEditingController(text: 'AMORAHEBAT25');
-  final _descController = TextEditingController(
-    text:
-        'Nikmati potongan harga eksklusif untuk staycation santai bersama keluarga di seluruh suite resort.',
-  );
+  final _promoNameController = TextEditingController();
+  final _promoCodeController = TextEditingController();
+  final _descController = TextEditingController();
 
   // Section 2: Tipe & Skema Diskon
   int _discountType = 0; // 0 = Persentase, 1 = Nominal Flat, 2 = Gratis Ekstra
-  final _discountValueController = TextEditingController(text: '25');
-  final _maxDiscountController = TextEditingController(text: 'Rp 400.000');
+  final _discountValueController = TextEditingController();
+  final _maxDiscountController = TextEditingController();
 
   // Section 3: Masa Berlaku
   int _periodTab = 0; // 0 = Periode Booking, 1 = Periode Stay
@@ -39,10 +38,10 @@ class _TambahPromoScreenState extends State<TambahPromoScreen> {
   int _applicableDays = 0; // 0 = All Days, 1 = Weekday, 2 = Weekend
 
   // Section 4: Kuota & Batas Klaim
-  final _totalQuotaController = TextEditingController(text: '150');
+  final _totalQuotaController = TextEditingController(text: '100');
   final _limitPerAccountController = TextEditingController(text: '1x Klaim');
-  final _minTxController = TextEditingController(text: 'Rp 800.000');
-  final _minStayController = TextEditingController(text: 'Min. 2 Malam');
+  final _minTxController = TextEditingController();
+  final _minStayController = TextEditingController(text: 'Min. 1 Malam');
 
   // Section 5: Cakupan Kamar
   int _roomCoverage = 1; // 0 = Semua Kamar, 1 = Kamar Tertentu
@@ -55,8 +54,59 @@ class _TambahPromoScreenState extends State<TambahPromoScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedStartDate = DateTime.now();
-    _selectedEndDate = DateTime.now().add(const Duration(days: 30));
+    if (_isEditMode) {
+      final p = widget.promoToEdit!;
+      _promoNameController.text =
+          p['title']?.toString() ?? p['nama_kampanye']?.toString() ?? '';
+      _promoCodeController.text =
+          p['code']?.toString() ?? p['kode_promo']?.toString() ?? '';
+      _descController.text =
+          p['description']?.toString() ?? p['deskripsi_promo']?.toString() ?? '';
+
+      final dType = (p['discountType'] ?? p['tipe_diskon'] ?? 'Persen')
+          .toString()
+          .toLowerCase();
+      _discountType = dType.contains('nominal') ? 1 : 0;
+
+      final discVal = (p['discountPercent'] ?? p['besaran_diskon'] as num?)?.toInt() ?? 0;
+      _discountValueController.text = discVal > 0
+          ? ThousandsSeparatorInputFormatter.format(discVal)
+          : '';
+
+      final maxDisc = (p['maxDiscount'] ?? p['maks_plafon_diskon'] as num?)?.toInt() ?? 0;
+      _maxDiscountController.text = maxDisc > 0
+          ? ThousandsSeparatorInputFormatter.format(maxDisc)
+          : '';
+
+      final minTx = (p['minBookingAmount'] ?? p['min_transaksi'] as num?)?.toInt() ?? 0;
+      _minTxController.text = minTx > 0
+          ? ThousandsSeparatorInputFormatter.format(minTx)
+          : '';
+
+      final quota = p['totalQuota'] ?? p['total_kuota'] ?? 100;
+      _totalQuotaController.text = ThousandsSeparatorInputFormatter.format(
+          quota is num ? quota : int.tryParse(quota.toString()) ?? 100);
+
+      final sDateStr = p['startDate'] ?? p['tgl_mulai'];
+      if (sDateStr != null) {
+        _selectedStartDate =
+            DateTime.tryParse(sDateStr.toString()) ?? DateTime.now();
+      } else {
+        _selectedStartDate = DateTime.now();
+      }
+
+      final eDateStr = p['expiredDate'] ?? p['tgl_berakhir'];
+      if (eDateStr != null) {
+        _selectedEndDate = DateTime.tryParse(eDateStr.toString()) ??
+            DateTime.now().add(const Duration(days: 30));
+      } else {
+        _selectedEndDate = DateTime.now().add(const Duration(days: 30));
+      }
+    } else {
+      _selectedStartDate = DateTime.now();
+      _selectedEndDate = DateTime.now().add(const Duration(days: 30));
+    }
+
     _startDateController.text =
         '${_selectedStartDate!.day} ${_monthName(_selectedStartDate!.month)} ${_selectedStartDate!.year}';
     _endDateController.text =
@@ -106,9 +156,9 @@ class _TambahPromoScreenState extends State<TambahPromoScreen> {
       return;
     }
 
-    final discountValStr =
-        _discountValueController.text.replaceAll(RegExp(r'[^0-9.]'), '');
-    final discountVal = double.tryParse(discountValStr) ?? 0.0;
+    final discountVal = ThousandsSeparatorInputFormatter.parse(
+            _discountValueController.text)
+        .toDouble();
     if (discountVal <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -122,47 +172,85 @@ class _TambahPromoScreenState extends State<TambahPromoScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      final maxDiscStr =
-          _maxDiscountController.text.replaceAll(RegExp(r'[^0-9.]'), '');
-      final maxDisc = double.tryParse(maxDiscStr) ?? 0.0;
+      final maxDisc =
+          ThousandsSeparatorInputFormatter.parse(_maxDiscountController.text)
+              .toDouble();
 
-      final minTxStr =
-          _minTxController.text.replaceAll(RegExp(r'[^0-9.]'), '');
-      final minTx = double.tryParse(minTxStr) ?? 0.0;
+      final minTx =
+          ThousandsSeparatorInputFormatter.parse(_minTxController.text)
+              .toDouble();
 
-      final quotaStr =
-          _totalQuotaController.text.replaceAll(RegExp(r'[^0-9]'), '');
-      final totalQuota = int.tryParse(quotaStr) ?? 100;
+      final totalQuota =
+          ThousandsSeparatorInputFormatter.parse(_totalQuotaController.text)
+              .toInt();
 
       final discountTypeStr = _discountType == 1 ? 'Nominal' : 'Persen';
       final isPublic = _publicDiscovery && !_secretCode;
 
-      final created = await PromoService.instance.createPromo(
-        code: code,
-        name: name,
-        discountValue: discountVal,
-        discountType: discountTypeStr,
-        maxDiscount: maxDisc > 0 ? maxDisc : null,
-        minTransaction: minTx > 0 ? minTx : null,
-        totalQuota: totalQuota,
-        seasonCategory: _applicableDays == 2 ? 'Weekend Escape' : 'Spesial',
-        startDate: _selectedStartDate ?? DateTime.now(),
-        endDate:
-            _selectedEndDate ?? DateTime.now().add(const Duration(days: 30)),
-        isPublic: isPublic,
-        status: 'Aktif',
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Voucher Promo "${created['kode_promo'] ?? code}" berhasil disimpan ke database!',
-            ),
-            backgroundColor: const Color(0xFF00758F),
-          ),
+      if (_isEditMode) {
+        final promoId = (widget.promoToEdit!['id'] ??
+                widget.promoToEdit!['promo_id'])
+            ?.toString() ??
+            '';
+        final ok = await PromoService.instance.updatePromo(
+          promoId: promoId,
+          name: name,
+          code: code,
+          discountValue: discountVal,
+          discountType: discountTypeStr,
+          maxDiscount: maxDisc > 0 ? maxDisc : null,
+          minTransaction: minTx > 0 ? minTx : null,
+          totalQuota: totalQuota > 0 ? totalQuota : 100,
+          startDate: _selectedStartDate,
+          endDate: _selectedEndDate,
         );
-        Navigator.pop(context, true);
+
+        if (mounted) {
+          if (ok) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Voucher Promo "$code" berhasil diperbarui!'),
+                backgroundColor: const Color(0xFF16A34A),
+              ),
+            );
+            Navigator.pop(context, true);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Gagal memperbarui voucher promo'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      } else {
+        final created = await PromoService.instance.createPromo(
+          code: code,
+          name: name,
+          discountValue: discountVal,
+          discountType: discountTypeStr,
+          maxDiscount: maxDisc > 0 ? maxDisc : null,
+          minTransaction: minTx > 0 ? minTx : null,
+          totalQuota: totalQuota > 0 ? totalQuota : 100,
+          seasonCategory: _applicableDays == 2 ? 'Weekend Escape' : 'Spesial',
+          startDate: _selectedStartDate ?? DateTime.now(),
+          endDate:
+              _selectedEndDate ?? DateTime.now().add(const Duration(days: 30)),
+          isPublic: isPublic,
+          status: 'Aktif',
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Voucher Promo "${created['kode_promo'] ?? code}" berhasil disimpan ke database!',
+              ),
+              backgroundColor: const Color(0xFF00758F),
+            ),
+          );
+          Navigator.pop(context, true);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -293,16 +381,16 @@ class _TambahPromoScreenState extends State<TambahPromoScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
-                children: const [
+                children: [
                   Text(
-                    'Tambah Promo',
-                    style: TextStyle(
+                    _isEditMode ? 'Edit Promo' : 'Tambah Promo',
+                    style: const TextStyle(
                       fontSize: 13.5,
                       fontWeight: FontWeight.w900,
                       color: Color(0xFF0F172A),
                     ),
                   ),
-                  Text(
+                  const Text(
                     'The Grand Amora Resort & Spa',
                     style: TextStyle(fontSize: 9.5, color: Color(0xFF64748B)),
                   ),
@@ -733,9 +821,25 @@ class _TambahPromoScreenState extends State<TambahPromoScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Besaran Diskon (%) *', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                    Text(
+                      _discountType == 1
+                          ? 'Besaran Diskon (Rp) *'
+                          : 'Besaran Diskon (%) *',
+                      style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0F172A)),
+                    ),
                     const SizedBox(height: 4),
-                    _buildInputBox(controller: _discountValueController, suffixText: '%'),
+                    _buildInputBox(
+                      controller: _discountValueController,
+                      suffixText: _discountType == 1 ? null : '%',
+                      prefixText: _discountType == 1 ? 'Rp ' : null,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: _discountType == 1
+                          ? [ThousandsSeparatorInputFormatter()]
+                          : [FilteringTextInputFormatter.digitsOnly],
+                    ),
                   ],
                 ),
               ),
@@ -744,9 +848,18 @@ class _TambahPromoScreenState extends State<TambahPromoScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Maks. Plafon Diskon', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                    const Text('Maks. Plafon Diskon',
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF0F172A))),
                     const SizedBox(height: 4),
-                    _buildInputBox(controller: _maxDiscountController),
+                    _buildInputBox(
+                      controller: _maxDiscountController,
+                      prefixText: 'Rp ',
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [ThousandsSeparatorInputFormatter()],
+                    ),
                   ],
                 ),
               ),
@@ -1215,7 +1328,12 @@ class _TambahPromoScreenState extends State<TambahPromoScreen> {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    _buildInputBox(controller: _totalQuotaController, suffixText: 'Kupon'),
+                    _buildInputBox(
+                      controller: _totalQuotaController,
+                      suffixText: 'Kupon',
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [ThousandsSeparatorInputFormatter()],
+                    ),
                   ],
                 ),
               ),
@@ -1243,7 +1361,12 @@ class _TambahPromoScreenState extends State<TambahPromoScreen> {
                   children: [
                     const Text('Min. Transaksi', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
                     const SizedBox(height: 4),
-                    _buildInputBox(controller: _minTxController),
+                    _buildInputBox(
+                      controller: _minTxController,
+                      prefixText: 'Rp ',
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [ThousandsSeparatorInputFormatter()],
+                    ),
                   ],
                 ),
               ),
@@ -1657,17 +1780,19 @@ class _TambahPromoScreenState extends State<TambahPromoScreen> {
                 )
               : Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
+                  children: [
                     Text(
-                      'Terbitkan Promo',
-                      style: TextStyle(
+                      _isEditMode
+                          ? 'Simpan Perubahan Promo'
+                          : 'Terbitkan Promo',
+                      style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
                         color: Colors.white,
                       ),
                     ),
-                    SizedBox(width: 6),
-                    Icon(Icons.arrow_forward_rounded,
+                    const SizedBox(width: 6),
+                    const Icon(Icons.arrow_forward_rounded,
                         size: 16, color: Colors.white),
                   ],
                 ),
@@ -1681,9 +1806,11 @@ class _TambahPromoScreenState extends State<TambahPromoScreen> {
     String? hint,
     IconData? suffixIcon,
     String? suffixText,
+    String? prefixText,
     VoidCallback? onTap,
     bool readOnly = false,
     TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -1695,12 +1822,18 @@ class _TambahPromoScreenState extends State<TambahPromoScreen> {
         readOnly: readOnly,
         onTap: onTap,
         keyboardType: keyboardType,
+        inputFormatters: inputFormatters,
         style: const TextStyle(
             fontSize: 11.5,
             fontWeight: FontWeight.w700,
             color: Color(0xFF0F172A)),
         decoration: InputDecoration(
           hintText: hint,
+          prefixText: prefixText,
+          prefixStyle: const TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0F172A)),
           hintStyle: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
           suffixIcon: suffixIcon != null
               ? Icon(suffixIcon, size: 16, color: const Color(0xFF64748B))
