@@ -168,9 +168,9 @@ class UserModel {
     UserRole parseRole(dynamic val) {
       if (val == null) return UserRole.customer;
       final s = val.toString().toLowerCase().trim().replaceAll(' ', '_').replaceAll('-', '_');
-      if (s == 'front_office' || s == 'staff_fo') return UserRole.staffFo;
-      if (s == 'maintenance' || s == 'housekeeping') return UserRole.maintenance;
-      if (s == 'administrator' || s == 'admin_hotel') return UserRole.adminHotel;
+      if (s == 'front_office' || s == 'staff_fo' || s == 'staf_fo' || s == 'staf' || s == 'staff' || s == 'fo') return UserRole.staffFo;
+      if (s == 'maintenance' || s == 'housekeeping' || s == 'teknisi') return UserRole.maintenance;
+      if (s == 'administrator' || s == 'admin_hotel' || s == 'admin') return UserRole.adminHotel;
       if (s == 'super_admin' || s == 'superadmin') return UserRole.superAdmin;
       if (s == 'customer') return UserRole.customer;
       return UserRoleExtension.fromApiString(s);

@@ -66,6 +66,46 @@ class AuthService {
     return rejectedList.contains(s);
   }
 
+  /// Helper normalisasi ID/identifier staf untuk pencarian database yang fleksibel
+  static String normalizeStaffIdentifier(String input) {
+    final trimmed = input.trim();
+    if (trimmed.contains('@')) {
+      return trimmed.toLowerCase();
+    }
+
+    final upper = trimmed.toUpperCase();
+    if (upper.contains('-')) {
+      return upper;
+    }
+
+    // Ubah format tanpa tanda strip jika diketik bersambung (misal fo2025001 -> FO-2025-001)
+    final foMatch =
+        RegExp(r'^FO(\d{4})(\d+)$', caseSensitive: false).firstMatch(trimmed);
+    if (foMatch != null) {
+      return 'FO-${foMatch.group(1)}-${foMatch.group(2)}';
+    }
+
+    final mtMatch =
+        RegExp(r'^MT(\d{4})(\d+)$', caseSensitive: false).firstMatch(trimmed);
+    if (mtMatch != null) {
+      return 'MT-${mtMatch.group(1)}-${mtMatch.group(2)}';
+    }
+
+    final admMatch =
+        RegExp(r'^ADM(\d{4})(\d+)$', caseSensitive: false).firstMatch(trimmed);
+    if (admMatch != null) {
+      return 'ADM-${admMatch.group(1)}-${admMatch.group(2)}';
+    }
+
+    final stfMatch =
+        RegExp(r'^STF(\d{4})(\d+)$', caseSensitive: false).firstMatch(trimmed);
+    if (stfMatch != null) {
+      return 'STF-${stfMatch.group(1)}-${stfMatch.group(2)}';
+    }
+
+    return upper;
+  }
+
   /// Helper normalisasi role jabatan hotel
   static UserRole? parseNormalizedHotelRole(dynamic raw) {
     if (raw == null) return null;
@@ -75,13 +115,21 @@ class AuthService {
         .trim()
         .replaceAll(' ', '_')
         .replaceAll('-', '_');
-    if (s == 'administrator' || s == 'admin_hotel') {
+    if (s == 'administrator' || s == 'admin_hotel' || s == 'admin') {
       return UserRole.adminHotel;
     }
-    if (s == 'front_office' || s == 'staff_fo') {
+    if (s == 'front_office' ||
+        s == 'staff_fo' ||
+        s == 'staf_fo' ||
+        s == 'staf' ||
+        s == 'staff' ||
+        s == 'fo') {
       return UserRole.staffFo;
     }
-    if (s == 'maintenance' || s == 'housekeeping') {
+    if (s == 'maintenance' ||
+        s == 'housekeeping' ||
+        s == 'teknisi' ||
+        s == 'cleaner') {
       return UserRole.maintenance;
     }
     return null;
@@ -407,7 +455,9 @@ class AuthService {
     }
 
     try {
-      // 1. Resolusi ID Petugas / NIK / Email menjadi email akun via RPC atau tabel staf_hotel
+      final normalizedId = normalizeStaffIdentifier(cleanIdentifier);
+
+      // 1. Resolusi ID Petugas / Email menjadi email akun via RPC atau tabel staf_hotel
       String? emailResult;
       try {
         final dynamic resolved = await sbService.client!.rpc(
@@ -419,14 +469,28 @@ class AuthService {
         debugPrint('⚠️ [resolve_staff_login RPC Info]: $e');
       }
 
-      // Jika RPC belum terdaftar atau tidak menemukan email, cari di tabel staf_hotel
+      // Jika belum ditemukan lewat RPC dan ada ID ternormalisasi, coba panggil RPC kembali
+      if ((emailResult == null || emailResult.isEmpty) &&
+          normalizedId != cleanIdentifier) {
+        try {
+          final dynamic resolved = await sbService.client!.rpc(
+            'resolve_staff_login',
+            params: {'p_identifier': normalizedId},
+          );
+          emailResult = resolved?.toString().trim().toLowerCase();
+        } catch (_) {}
+      }
+
+      // Jika RPC belum terdaftar atau tidak menemukan email, cari langsung di tabel staf_hotel
       Map<String, dynamic>? staffRow;
       if (emailResult == null || emailResult.isEmpty) {
+        final filterOr =
+            'id_staf.ilike.$normalizedId,id_staf.ilike.$cleanIdentifier,email.ilike.$cleanIdentifier,nik_staf.ilike.$cleanIdentifier';
         try {
           final queryStaff = await sbService
               .table(SupabaseConfig.tableStafHotel)
               ?.select()
-              .or('id_staf.eq.$cleanIdentifier,email.eq.$cleanIdentifier,nik_staf.eq.$cleanIdentifier')
+              .or(filterOr)
               .maybeSingle();
           if (queryStaff != null) {
             staffRow = Map<String, dynamic>.from(queryStaff);
@@ -436,12 +500,17 @@ class AuthService {
 
         // Fallback Service Role REST API agar tidak terhalang RLS unauthenticated
         if (staffRow == null) {
-          staffRow = await _fetchStaffRowViaRest(
-              'or=(id_staf.eq.$cleanIdentifier,email.eq.$cleanIdentifier,nik_staf.eq.$cleanIdentifier)');
+          staffRow = await _fetchStaffRowViaRest('or=($filterOr)');
           if (staffRow != null) {
             emailResult = staffRow['email']?.toString().trim().toLowerCase();
           }
         }
+      }
+
+      // Fallback jika identifier yang dimasukkan adalah email langsung
+      if ((emailResult == null || emailResult.isEmpty) &&
+          cleanIdentifier.contains('@')) {
+        emailResult = cleanIdentifier.toLowerCase();
       }
 
       if (emailResult == null || emailResult.isEmpty) {
@@ -469,7 +538,9 @@ class AuthService {
         staffRow ??= await _fetchStaffRowViaRest('email=eq.$emailResult');
 
         final storedPass = staffRow?['password']?.toString();
-        if (storedPass == null || (storedPass != password && storedPass != 'MANAGED_BY_SUPABASE_AUTH')) {
+        if (storedPass == null ||
+            (storedPass != password &&
+                storedPass != 'MANAGED_BY_SUPABASE_AUTH')) {
           throw Exception('ID Petugas atau kata sandi salah');
         }
       }
@@ -505,24 +576,26 @@ class AuthService {
       }
 
       // 6. Validasi tab portal yang diminta
-      final String portalName;
-      switch (expectedRole) {
-        case UserRole.adminHotel:
-          portalName = 'Administrator';
-          break;
-        case UserRole.staffFo:
-          portalName = 'Staf Front Office';
-          break;
-        case UserRole.maintenance:
-          portalName = 'Maintenance';
-          break;
-        default:
-          portalName = expectedRole.displayName;
-      }
+      final bool isStaffPortal = (expectedRole == UserRole.staffFo ||
+          expectedRole == UserRole.maintenance);
+      final bool isActualStaff = (actualRole == UserRole.staffFo ||
+          actualRole == UserRole.maintenance);
 
-      if (actualRole != expectedRole) {
+      if (isStaffPortal) {
+        if (!isActualStaff) {
+          await sbService.client?.auth.signOut();
+          throw Exception(
+              'Akun ini adalah Administrator Hotel, silakan masuk melalui Portal Administrator');
+        }
+      } else if (expectedRole == UserRole.adminHotel) {
+        if (actualRole != UserRole.adminHotel) {
+          await sbService.client?.auth.signOut();
+          throw Exception(
+              'Akun ini adalah Staf Hotel, silakan masuk melalui Portal Staf');
+        }
+      } else if (actualRole != expectedRole) {
         await sbService.client?.auth.signOut();
-        throw Exception('Akun ini bukan akun $portalName');
+        throw Exception('Akun ini bukan akun ${expectedRole.displayName}');
       }
 
       // 7. Bangun UserModel

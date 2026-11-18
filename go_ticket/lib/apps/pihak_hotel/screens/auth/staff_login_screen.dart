@@ -7,40 +7,15 @@ import '../administrator/administrator_dashboard_screen.dart';
 import '../front_office/fo_dashboard_screen.dart';
 import '../maintenance/maintenance_dashboard_screen.dart';
 
-/// Formatter otomatis untuk ID Petugas: <role-tahun_bekerja_urutan pegawai keberapa>
-/// Contoh: ADM-2025-001 atau STF-2025-084.
-/// Otomatis menyisipkan tanda '-' tanpa perlu diketik manual.
+/// Formatter input ID/Email Petugas.
+/// Membiarkan teks fleksibel agar pengguna bisa mengetikkan format ID (FO-xxx, MT-xxx, ADM-xxx) maupun email.
 class StaffIdInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    final text = newValue.text;
-    // Jika user mengetikkan email (mengandung @), biarkan format teks email biasa
-    if (text.contains('@')) {
-      return newValue;
-    }
-
-    final clean = text.replaceAll('-', '').toUpperCase();
-    if (clean.isEmpty) {
-      return newValue.copyWith(text: '');
-    }
-
-    // Format: 3 huruf role - 4 digit tahun - urutan pegawai
-    final buffer = StringBuffer();
-    for (int i = 0; i < clean.length && i < 11; i++) {
-      if (i == 3 || i == 7) {
-        buffer.write('-');
-      }
-      buffer.write(clean[i]);
-    }
-
-    final formatted = buffer.toString();
-    return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
-    );
+    return newValue;
   }
 }
 
@@ -113,7 +88,7 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
       if (_selectedRoleIndex == 0) {
         final rawId = _staffIdController.text.trim();
         if (rawId.isEmpty) {
-          throw Exception('Silakan masukkan ID Petugas atau NIK Staf.');
+          throw Exception('Silakan masukkan ID Petugas atau Email Petugas.');
         }
         if (_staffPasswordController.text.isEmpty) {
           throw Exception('Silakan masukkan kata sandi Anda.');
@@ -455,14 +430,15 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
         ),
         const SizedBox(height: 14),
 
-        // ID Petugas / NIK Staf *
-        _buildRequiredLabel('ID Petugas / NIK Staf'),
+        // ID Petugas / Email Petugas *
+        _buildRequiredLabel('ID Petugas / Email Petugas'),
         _buildInputField(
           controller: _staffIdController,
-          hint: _selectedStaffRole == 0 ? 'STF-2025-084' : 'MTC-2025-012',
+          hint: _selectedStaffRole == 0
+              ? 'Contoh: FO-2025-001 (atau email)'
+              : 'Contoh: MT-2025-001 (atau email)',
           icon: Icons.badge_outlined,
-          inputFormatters: [StaffIdInputFormatter()],
-          textCapitalization: TextCapitalization.characters,
+          textCapitalization: TextCapitalization.none,
         ),
         const SizedBox(height: 14),
 
@@ -724,8 +700,7 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
           controller: _adminIdController,
           hint: 'Contoh: ADM-2025-001 (atau email)',
           icon: Icons.person_outline_rounded,
-          inputFormatters: [StaffIdInputFormatter()],
-          textCapitalization: TextCapitalization.characters,
+          textCapitalization: TextCapitalization.none,
         ),
         const SizedBox(height: 14),
 
