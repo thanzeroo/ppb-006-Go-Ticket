@@ -24,8 +24,6 @@ class _DashboardTabState extends State<DashboardTab> {
     'Bulan Ini (MTD)',
     'Tahun Ini (YTD)',
   ];
-  String _selectedRegion = 'Seluruh Indonesia (Nasional)';
-
   Map<String, dynamic> _stats = {};
   List<HotelModel> _hotels = [];
   bool _isLoading = true;
@@ -92,27 +90,23 @@ class _DashboardTabState extends State<DashboardTab> {
         _buildPeriodFilters(),
         const SizedBox(height: 12),
 
-        // 4. Region Dropdown Card
-        _buildRegionSelector(),
-        const SizedBox(height: 14),
-
-        // 5. Alert Banner Card ("PERHATIAN KEUANGAN")
+        // 4. Alert Banner Card ("PERHATIAN KEUANGAN")
         _buildFinancialAlertCard(),
         const SizedBox(height: 14),
 
-        // 6. Key Metrics Grid (2x2)
+        // 5. Key Metrics Grid (2x2)
         _buildMetricsGrid(),
         const SizedBox(height: 14),
 
-        // 7. National Booking Volume Trend Card (Interactive/Painter)
+        // 6. National Booking Volume Trend Card (Interactive/Painter)
         _buildBookingTrendCard(),
         const SizedBox(height: 20),
 
-        // 8. Sebaran Hotel Populer
+        // 7. Sebaran Hotel Populer
         _buildPopularHotelsSection(),
         const SizedBox(height: 20),
 
-        // 9. Aksi Cepat Super Admin
+        // 8. Aksi Cepat Super Admin
         _buildQuickActionsSection(),
         const SizedBox(height: 24),
       ],
@@ -211,122 +205,7 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // 3. Region Selector Card (Interaktif & Terhubung dengan Filter)
-  // ---------------------------------------------------------------------------
-  Widget _buildRegionSelector() {
-    final availableCities = [
-      'Seluruh Indonesia (Nasional)',
-      ..._hotels
-          .map((h) => h.city.trim())
-          .where((c) => c.isNotEmpty)
-          .toSet()
-          .toList()
-        ..sort()
-    ];
-
-    return InkWell(
-      onTap: () {
-        showModalBottomSheet(
-          context: context,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          builder: (ctx) => Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Pilih Wilayah / Region',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(ctx),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                ...availableCities.map((city) {
-                  final isSelected = _selectedRegion == city;
-                  return ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(
-                      city.contains('Nasional')
-                          ? Icons.public
-                          : Icons.location_on_outlined,
-                      color: isSelected
-                          ? const Color(0xFF00758F)
-                          : const Color(0xFF64748B),
-                    ),
-                    title: Text(
-                      city,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.w500,
-                        color: isSelected
-                            ? const Color(0xFF00758F)
-                            : const Color(0xFF0F172A),
-                      ),
-                    ),
-                    trailing: isSelected
-                        ? const Icon(Icons.check,
-                            color: Color(0xFF00758F), size: 18)
-                        : null,
-                    onTap: () {
-                      setState(() => _selectedRegion = city);
-                      Navigator.pop(ctx);
-                    },
-                  );
-                }),
-              ],
-            ),
-          ),
-        );
-      },
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: _selectedRegion == 'Seluruh Indonesia (Nasional)'
-                ? const Color(0xFFE2E8F0)
-                : const Color(0xFF00C2FF),
-          ),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.public, color: Color(0xFF0096B4), size: 18),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                _selectedRegion,
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF0F172A),
-                ),
-              ),
-            ),
-            const Icon(Icons.keyboard_arrow_down_rounded,
-                color: Color(0xFF64748B), size: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // 4. Financial Alert Banner
+  // 3. Financial Alert Banner
   // ---------------------------------------------------------------------------
   Widget _buildFinancialAlertCard() {
     return Container(
@@ -449,7 +328,7 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // 5. Key Metrics 2x2 Grid (100% Dinamis dari Database & Terfilter)
+  // 4. Key Metrics 2x2 Grid (100% Dinamis dari Database)
   // ---------------------------------------------------------------------------
   Widget _buildMetricsGrid() {
     final baseRev = (_stats['totalRevenue'] as num?)?.toDouble() ?? 0;
@@ -461,15 +340,7 @@ class _DashboardTabState extends State<DashboardTab> {
             : (_selectedPeriodIndex == 2 ? 1.0 : 4.2));
     final adjustedRev = baseRev * periodMultiplier;
 
-    final filteredHotels = _selectedRegion == 'Seluruh Indonesia (Nasional)'
-        ? _hotels
-        : _hotels
-            .where((h) => h.city
-                .toLowerCase()
-                .contains(_selectedRegion.toLowerCase()))
-            .toList();
-
-    final totalHotelsCount = filteredHotels.length;
+    final totalHotelsCount = _hotels.length;
     final totalUsers = (_stats['totalUsers'] as num?)?.toInt() ?? 0;
 
     final gmvStr = CurrencyFormatter.toRupiah(adjustedRev.round());
@@ -513,9 +384,7 @@ class _DashboardTabState extends State<DashboardTab> {
                 value: '$totalHotelsCount',
                 unit: 'Unit',
                 icon: Icons.apartment_rounded,
-                subText: _selectedRegion == 'Seluruh Indonesia (Nasional)'
-                    ? 'Nasional'
-                    : _selectedRegion,
+                subText: 'Nasional',
               ),
             ),
             const SizedBox(width: 10),
@@ -793,18 +662,10 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // 7. Sebaran Hotel Populer (Dinamis dari Database & Terfilter Region)
+  // 6. Sebaran Hotel Populer (Dinamis dari Database)
   // ---------------------------------------------------------------------------
   Widget _buildPopularHotelsSection() {
-    final filteredHotels = _selectedRegion == 'Seluruh Indonesia (Nasional)'
-        ? _hotels
-        : _hotels
-            .where((h) => h.city
-                .toLowerCase()
-                .contains(_selectedRegion.toLowerCase()))
-            .toList();
-
-    if (filteredHotels.isEmpty) {
+    if (_hotels.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Container(
@@ -816,7 +677,7 @@ class _DashboardTabState extends State<DashboardTab> {
           ),
           child: Center(
             child: Text(
-              'Belum ada hotel terdaftar di region $_selectedRegion',
+              'Belum ada hotel terdaftar',
               style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
             ),
           ),
@@ -824,7 +685,7 @@ class _DashboardTabState extends State<DashboardTab> {
       );
     }
 
-    final list = filteredHotels.map((h) {
+    final list = _hotels.map((h) {
       return {
         'title': h.name,
         'count': '${h.totalRooms} Kamar Terdaftar',

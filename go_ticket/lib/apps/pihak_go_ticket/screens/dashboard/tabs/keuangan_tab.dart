@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../../../core/models/booking_model.dart';
-import '../../../../../core/services/booking_service.dart';
 import '../../../../../core/services/super_admin_service.dart';
 import '../../../../../core/utils/currency_formatter.dart';
 
@@ -16,11 +14,8 @@ class KeuanganTab extends StatefulWidget {
 
 class _KeuanganTabState extends State<KeuanganTab> {
   int _selectedPeriod = 1; // 0 = Harian, 1 = Bulanan, 2 = Tahunan
-  DateTime _startDate = DateTime.now().subtract(const Duration(days: 30));
-  DateTime _endDate = DateTime.now();
 
   Map<String, dynamic> _stats = {};
-  List<BookingModel> _recentBookings = [];
   bool _isLoading = true;
 
   @override
@@ -33,11 +28,9 @@ class _KeuanganTabState extends State<KeuanganTab> {
     setState(() => _isLoading = true);
     try {
       final stats = await SuperAdminService.instance.getPlatformStats();
-      final bookings = await BookingService.instance.getMyBookings();
       if (mounted) {
         setState(() {
           _stats = stats;
-          _recentBookings = bookings.take(10).toList();
           _isLoading = false;
         });
       }
@@ -45,7 +38,6 @@ class _KeuanganTabState extends State<KeuanganTab> {
       if (mounted) {
         setState(() {
           _stats = {};
-          _recentBookings = [];
           _isLoading = false;
         });
       }
@@ -82,7 +74,7 @@ class _KeuanganTabState extends State<KeuanganTab> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: const [
                   Text(
-                    'Laporan Keuangan & Transaksi',
+                    'Laporan Keuangan',
                     style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w900,
@@ -91,7 +83,7 @@ class _KeuanganTabState extends State<KeuanganTab> {
                   ),
                   SizedBox(height: 3),
                   Text(
-                    'Rekapitulasi pendapatan kotor, omzet bersih, komisi sistem, dan ekspor laporan resmi.',
+                    'Rekapitulasi pendapatan kotor, omzet bersih, dan komisi sistem.',
                     style: TextStyle(
                       fontSize: 11.5,
                       color: Color(0xFF64748B),
@@ -109,15 +101,11 @@ class _KeuanganTabState extends State<KeuanganTab> {
         _buildPeriodSegmentedControl(),
         const SizedBox(height: 12),
 
-        // 3. Date Range Picker Bar
-        _buildDateRangePickerBar(),
-        const SizedBox(height: 14),
-
-        // 4. Hero Card: PENDAPATAN BERSIH (NET REVENUE)
+        // 3. Hero Card: PENDAPATAN BERSIH (NET REVENUE)
         _buildNetRevenueHeroCard(),
         const SizedBox(height: 12),
 
-        // 5. Two Metric Cards (Dinamis dari Database)
+        // 4. Two Metric Cards (Dinamis dari Database)
         Row(
           children: [
             Expanded(
@@ -139,16 +127,8 @@ class _KeuanganTabState extends State<KeuanganTab> {
         ),
         const SizedBox(height: 16),
 
-        // 6. Metode Pembayaran Card with multi-segment bar
+        // 5. Metode Pembayaran Card with multi-segment bar
         _buildPaymentMethodsCard(),
-        const SizedBox(height: 18),
-
-        // 7. Transaksi Pembookingan List
-        _buildRecentTransactionsSection(),
-        const SizedBox(height: 18),
-
-        // 8. Ekspor & Cetak Berkas Card
-        _buildExportReportCard(),
         const SizedBox(height: 24),
       ],
     );
@@ -202,100 +182,6 @@ class _KeuanganTabState extends State<KeuanganTab> {
             ),
           );
         }),
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Date Range Picker Bar (Interaktif & Berfungsi)
-  // ---------------------------------------------------------------------------
-  Widget _buildDateRangePickerBar() {
-    final startStr = '${_startDate.day.toString().padLeft(2, '0')}/${_startDate.month.toString().padLeft(2, '0')}/${_startDate.year}';
-    final endStr = '${_endDate.day.toString().padLeft(2, '0')}/${_endDate.month.toString().padLeft(2, '0')}/${_endDate.year}';
-
-    return InkWell(
-      onTap: () async {
-        final picked = await showDateRangePicker(
-          context: context,
-          firstDate: DateTime(2023),
-          lastDate: DateTime(2030),
-          initialDateRange: DateTimeRange(start: _startDate, end: _endDate),
-          builder: (context, child) {
-            return Theme(
-              data: ThemeData.light().copyWith(
-                colorScheme: const ColorScheme.light(
-                  primary: Color(0xFF00758F),
-                  onPrimary: Colors.white,
-                  surface: Colors.white,
-                  onSurface: Color(0xFF0F172A),
-                ),
-              ),
-              child: child!,
-            );
-          },
-        );
-        if (picked != null) {
-          setState(() {
-            _startDate = picked.start;
-            _endDate = picked.end;
-          });
-        }
-      },
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE0F7FA),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.calendar_month_outlined,
-                size: 16,
-                color: Color(0xFF0096B4),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'RENTANG TANGGAL (KLIK UNTUK FILTER)',
-                    style: TextStyle(
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF64748B),
-                      letterSpacing: 0.4,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '$startStr – $endStr',
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0F172A),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(
-              Icons.tune_rounded,
-              color: Color(0xFF00758F),
-              size: 18,
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -697,278 +583,6 @@ class _KeuanganTabState extends State<KeuanganTab> {
               fontSize: 13,
               fontWeight: FontWeight.w800,
               color: Color(0xFF0F172A),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Transaksi Pembookingan (100% Dinamis dari Database)
-  // ---------------------------------------------------------------------------
-  Widget _buildRecentTransactionsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Transaksi Pembookingan',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF0F172A),
-              ),
-            ),
-            GestureDetector(
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Menampilkan seluruh riwayat transaksi...')),
-                );
-              },
-              child: const Text(
-                'Lihat Semua',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0284C7),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        if (_recentBookings.isEmpty)
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 24),
-            alignment: Alignment.center,
-            child: const Text(
-              'Belum ada transaksi tercatat.',
-              style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-            ),
-          )
-        else
-          ..._recentBookings.map((b) => _buildBookingCard(b)),
-      ],
-    );
-  }
-
-  Widget _buildBookingCard(BookingModel b) {
-    final dateStr =
-        '${b.checkInDate.day}/${b.checkInDate.month}/${b.checkInDate.year}';
-    final badgeText = b.paymentMethod ?? b.status.displayName;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Top Row: Code & Status Badge
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  b.bookingCode,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF2563EB),
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE0F7FA),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  badgeText,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF007A94),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // Room & Amount
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  b.roomTypeName,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                CurrencyFormatter.toRupiah(b.totalAmount),
-                style: const TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF006678),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-
-          // Guest & Date
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                b.customerName,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF64748B),
-                ),
-              ),
-              Row(
-                children: [
-                  Text(
-                    dateStr,
-                    style: const TextStyle(
-                      fontSize: 10.5,
-                      color: Color(0xFF64748B),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(
-                    Icons.chevron_right,
-                    size: 16,
-                    color: Color(0xFF94A3B8),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Ekspor & Cetak Berkas Card
-  // ---------------------------------------------------------------------------
-  Widget _buildExportReportCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: const [
-              Icon(Icons.print_outlined, color: Color(0xFF0096B4), size: 19),
-              SizedBox(width: 8),
-              Text(
-                'Ekspor & Cetak Berkas',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Laporan dilengkapi stempel digital resmi, tanda tangan QR verifikasi, dan nomor registrasi audit platform Go Ticket.',
-            style: TextStyle(
-              fontSize: 11,
-              color: Color(0xFF64748B),
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Button 1: Unduh Laporan PDF Resmi
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Mengunduh Laporan Keuangan PDF Resmi...')),
-                );
-              },
-              icon: const Icon(Icons.picture_as_pdf_rounded, size: 17, color: Colors.white),
-              label: const Text(
-                'Unduh Laporan PDF Resmi',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00C2FF),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                elevation: 0,
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          // Button 2: Ekspor Format CSV / Excel
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Mengekspor data transaksi ke file Excel/CSV...')),
-                );
-              },
-              icon: const Icon(Icons.table_chart_outlined,
-                  size: 17, color: Color(0xFF007A94)),
-              label: const Text(
-                'Ekspor Format CSV / Excel',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF007A94),
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                backgroundColor: const Color(0xFFE0F7FA),
-                side: const BorderSide(color: Color(0xFFBAE6FD)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(22),
-                ),
-              ),
             ),
           ),
         ],
