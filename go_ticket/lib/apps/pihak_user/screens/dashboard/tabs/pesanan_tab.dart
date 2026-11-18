@@ -8,6 +8,7 @@ import 'package:go_ticket/core/services/booking_service.dart';
 import 'package:go_ticket/core/utils/currency_formatter.dart';
 import 'package:go_ticket/core/widgets/user_avatar.dart';
 import '../../../router/customer_router.dart';
+import '../../../services/user_booking_storage.dart';
 import '../customer_dashboard_screen.dart';
 import 'saved_hotel_screen.dart';
 
@@ -32,7 +33,7 @@ class _PesananTabState extends State<PesananTab>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _tabController.addListener(() {
       setState(() {});
     });
@@ -103,19 +104,52 @@ class _PesananTabState extends State<PesananTab>
     );
   }
 
+  Future<List<BookingModel>> _fetchBookings() async {
+    final remoteList = await BookingService.instance.getMyBookings();
+    final localList = await UserBookingStorage.instance.getBookings();
+
+    final Map<String, BookingModel> map = {};
+    for (final b in remoteList) {
+      final key = b.bookingCode.isNotEmpty ? b.bookingCode : b.id;
+      map[key] = b;
+    }
+    for (final b in localList) {
+      final key = b.bookingCode.isNotEmpty ? b.bookingCode : b.id;
+      if (map.containsKey(key)) {
+        if (b.status == BookingStatus.cancelled) {
+          map[key] = map[key]!.copyWith(status: BookingStatus.cancelled);
+        }
+      } else {
+        map[key] = b;
+      }
+    }
+
+    final merged = map.values.toList();
+    merged.sort((a, b) {
+      final tA = a.paidAt ?? a.createdAt ?? a.checkInDate;
+      final tB = b.paidAt ?? b.createdAt ?? b.checkInDate;
+      return tB.compareTo(tA);
+    });
+    return merged;
+  }
+
   // ---------------------------------------------------------------------------
   // MAIN PEMESANAN VIEW
   // ---------------------------------------------------------------------------
   Widget _buildPemesananView() {
     return FutureBuilder<List<BookingModel>>(
-      future: BookingService.instance.getMyBookings(),
+      future: _fetchBookings(),
       builder: (context, snapshot) {
         final allBookings = snapshot.data ?? [];
-        final countActive = allBookings
+        final countPending = allBookings
+            .where((b) =>
+                b.status == BookingStatus.pendingVerification ||
+                b.status == BookingStatus.pendingPayment)
+            .length;
+        final countConfirmed = allBookings
             .where((b) =>
                 b.status == BookingStatus.confirmed ||
-                b.status == BookingStatus.checkedIn ||
-                b.status == BookingStatus.pendingPayment)
+                b.status == BookingStatus.checkedIn)
             .length;
         final countCompleted = allBookings
             .where((b) => b.status == BookingStatus.checkedOut)
@@ -134,7 +168,8 @@ class _PesananTabState extends State<PesananTab>
               _buildHeader(),
               _buildTabBar(
                 countAll: countAll,
-                countActive: countActive,
+                countPending: countPending,
+                countConfirmed: countConfirmed,
                 countCompleted: countCompleted,
                 countCancelled: countCancelled,
               ),
@@ -144,8 +179,9 @@ class _PesananTabState extends State<PesananTab>
                     : TabBarView(
                         controller: _tabController,
                         children: [
-                          _buildOrderList(allBookings, filterStatus: null),
-                          _buildOrderList(allBookings, filterStatus: 'active'),
+                          _buildOrderList(allBookings, filterStatus: 'all'),
+                          _buildOrderList(allBookings, filterStatus: 'pending'),
+                          _buildOrderList(allBookings, filterStatus: 'confirmed'),
                           _buildOrderList(allBookings, filterStatus: 'selesai'),
                           _buildOrderList(allBookings, filterStatus: 'dibatalkan'),
                         ],
@@ -350,13 +386,15 @@ class _PesananTabState extends State<PesananTab>
   // ---------------------------------------------------------------------------
   Widget _buildTabBar({
     required int countAll,
-    required int countActive,
+    required int countPending,
+    required int countConfirmed,
     required int countCompleted,
     required int countCancelled,
   }) {
     final tabs = [
       'Semua ($countAll)',
-      'Aktif ($countActive)',
+      'Menunggu Konfirmasi ($countPending)',
+      'Dikonfirmasi ($countConfirmed)',
       'Selesai ($countCompleted)',
       'Dibatalkan ($countCancelled)',
     ];
@@ -390,13 +428,16 @@ class _PesananTabState extends State<PesananTab>
   // ---------------------------------------------------------------------------
   Widget _buildOrderList(
     List<BookingModel> allBookings, {
-    String? filterStatus,
+    required String filterStatus,
   }) {
     final filtered = allBookings.where((b) {
-      if (filterStatus == 'active') {
-        return b.status == BookingStatus.confirmed ||
-            b.status == BookingStatus.checkedIn ||
+      if (filterStatus == 'pending') {
+        return b.status == BookingStatus.pendingVerification ||
             b.status == BookingStatus.pendingPayment;
+      }
+      if (filterStatus == 'confirmed') {
+        return b.status == BookingStatus.confirmed ||
+            b.status == BookingStatus.checkedIn;
       }
       if (filterStatus == 'selesai') {
         return b.status == BookingStatus.checkedOut;
@@ -412,6 +453,7 @@ class _PesananTabState extends State<PesananTab>
         b.hotelName,
         b.hotelAddress ?? '',
         b.roomTypeName,
+        b.roomNumber ?? '',
         b.status.displayName,
       ]);
     }).toList();
@@ -446,324 +488,502 @@ class _PesananTabState extends State<PesananTab>
     final isCancelled = b.status == BookingStatus.cancelled ||
         b.status == BookingStatus.expired;
     final isCompleted = b.status == BookingStatus.checkedOut;
+    final isConfirmed = b.status == BookingStatus.confirmed ||
+        b.status == BookingStatus.checkedIn;
+    final isPending = b.status == BookingStatus.pendingVerification ||
+        b.status == BookingStatus.pendingPayment;
+
     final dates =
         '${b.checkInDate.day} ${_monthShort(b.checkInDate.month)} – ${b.checkOutDate.day} ${_monthShort(b.checkOutDate.month)} ${b.checkOutDate.year}';
     final priceStr = CurrencyFormatter.toRupiah(b.totalAmount);
     final paymentMethodStr = b.paymentMethod ?? 'QRIS';
 
-    Color headerBg = const Color(0xFFE0F7FA);
-    Color statusColor = const Color(0xFF0096C7);
-    Color dotColor = const Color(0xFF00B4D8);
+    String statusText = 'Menunggu Konfirmasi';
+    Color headerBg = const Color(0xFFFFFBEB);
+    Color statusColor = const Color(0xFFD97706);
+    Color dotColor = const Color(0xFFD97706);
 
     if (isCompleted) {
-      headerBg = const Color(0xFFF3F4F6);
-      statusColor = const Color(0xFF6B7280);
-      dotColor = const Color(0xFF9CA3AF);
+      statusText = 'Selesai';
+      headerBg = const Color(0xFFDCFCE7);
+      statusColor = const Color(0xFF16A34A);
+      dotColor = const Color(0xFF16A34A);
+    } else if (isConfirmed) {
+      statusText = 'Dikonfirmasi';
+      headerBg = const Color(0xFFDBEAFE);
+      statusColor = const Color(0xFF2563EB);
+      dotColor = const Color(0xFF2563EB);
     } else if (isCancelled) {
+      statusText = 'Dibatalkan (Reject)';
       headerBg = const Color(0xFFFEE2E2);
       statusColor = const Color(0xFFEF4444);
       dotColor = const Color(0xFFEF4444);
     }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isCancelled
-              ? const Color(0xFFEF4444).withOpacity(0.3)
-              : const Color(0xFF00B4D8).withOpacity(0.4),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+    final createdAt = b.paidAt ?? b.createdAt ?? DateTime.now();
+    final elapsedHours = DateTime.now().difference(createdAt).inHours;
+    final canReject = elapsedHours < 24;
+    final hoursRemaining = (24 - elapsedHours).clamp(0, 24);
+
+    return InkWell(
+      onTap: () {
+        Navigator.pushNamed(
+          context,
+          CustomerRouter.reservationDetail,
+          arguments: b,
+        ).then((_) => setState(() {}));
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isCancelled
+                ? const Color(0xFFEF4444).withValues(alpha: 0.3)
+                : const Color(0xFF00B4D8).withValues(alpha: 0.4),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header Status & ID
-          Container(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            decoration: BoxDecoration(
-              color: headerBg,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(16)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: dotColor,
-                        shape: BoxShape.circle,
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header Status & ID
+            Container(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              decoration: BoxDecoration(
+                color: headerBg,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: dotColor,
+                          shape: BoxShape.circle,
+                        ),
                       ),
+                      const SizedBox(width: 6),
+                      Text(
+                        statusText,
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: statusColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                  InkWell(
+                    onTap: () {
+                      Clipboard.setData(ClipboardData(text: b.bookingCode));
+                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('ID ${b.bookingCode} berhasil disalin!'),
+                          duration: const Duration(seconds: 1),
+                        ),
+                      );
+                    },
+                    child: Row(
+                      children: [
+                        Text(
+                          'ID: ${b.bookingCode}',
+                          style: GoogleFonts.inter(
+                              fontSize: 12, color: const Color(0xFF6B7280)),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.copy_outlined,
+                            size: 14, color: Color(0xFF9CA3AF)),
+                      ],
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      b.status.displayName,
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: statusColor,
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.network(
+                          b.hotelImageUrl ?? '',
+                          width: 80,
+                          height: 70,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 80,
+                            height: 70,
+                            color: const Color(0xFFE5E7EB),
+                            child: const Icon(Icons.hotel, color: Colors.grey),
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                InkWell(
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: b.bookingCode));
-                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('ID ${b.bookingCode} berhasil disalin!'),
-                        duration: const Duration(seconds: 1),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              b.hotelAddress ?? 'Indonesia',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: const Color(0xFF6B7280),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              b.hotelName,
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF111827),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              '${b.roomTypeName} • Kamar ${b.roomNumber ?? '003'} (${b.totalRooms} Kamar • ${b.nights} Malam)',
+                              style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: const Color(0xFF6B7280)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                const Icon(Icons.calendar_today,
+                                    size: 12, color: Color(0xFF9CA3AF)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  dates,
+                                  style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      color: const Color(0xFF6B7280)),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    );
-                  },
-                  child: Row(
+                    ],
+                  ),
+                  const Divider(height: 20, color: Color(0xFFE5E7EB)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'ID: ${b.bookingCode}',
+                        'Total Pembayaran',
                         style: GoogleFonts.inter(
                             fontSize: 12, color: const Color(0xFF6B7280)),
                       ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.copy_outlined,
-                          size: 14, color: Color(0xFF9CA3AF)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.network(
-                        b.hotelImageUrl ?? '',
-                        width: 80,
-                        height: 70,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          width: 80,
-                          height: 70,
-                          color: const Color(0xFFE5E7EB),
-                          child: const Icon(Icons.hotel, color: Colors.grey),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      Row(
                         children: [
                           Text(
-                            b.hotelAddress ?? 'Indonesia',
+                            priceStr,
                             style: GoogleFonts.inter(
-                              fontSize: 11,
-                              color: const Color(0xFF6B7280),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            b.hotelName,
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
                               color: const Color(0xFF111827),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
-                          Text(
-                            '${b.roomTypeName} (${b.totalRooms} Kamar • ${b.nights} Malam)',
-                            style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: const Color(0xFF6B7280)),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              const Icon(Icons.calendar_today,
-                                  size: 12, color: Color(0xFF9CA3AF)),
-                              const SizedBox(width: 4),
-                              Text(
-                                dates,
-                                style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    color: const Color(0xFF6B7280)),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: isCancelled
+                                  ? const Color(0xFFFEE2E2)
+                                  : const Color(0xFFF0FDF4),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: isCancelled
+                                    ? const Color(0xFFFCA5A5)
+                                    : const Color(0xFF86EFAC),
                               ),
-                            ],
+                            ),
+                            child: Text(
+                              isCancelled
+                                  ? 'Dibatalkan'
+                                  : '✓ Lunas ($paymentMethodStr)',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: isCancelled
+                                    ? const Color(0xFFEF4444)
+                                    : const Color(0xFF16A34A),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                ),
-                const Divider(height: 20, color: Color(0xFFE5E7EB)),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Total Pembayaran',
-                      style: GoogleFonts.inter(
-                          fontSize: 12, color: const Color(0xFF6B7280)),
-                    ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Action Buttons
+                  if (isPending) ...[
                     Row(
                       children: [
-                        Text(
-                          priceStr,
-                          style: GoogleFonts.inter(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: const Color(0xFF111827),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => Navigator.pushNamed(
+                              context,
+                              CustomerRouter.reservationDetail,
+                              arguments: b,
+                            ).then((_) => setState(() {})),
+                            icon: const Icon(Icons.receipt_long,
+                                size: 15, color: Color(0xFF00B4D8)),
+                            label: Text(
+                              'Detail Reservasi',
+                              style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF00B4D8)),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Color(0xFF00B4D8)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: isCancelled
-                                ? const Color(0xFFFEE2E2)
-                                : const Color(0xFFF0FDF4),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: isCancelled
-                                  ? const Color(0xFFFCA5A5)
-                                  : const Color(0xFF86EFAC),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => Navigator.pushNamed(
+                              context,
+                              CustomerRouter.eTicket,
+                              arguments: b,
+                            ),
+                            icon: const Icon(Icons.qr_code, size: 15),
+                            label: Text(
+                              'Lihat E-Tiket',
+                              style: GoogleFonts.inter(
+                                  fontSize: 12, fontWeight: FontWeight.w700),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF00B4D8),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              elevation: 0,
                             ),
                           ),
-                          child: Text(
-                            isCancelled
-                                ? 'Dibatalkan'
-                                : '✓ Lunas ($paymentMethodStr)',
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              color: isCancelled
-                                  ? const Color(0xFFEF4444)
-                                  : const Color(0xFF16A34A),
-                              fontWeight: FontWeight.w600,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              canReject
+                                  ? Icons.timer_outlined
+                                  : Icons.timer_off_outlined,
+                              size: 13,
+                              color: canReject
+                                  ? const Color(0xFFD97706)
+                                  : Colors.red,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              canReject
+                                  ? 'Toleransi reject: sisa $hoursRemaining jam'
+                                  : 'Toleransi reject berakhir (hangus jika tidak check-in)',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: canReject
+                                    ? const Color(0xFFD97706)
+                                    : Colors.red,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (canReject)
+                          InkWell(
+                            onTap: () => Navigator.pushNamed(
+                              context,
+                              CustomerRouter.reservationDetail,
+                              arguments: b,
+                            ).then((_) => setState(() {})),
+                            child: Text(
+                              'Reject Tiket >',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.red,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ] else if (isConfirmed) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => Navigator.pushNamed(
+                              context,
+                              CustomerRouter.reservationDetail,
+                              arguments: b,
+                            ),
+                            icon: const Icon(Icons.receipt_long,
+                                size: 15, color: Color(0xFF00B4D8)),
+                            label: Text(
+                              'Detail Reservasi',
+                              style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF00B4D8)),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Color(0xFF00B4D8)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => Navigator.pushNamed(
+                              context,
+                              CustomerRouter.eTicket,
+                              arguments: b,
+                            ),
+                            icon: const Icon(Icons.qr_code, size: 15),
+                            label: Text(
+                              'Lihat E-Tiket & QR',
+                              style: GoogleFonts.inter(
+                                  fontSize: 12, fontWeight: FontWeight.w700),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF00B4D8),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              elevation: 0,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else if (isCompleted) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => Navigator.pushNamed(
+                              context,
+                              CustomerRouter.postCheckoutReview,
+                              arguments: b,
+                            ).then((_) => setState(() {})),
+                            icon: const Icon(Icons.star_rounded,
+                                color: Colors.amber, size: 16),
+                            label: Text(
+                              'Beri Ulasan',
+                              style: GoogleFonts.inter(
+                                  fontSize: 12, fontWeight: FontWeight.w700),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0F172A),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              elevation: 0,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => Navigator.pushNamed(
+                              context,
+                              CustomerRouter.reservationDetail,
+                              arguments: b,
+                            ),
+                            icon: const Icon(Icons.receipt_long,
+                                size: 15, color: Color(0xFF00B4D8)),
+                            label: Text(
+                              'Detail Reservasi',
+                              style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: const Color(0xFF00B4D8),
+                                  fontWeight: FontWeight.w700),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Color(0xFF00B4D8)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => Navigator.pushNamed(
+                              context,
+                              CustomerRouter.reservationDetail,
+                              arguments: b,
+                            ),
+                            icon: const Icon(Icons.receipt_long,
+                                size: 15, color: Colors.red),
+                            label: Text(
+                              'Lihat Detail Pembatalan',
+                              style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.red),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Colors.red),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
                             ),
                           ),
                         ),
                       ],
                     ),
                   ],
-                ),
-                const SizedBox(height: 12),
-                // Action Buttons
-                if (!isCancelled && !isCompleted) ...[
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () => Navigator.pushNamed(
-                        context,
-                        CustomerRouter.eTicket,
-                        arguments: b,
-                      ),
-                      icon: const Icon(Icons.qr_code, size: 16),
-                      label: Text(
-                        'Lihat E-Tiket & QR',
-                        style: GoogleFonts.inter(
-                            fontSize: 13, fontWeight: FontWeight.w700),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00B4D8),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        elevation: 0,
-                      ),
-                    ),
-                  ),
-                ] else if (isCompleted) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => Navigator.pushNamed(
-                            context,
-                            CustomerRouter.postCheckoutReview,
-                            arguments: b,
-                          ),
-                          icon: const Icon(Icons.star_border,
-                              color: Color(0xFFF59E0B), size: 14),
-                          label: Text(
-                            'Beri Ulasan',
-                            style: GoogleFonts.inter(
-                                fontSize: 12, color: const Color(0xFFF59E0B)),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Color(0xFFF59E0B)),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8)),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            minimumSize: Size.zero,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () =>
-                              CustomerDashboardScreen.tabNotifier.value = 1,
-                          icon: const Icon(Icons.refresh,
-                              color: Color(0xFF00B4D8), size: 14),
-                          label: Text(
-                            'Pesan Lagi',
-                            style: GoogleFonts.inter(
-                                fontSize: 12, color: const Color(0xFF00B4D8)),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Color(0xFF00B4D8)),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8)),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            minimumSize: Size.zero,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ] else ...[
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Text(
-                        'Pesanan telah dibatalkan.',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: const Color(0xFF9CA3AF),
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

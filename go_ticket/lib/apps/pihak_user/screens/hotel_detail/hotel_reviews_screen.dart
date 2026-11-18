@@ -4,6 +4,7 @@ import 'package:go_ticket/core/models/booking_args.dart';
 import 'package:go_ticket/core/models/review_model.dart';
 import 'package:go_ticket/core/services/review_service.dart';
 import 'package:go_ticket/core/widgets/gt_ui.dart';
+import '../../services/user_booking_storage.dart';
 
 /// Ulasan hotel (Figma: "USER Page Ulasan Hotel").
 /// Menampilkan data ulasan dinamis dari DB; jika kosong → empty state.
@@ -28,11 +29,24 @@ class _HotelReviewsScreenState extends State<HotelReviewsScreen> {
   }
 
   Future<void> _loadReviews() async {
-    final reviews =
+    final remoteReviews =
         await ReviewService.instance.getReviewsByHotel(_a.hotelId);
+    final localReviews =
+        await UserBookingStorage.instance.getReviewsByHotel(_a.hotelId);
+
+    final Map<String, ReviewModel> reviewMap = {};
+    for (final r in localReviews) {
+      reviewMap[r.id] = r;
+    }
+    for (final r in remoteReviews) {
+      if (!reviewMap.containsKey(r.id)) {
+        reviewMap[r.id] = r;
+      }
+    }
+
     if (mounted) {
       setState(() {
-        _reviews = reviews;
+        _reviews = reviewMap.values.toList();
         _loading = false;
       });
     }

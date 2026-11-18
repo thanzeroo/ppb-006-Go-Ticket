@@ -11,6 +11,7 @@ import '../../../../core/models/booking_args.dart';
 import '../../../../core/models/booking_model.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../core/widgets/custom_button.dart';
+import '../../router/customer_router.dart';
 
 /// Halaman E-Tiket untuk Check-in Customer.
 class ETicketDetailScreen extends StatelessWidget {
@@ -58,6 +59,16 @@ class ETicketDetailScreen extends StatelessWidget {
     if (arguments is BookingModel) return (arguments as BookingModel).roomTypeName;
     if (arguments is BookingArgs) return (arguments as BookingArgs).roomName;
     return 'Standard Room';
+  }
+
+  String get roomNumber {
+    if (arguments is BookingModel) {
+      return (arguments as BookingModel).roomNumber ?? '003';
+    }
+    if (arguments is Map && arguments['roomNumber'] != null) {
+      return arguments['roomNumber'].toString();
+    }
+    return '003';
   }
 
   String get dateRange {
@@ -251,6 +262,10 @@ class ETicketDetailScreen extends StatelessWidget {
                   roomName,
                 ),
                 _buildTicketRow(
+                  'Nomor Kamar',
+                  'Kamar $roomNumber',
+                ),
+                _buildTicketRow(
                   'Jadwal Menginap',
                   dateRange,
                 ),
@@ -411,6 +426,16 @@ class ETicketDetailScreen extends StatelessWidget {
   Widget _buildActions(BuildContext context) {
     return Column(
       children: [
+        GoTicketButton(
+          label: 'Lihat Detail Reservasi',
+          icon: Icons.receipt_long_outlined,
+          onPressed: () => Navigator.pushNamed(
+            context,
+            CustomerRouter.reservationDetail,
+            arguments: arguments,
+          ),
+        ),
+        const SizedBox(height: 10),
         GoTicketOutlinedButton(
           label: 'Kembali ke Beranda',
           onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),

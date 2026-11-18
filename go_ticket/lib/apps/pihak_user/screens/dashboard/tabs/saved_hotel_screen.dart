@@ -823,17 +823,34 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
               Positioned(
                 top: 10,
                 right: 10,
-                child: Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.92),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.favorite,
-                    color: Colors.red,
-                    size: 18,
+                child: GestureDetector(
+                  onTap: () async {
+                    await CustomerDataService.instance.toggleSavedHotel(hotel);
+                    await _loadHotels();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            '${hotel['name'] ?? 'Hotel'} dihapus dari tersimpan',
+                          ),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  },
+                  child: Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.92),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.favorite,
+                      color: Colors.red,
+                      size: 18,
+                    ),
                   ),
                 ),
               ),
@@ -920,94 +937,62 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                if (hotel['originalPrice'] != null)
-                  Text(
-                    _formatPrice(hotel['originalPrice']),
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: const Color(0xFF9CA3AF),
-                      decoration: TextDecoration.lineThrough,
-                    ),
-                  ),
+                const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _formatPrice(hotel['price']),
+                    if (availability != null && availability.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: availability.contains('Tersedia')
+                              ? const Color(0xFFF0FDF4)
+                              : const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          availability,
                           style: GoogleFonts.inter(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: const Color(0xFF111827),
+                            fontSize: 12,
+                            color: availability.contains('Tersedia')
+                                ? const Color(0xFF16A34A)
+                                : const Color(0xFF3B82F6),
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        Text(
-                          '/ malam',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: const Color(0xFF6B7280),
-                          ),
+                      )
+                    else
+                      const SizedBox.shrink(),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pushNamed(
+                        context,
+                        CustomerRouter.hotelDetail,
+                        arguments: hotel,
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00B4D8),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 10,
                         ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        if (availability != null && availability.isNotEmpty)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: availability.contains('Tersedia')
-                                  ? const Color(0xFFF0FDF4)
-                                  : const Color(0xFFEFF6FF),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              availability,
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                color: availability.contains('Tersedia')
-                                    ? const Color(0xFF16A34A)
-                                    : const Color(0xFF3B82F6),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          onPressed: () => Navigator.pushNamed(
-                            context,
-                            CustomerRouter.hotelDetail,
-                            arguments: hotel,
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF00B4D8),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            elevation: 0,
-                            minimumSize: Size.zero,
-                          ),
-                          child: Text(
-                            'Pesan Sekarang',
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                      ],
+                        elevation: 0,
+                        minimumSize: Size.zero,
+                      ),
+                      child: Text(
+                        'Pesan Sekarang',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                   ],
                 ),

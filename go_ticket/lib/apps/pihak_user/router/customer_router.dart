@@ -25,6 +25,7 @@ import '../screens/settings/security_screen.dart';
 import '../screens/settings/voucher_screen.dart';
 import '../screens/ticket/e_ticket_detail_screen.dart';
 import '../screens/ticket/post_checkout_review_screen.dart';
+import '../screens/ticket/reservation_detail_screen.dart';
 
 /// Router utama Customer App Go Ticket.
 ///
@@ -74,6 +75,9 @@ class CustomerRouter {
 
   /// Detail E-Tiket (QR Code)
   static const String eTicket = '/ticket/detail';
+
+  /// Halaman Detail Reservasi
+  static const String reservationDetail = '/ticket/reservation-detail';
 
   /// Halaman review setelah checkout
   static const String postCheckoutReview = '/ticket/review';
@@ -161,6 +165,12 @@ class CustomerRouter {
         // arguments: BookingModel atau String bookingId
         return _buildRoute(
           ETicketDetailScreen(arguments: settings.arguments),
+          settings,
+        );
+
+      case reservationDetail:
+        return _buildRoute(
+          ReservationDetailScreen(arguments: settings.arguments),
           settings,
         );
 

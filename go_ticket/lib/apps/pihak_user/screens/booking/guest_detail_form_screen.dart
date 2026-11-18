@@ -17,7 +17,18 @@ class GuestDetailFormScreen extends StatefulWidget {
 }
 
 class _GuestDetailFormScreenState extends State<GuestDetailFormScreen> {
-  late final BookingArgs _args = BookingArgs.fromHotel(widget.arguments);
+  late final BookingArgs _args =
+      (widget.arguments is Map && widget.arguments['args'] != null)
+          ? BookingArgs.fromHotel(widget.arguments['args'])
+          : BookingArgs.fromHotel(widget.arguments);
+  late final String _roomNumber =
+      (widget.arguments is Map && widget.arguments['roomNumber'] != null)
+          ? widget.arguments['roomNumber'].toString()
+          : '003';
+  late final bool _isAutoRoom =
+      (widget.arguments is Map && widget.arguments['isAutoRoom'] is bool)
+          ? widget.arguments['isAutoRoom'] as bool
+          : true;
 
   static const int _maxAdults = 2;
   static const int _maxChildren = 1;
@@ -154,13 +165,17 @@ class _GuestDetailFormScreenState extends State<GuestDetailFormScreen> {
     Navigator.pushNamed(
       context,
       CustomerRouter.payment,
-      arguments: _args.copyWith(
-        adults: _adults,
-        children: _children,
-        guestName: _name.text.trim(),
-        email: _email.text.trim(),
-        phone: '+62 ${_phone.text.trim()}',
-      ),
+      arguments: {
+        'args': _args.copyWith(
+          adults: _adults,
+          children: _children,
+          guestName: _name.text.trim(),
+          email: _email.text.trim(),
+          phone: '+62 ${_phone.text.trim()}',
+        ),
+        'roomNumber': _roomNumber,
+        'isAutoRoom': _isAutoRoom,
+      },
     );
   }
 
@@ -249,6 +264,20 @@ class _GuestDetailFormScreenState extends State<GuestDetailFormScreen> {
                     child: Text(_args.roomName,
                         style: const TextStyle(
                             fontWeight: FontWeight.w700, color: GT.teal)),
+                  ),
+                ]),
+                const SizedBox(height: 4),
+                Row(children: [
+                  const Icon(Icons.meeting_room_outlined,
+                      size: 14, color: GT.green),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Nomor Kamar: $_roomNumber (${_isAutoRoom ? "Otomatis" : "Manual"})',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: GT.green,
+                    ),
                   ),
                 ]),
                 const SizedBox(height: 4),

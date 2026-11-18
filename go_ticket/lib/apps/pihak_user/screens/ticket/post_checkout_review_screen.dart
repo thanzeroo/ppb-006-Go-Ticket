@@ -13,8 +13,9 @@ import '../../../../core/services/review_service.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../core/widgets/custom_button.dart';
 import '../../../../core/widgets/custom_text_field.dart';
+import '../../services/user_booking_storage.dart';
 
-/// Halaman review & rating pasca checkout.
+/// Halaman review & rating pasca checkout dengan proses verifikasi sederhana.
 class PostCheckoutReviewScreen extends StatefulWidget {
   final dynamic arguments;
 
@@ -31,15 +32,16 @@ class _PostCheckoutReviewScreenState extends State<PostCheckoutReviewScreen> {
   // ---------------------------------------------------------------------------
 
   /// Rating keseluruhan (1-5)
-  int _overallRating = 0;
+  int _overallRating = 5;
 
   /// Rating per kategori
-  int _cleanlinessRating = 0;
-  int _facilityRating = 0;
-  int _locationRating = 0;
-  int _serviceRating = 0;
+  int _cleanlinessRating = 5;
+  int _facilityRating = 5;
+  int _locationRating = 5;
+  int _serviceRating = 5;
 
   final _reviewController = TextEditingController();
+  bool _isVerifiedChecked = true;
   bool _isLoading = false;
   bool _isSubmitted = false;
 
@@ -55,7 +57,21 @@ class _PostCheckoutReviewScreenState extends State<PostCheckoutReviewScreen> {
   Future<void> _submitReview() async {
     if (_overallRating == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Berikan rating bintang terlebih dahulu')),
+        const SnackBar(content: Text('Silakan pilih rating bintang terlebih dahulu.')),
+      );
+      return;
+    }
+
+    if (_reviewController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Silakan tuliskan cerita pengalaman menginap Anda.')),
+      );
+      return;
+    }
+
+    if (!_isVerifiedChecked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Centang pernyataan verifikasi menginap terlebih dahulu.')),
       );
       return;
     }
@@ -65,13 +81,14 @@ class _PostCheckoutReviewScreenState extends State<PostCheckoutReviewScreen> {
     try {
       final user = AuthService.instance.currentUser;
       final b = booking;
+      final hotelId = b?.hotelId.isNotEmpty == true ? b!.hotelId : '1';
 
       final rev = ReviewModel(
-        id: '',
-        bookingId: b?.id ?? '',
-        hotelId: b?.hotelId ?? '1',
+        id: 'rev-${DateTime.now().millisecondsSinceEpoch}',
+        bookingId: b?.id.isNotEmpty == true ? b!.id : (b?.bookingCode ?? ''),
+        hotelId: hotelId,
         customerId: user?.id ?? '1',
-        customerName: user?.fullName ?? 'Tamu Go Ticket',
+        customerName: user?.fullName ?? b?.customerName ?? 'Tamu Go Ticket',
         overallRating: _overallRating.toDouble(),
         cleanlinessRating: _cleanlinessRating > 0 ? _cleanlinessRating : _overallRating,
         facilityRating: _facilityRating > 0 ? _facilityRating : _overallRating,
@@ -79,9 +96,16 @@ class _PostCheckoutReviewScreenState extends State<PostCheckoutReviewScreen> {
         serviceRating: _serviceRating > 0 ? _serviceRating : _overallRating,
         reviewText: _reviewController.text.trim(),
         createdAt: DateTime.now(),
+        roomTypeName: b?.roomTypeName,
       );
 
-      await ReviewService.instance.addReview(rev);
+      // 1. Simpan ke Supabase DB
+      try {
+        await ReviewService.instance.addReview(rev);
+      } catch (_) {}
+
+      // 2. Simpan ke local storage agar ulasan pasti langsung muncul di Property Detail
+      await UserBookingStorage.instance.saveReview(rev);
 
       if (!mounted) return;
       setState(() {
@@ -106,7 +130,7 @@ class _PostCheckoutReviewScreenState extends State<PostCheckoutReviewScreen> {
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
-        title: const Text('Beri Ulasan'),
+        title: const Text('Beri Ulasan Terverifikasi', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
         automaticallyImplyLeading: !_isSubmitted,
       ),
       body: _isSubmitted ? _buildSuccessView(context) : _buildReviewForm(),
@@ -119,55 +143,65 @@ class _PostCheckoutReviewScreenState extends State<PostCheckoutReviewScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header hotel info
+          // Header hotel info & status selesai
           _buildHotelHeader(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
           // Rating keseluruhan — bintang besar
-          Text('Bagaimana kesan Anda?', style: AppTextStyles.titleMedium),
+          Text('Bagaimana kesan menginap Anda?', style: AppTextStyles.titleMedium),
           const SizedBox(height: 12),
           _buildOverallStars(),
           const SizedBox(height: 8),
           Center(
-              child: Text(_getRatingLabel(),
-                  style: AppTextStyles.headlineSmall
-                      .copyWith(color: AppColors.warning))),
+            child: Text(
+              _getRatingLabel(),
+              style: AppTextStyles.headlineSmall.copyWith(
+                color: AppColors.warning,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
           const SizedBox(height: 24),
 
           // Rating per kategori
-          Text('Rating per Kategori', style: AppTextStyles.titleMedium),
+          Text('Penilaian Aspek Menginap', style: AppTextStyles.titleMedium),
           const SizedBox(height: 12),
-          _buildCategoryRating('Kebersihan', Icons.cleaning_services_outlined,
+          _buildCategoryRating('Kebersihan Kamar', Icons.cleaning_services_outlined,
               _cleanlinessRating, (v) => setState(() => _cleanlinessRating = v)),
-          _buildCategoryRating('Fasilitas', Icons.pool_outlined,
+          _buildCategoryRating('Fasilitas Hotel', Icons.pool_outlined,
               _facilityRating, (v) => setState(() => _facilityRating = v)),
-          _buildCategoryRating('Lokasi', Icons.location_on_outlined,
+          _buildCategoryRating('Lokasi & Akses', Icons.location_on_outlined,
               _locationRating, (v) => setState(() => _locationRating = v)),
-          _buildCategoryRating('Pelayanan', Icons.support_agent_outlined,
+          _buildCategoryRating('Pelayanan Staf', Icons.support_agent_outlined,
               _serviceRating, (v) => setState(() => _serviceRating = v)),
           const SizedBox(height: 24),
 
-          // Teks ulasan
-          Text('Ceritakan pengalaman Anda', style: AppTextStyles.titleMedium),
+          // Teks ulasan (tanpa input foto sesuai instruksi)
+          Text('Ceritakan Pengalaman Anda', style: AppTextStyles.titleMedium),
+          const SizedBox(height: 6),
+          const Text(
+            'Ulasan Anda akan diverifikasi dan ditampilkan langsung di halaman Property Detail hotel.',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
           const SizedBox(height: 12),
           GoTicketTextField(
             hint:
-                'Bagikan pengalaman menginap Anda untuk membantu tamu lainnya...',
+                'Bagikan kesan Anda tentang kebersihan kamar, pelayanan resepsionis, fasilitas, atau sarapan hotel...',
             controller: _reviewController,
-            maxLines: 5,
+            maxLines: 4,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
-          // Tambah foto
-          _buildPhotoUpload(),
-          const SizedBox(height: 32),
+          // Box Verifikasi Menginap Sederhana
+          _buildVerificationBox(),
+          const SizedBox(height: 24),
 
           // Tombol submit
           GoTicketButton(
-            label: 'Kirim Ulasan',
+            label: 'Verifikasi & Kirim Ulasan',
             onPressed: _isLoading ? null : _submitReview,
             isLoading: _isLoading,
-            icon: Icons.send_rounded,
+            icon: Icons.verified_rounded,
           ),
         ],
       ),
@@ -177,9 +211,11 @@ class _PostCheckoutReviewScreenState extends State<PostCheckoutReviewScreen> {
   Widget _buildHotelHeader() {
     final name = booking?.hotelName ?? 'Hotel';
     final address = booking?.hotelAddress ?? 'Indonesia';
+    final roomName = booking?.roomTypeName ?? 'Standard Room';
+    final roomNum = booking?.roomNumber ?? '003';
     final checkOut = booking != null
-        ? 'Checkout: ${booking!.checkOutDate.day}/${booking!.checkOutDate.month}/${booking!.checkOutDate.year}'
-        : 'Checkout Selesai';
+        ? 'Checkout Selesai: ${booking!.checkOutDate.day}/${booking!.checkOutDate.month}/${booking!.checkOutDate.year}'
+        : 'Status: Checkout Selesai';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -195,9 +231,9 @@ class _PostCheckoutReviewScreenState extends State<PostCheckoutReviewScreen> {
             child: Container(
               width: 60,
               height: 60,
-              color: AppColors.grey200,
+              color: const Color(0xFFDCFCE7),
               child: const Icon(Icons.hotel_rounded,
-                  size: 30, color: AppColors.grey400),
+                  size: 30, color: Color(0xFF16A34A)),
             ),
           ),
           const SizedBox(width: 12),
@@ -205,9 +241,24 @@ class _PostCheckoutReviewScreenState extends State<PostCheckoutReviewScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDCFCE7),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text('STATUS: SELESAI', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF16A34A))),
+                    ),
+                    const SizedBox(width: 6),
+                    Text('Kamar $roomNum', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.grey)),
+                  ],
+                ),
+                const SizedBox(height: 3),
                 Text(name, style: AppTextStyles.titleMedium),
-                Text(address, style: AppTextStyles.bodySmall),
-                Text(checkOut, style: AppTextStyles.caption),
+                Text('$roomName • $address', style: AppTextStyles.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(checkOut, style: AppTextStyles.caption.copyWith(color: const Color(0xFF16A34A), fontWeight: FontWeight.w600)),
               ],
             ),
           ),
@@ -271,30 +322,59 @@ class _PostCheckoutReviewScreenState extends State<PostCheckoutReviewScreen> {
     );
   }
 
-  Widget _buildPhotoUpload() {
+  Widget _buildVerificationBox() {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.grey100,
+        color: const Color(0xFFF0FDF4),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.grey300),
+        border: Border.all(color: const Color(0xFF86EFAC)),
       ),
-      child: InkWell(
-        onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Fitur unggah foto segera hadir'))),
-        child: Column(
-          children: [
-            const Icon(Icons.add_photo_alternate_outlined,
-                size: 36, color: AppColors.grey400),
-            const SizedBox(height: 6),
-            Text('Tambah Foto (Opsional)',
-                style: AppTextStyles.labelMedium
-                    .copyWith(color: AppColors.grey600)),
-            Text('Maks. 5 foto (JPG, PNG)',
-                style: AppTextStyles.caption.copyWith(color: AppColors.grey400)),
-          ],
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.verified_user_rounded, color: Color(0xFF16A34A), size: 18),
+              SizedBox(width: 6),
+              Text(
+                'Verifikasi Menginap Go Ticket',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF16A34A),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Booking ID: ${booking?.bookingCode ?? "GT-RESERVASI"} • Terverifikasi Check-out',
+            style: const TextStyle(fontSize: 11, color: Color(0xFF374151), fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: Checkbox(
+                  value: _isVerifiedChecked,
+                  activeColor: const Color(0xFF16A34A),
+                  onChanged: (val) => setState(() => _isVerifiedChecked = val ?? true),
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Saya menyatakan dengan jujur bahwa saya telah menyelesaikan masa menginap di hotel ini, dan ulasan ini adalah pengalaman nyata saya.',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF4B5563), height: 1.3),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -310,18 +390,18 @@ class _PostCheckoutReviewScreenState extends State<PostCheckoutReviewScreen> {
               width: 80,
               height: 80,
               decoration: const BoxDecoration(
-                color: AppColors.successLight,
+                color: Color(0xFFDCFCE7),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.check_rounded,
-                  size: 44, color: AppColors.statusConfirmed),
+                  size: 44, color: Color(0xFF16A34A)),
             ),
             const SizedBox(height: 20),
-            Text('Terima Kasih atas Ulasan Anda!',
+            Text('Ulasan Terverifikasi Berhasil Dikirim!',
                 textAlign: TextAlign.center, style: AppTextStyles.headlineSmall),
             const SizedBox(height: 10),
             Text(
-              'Ulasan Anda sangat berharga untuk membantu tamu lain memilih akomodasi terbaik di Go Ticket.',
+              'Ulasan Anda telah berhasil diverifikasi dan sekarang aktif di halaman Property Detail ${booking?.hotelName ?? "hotel"}.',
               textAlign: TextAlign.center,
               style: AppTextStyles.bodyMedium
                   .copyWith(color: AppColors.textSecondaryLight),

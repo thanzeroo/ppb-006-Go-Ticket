@@ -16,6 +16,12 @@ class RoomSelectionScreen extends StatefulWidget {
 
 enum _DayStatus { available, full, maintenance }
 
+class _RoomUnit {
+  final String number;
+  final bool isBooked;
+  const _RoomUnit({required this.number, required this.isBooked});
+}
+
 class _Room {
   final String? id;
   final String name;
@@ -27,6 +33,7 @@ class _Room {
   final String? badge;
   final String? note;
   final bool soldOut;
+  final List<_RoomUnit> units;
   const _Room({
     this.id,
     required this.name,
@@ -38,6 +45,7 @@ class _Room {
     this.badge,
     this.note,
     this.soldOut = false,
+    this.units = const [],
   });
 }
 
@@ -50,6 +58,8 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
   int _room = 0;
   List<_Room> _rooms = [];
   bool _isLoadingRooms = true;
+  bool _isAutoRoom = true;
+  final Map<int, String> _manualRoomSelection = {};
 
   static const _monthNames = [
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli',
@@ -91,6 +101,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                 badge: r.totalUnits <= 2
                     ? 'Sisa ${r.totalUnits} Kamar Lagi!'
                     : null,
+                units: _generateUnitsForType(r.name, r.totalUnits),
               );
             }).toList();
             _isLoadingRooms = false;
@@ -110,6 +121,43 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
         });
       }
     }
+  }
+
+  static List<_RoomUnit> _generateUnitsForType(String typeName, int totalUnits) {
+    final count = totalUnits > 0 ? totalUnits : 5;
+    final isDeluxe = typeName.toLowerCase().contains('deluxe');
+    final isSuite = typeName.toLowerCase().contains('suite');
+    final prefix = isDeluxe ? '0' : (isSuite ? '1' : '2');
+
+    return List.generate(count, (idx) {
+      final numStr = '$prefix${(idx + 1).toString().padLeft(2, '0')}';
+      // Sesuai kebutuhan: Tipe Deluxe 5 unit (001,002,003,004,005) kamar 001 & 002 sudah terisi/terbooking
+      final isBooked = isDeluxe ? (idx < 2) : (idx == 0);
+      return _RoomUnit(number: numStr, isBooked: isBooked);
+    });
+  }
+
+  String _getEffectiveRoomNumber(int i) {
+    if (i < 0 || i >= _rooms.length) return '001';
+    final r = _rooms[i];
+    if (r.units.isEmpty) return '001';
+
+    if (!_isAutoRoom && _manualRoomSelection.containsKey(i)) {
+      final selectedNum = _manualRoomSelection[i]!;
+      final matchingUnit = r.units.firstWhere(
+        (u) => u.number == selectedNum,
+        orElse: () => r.units.first,
+      );
+      if (!matchingUnit.isBooked) {
+        return matchingUnit.number;
+      }
+    }
+
+    final freeUnit = r.units.firstWhere(
+      (u) => !u.isBooked,
+      orElse: () => r.units.first,
+    );
+    return freeUnit.number;
   }
 
   DateTime get _today {
@@ -174,7 +222,14 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
               : null,
           image:
               'https://images.unsplash.com/photo-1540541338287-41700207dee6?w=800',
-          badge: 'Sisa 2 Kamar Lagi!',
+          badge: 'Sisa 3 Kamar Lagi!',
+          units: const [
+            _RoomUnit(number: '001', isBooked: true),
+            _RoomUnit(number: '002', isBooked: true),
+            _RoomUnit(number: '003', isBooked: false),
+            _RoomUnit(number: '004', isBooked: false),
+            _RoomUnit(number: '005', isBooked: false),
+          ],
         ),
         _Room(
           id: '2',
@@ -189,6 +244,12 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
           image:
               'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=800',
           note: 'Tersedia untuk 2 malam',
+          units: const [
+            _RoomUnit(number: '101', isBooked: true),
+            _RoomUnit(number: '102', isBooked: false),
+            _RoomUnit(number: '103', isBooked: false),
+            _RoomUnit(number: '104', isBooked: false),
+          ],
         ),
         _Room(
           id: '3',
@@ -201,6 +262,10 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
           note:
               'Kolam renang pribadi, dek berjemur eksklusif, pelayanan pribadi 24 jam.',
           soldOut: true,
+          units: const [
+            _RoomUnit(number: '201', isBooked: true),
+            _RoomUnit(number: '202', isBooked: true),
+          ],
         ),
       ];
 
@@ -220,17 +285,23 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       );
       return;
     }
+    final chosenRoomNum = _getEffectiveRoomNumber(_room);
     Navigator.pushNamed(
       context,
       CustomerRouter.guestDetail,
-      arguments: _args.copyWith(
-        roomId: room.id,
-        roomName: room.name,
-        roomImage: room.image,
-        roomPrice: room.price,
-        checkIn: _in,
-        checkOut: _out,
-      ),
+      arguments: {
+        'args': _args.copyWith(
+          roomId: room.id,
+          roomName: '${room.name} (Kamar $chosenRoomNum)',
+          roomImage: room.image,
+          roomPrice: room.price,
+          checkIn: _in,
+          checkOut: _out,
+        ),
+        'rawRoomName': room.name,
+        'roomNumber': chosenRoomNum,
+        'isAutoRoom': _isAutoRoom,
+      },
     );
   }
 
@@ -321,6 +392,12 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                   const SizedBox(width: 6),
                   if (_nights > 0)
                     GTChip('$_nights Malam', bg: GT.sky),
+                  const SizedBox(width: 6),
+                  GTChip(
+                    'No. ${_getEffectiveRoomNumber(_room)}',
+                    bg: const Color(0xFFDCFCE7),
+                    fg: GT.green,
+                  ),
                 ]),
                 const SizedBox(height: 2),
                 Text(ready ? rp(total) : '-',
@@ -715,11 +792,241 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                       ),
                     ),
                   ]),
+                  if (selected && !r.soldOut && r.units.isNotEmpty)
+                    _buildRoomNumberSelector(i, r),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildRoomNumberSelector(int i, _Room r) {
+    final effectiveNum = _getEffectiveRoomNumber(i);
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF86EFAC)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.meeting_room_outlined, size: 18, color: GT.teal),
+              const SizedBox(width: 6),
+              const Expanded(
+                child: Text(
+                  'ALOKASI NOMOR KAMAR',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: GT.teal,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                padding: const EdgeInsets.all(2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InkWell(
+                      onTap: () => setState(() => _isAutoRoom = true),
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: _isAutoRoom ? GT.teal : Colors.transparent,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          'Otomatis',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: _isAutoRoom ? Colors.white : GT.muted,
+                          ),
+                        ),
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () => setState(() => _isAutoRoom = false),
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: !_isAutoRoom ? GT.teal : Colors.transparent,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          'Pilih Manual',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: !_isAutoRoom ? Colors.white : GT.muted,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (_isAutoRoom) ...[
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFBBF7D0)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFDCFCE7),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.check_rounded, color: GT.green, size: 16),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Kamar Terpilih Otomatis: No. $effectiveNum',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: GT.ink,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Sistem mengisi nomor kamar secara urut (kamar 001 & 002 yang sudah terisi otomatis dilewati).',
+                          style: TextStyle(fontSize: 11, color: GT.muted, height: 1.3),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            const Text(
+              'Pilih salah satu nomor kamar yang masih tersedia:',
+              style: TextStyle(fontSize: 11, color: GT.body, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: r.units.map((unit) {
+                final isSelected = effectiveNum == unit.number && !unit.isBooked;
+                if (unit.isBooked) {
+                  return InkWell(
+                    onTap: () {
+                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Kamar ${unit.number} sudah terisi / terbooking. Silakan pilih nomor kamar lain.'),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.lock_outline, size: 12, color: Color(0xFF94A3B8)),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${unit.number} (Terisi)',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF94A3B8),
+                              fontWeight: FontWeight.w600,
+                              decoration: TextDecoration.lineThrough,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                return InkWell(
+                  onTap: () {
+                    setState(() {
+                      _manualRoomSelection[i] = unit.number;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isSelected ? GT.teal : Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isSelected ? GT.teal : const Color(0xFF86EFAC),
+                        width: isSelected ? 1.5 : 1,
+                      ),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: GT.teal.withValues(alpha: 0.2),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              )
+                            ]
+                          : null,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isSelected ? Icons.check_circle_rounded : Icons.meeting_room,
+                          size: 13,
+                          color: isSelected ? Colors.white : GT.teal,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${unit.number} (Tersedia)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: isSelected ? Colors.white : GT.teal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
       ),
     );
   }

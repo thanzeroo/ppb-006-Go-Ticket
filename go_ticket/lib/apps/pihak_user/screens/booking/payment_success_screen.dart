@@ -22,7 +22,11 @@ class PaymentSuccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final a = BookingArgs.fromHotel(arguments);
+    final a = BookingArgs.fromHotel(
+        arguments is Map && arguments['args'] != null ? arguments['args'] : arguments);
+    final roomNum = arguments is Map && arguments['roomNumber'] != null
+        ? arguments['roomNumber'].toString()
+        : '003';
     final now = DateTime.now();
     final stamp =
         '${now.day} ${BookingArgs.monthShort(now.month)} ${now.year}, '
@@ -130,7 +134,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                   child: Row(children: [
                     Expanded(
                         child: _info('TIPE KAMAR', a.roomName,
-                            '1 Kamar • ${a.adults} Dewasa')),
+                            'Kamar $roomNum • ${a.adults} Dewasa')),
                     Expanded(
                         child: _info('JADWAL MENGINAP', a.dateRange,
                             'Durasi: ${a.nights} Malam')),
@@ -292,57 +296,37 @@ class PaymentSuccessScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             GTButton(
-              label: 'Lihat E-Tiket & Detail Reservasi',
-              leading: Icons.confirmation_number_outlined,
-              onTap: () => Navigator.pushNamed(context, CustomerRouter.eTicket,
-                  arguments: a),
+              label: 'Lihat Detail Reservasi',
+              leading: Icons.receipt_long_outlined,
+              onTap: () => Navigator.pushNamed(
+                context,
+                CustomerRouter.reservationDetail,
+                arguments: arguments,
+              ),
             ),
             const SizedBox(height: 10),
             GTButton(
-              label: 'BATALKAN TIKET',
-              color: const Color(0xFFFF0000),
-              textColor: Colors.white,
-              onTap: () => _confirmCancel(context),
+              label: 'Lihat E-Tiket Digital',
+              leading: Icons.confirmation_number_outlined,
+              color: Colors.white,
+              textColor: GT.teal,
+              onTap: () => Navigator.pushNamed(
+                context,
+                CustomerRouter.eTicket,
+                arguments: arguments,
+              ),
             ),
             const SizedBox(height: 10),
             GTButton(
               label: 'Kembali ke Menu Utama / Beranda',
               leading: Icons.home_outlined,
               color: Colors.white,
-              textColor: GT.teal,
+              textColor: GT.muted,
               onTap: () => Navigator.of(context).pushNamedAndRemoveUntil(
                   CustomerRouter.dashboard, (r) => false),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _confirmCancel(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Batalkan Tiket?'),
-        content: const Text(
-            'Pembatalan mengikuti kebijakan hotel. Dana dikembalikan sesuai '
-            'ketentuan refund yang berlaku.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Tidak')),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content: Text('Permintaan pembatalan dikirim')));
-              Navigator.of(context).pushNamedAndRemoveUntil(
-                  CustomerRouter.dashboard, (r) => false);
-            },
-            child: const Text('Ya, Batalkan',
-                style: TextStyle(color: GT.red)),
-          ),
-        ],
       ),
     );
   }

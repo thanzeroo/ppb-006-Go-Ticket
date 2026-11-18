@@ -7,6 +7,7 @@ import 'package:go_ticket/core/models/booking_model.dart';
 import 'package:go_ticket/core/services/auth_service.dart';
 import 'package:go_ticket/core/services/booking_service.dart';
 import '../../router/customer_router.dart';
+import '../../services/user_booking_storage.dart';
 import 'package:go_ticket/core/widgets/gt_ui.dart';
 
 /// Pembayaran (Figma: "USER Page Payment").
@@ -19,7 +20,8 @@ class PaymentProcessScreen extends StatefulWidget {
 }
 
 class _PaymentProcessScreenState extends State<PaymentProcessScreen> {
-  late BookingArgs _args = BookingArgs.fromHotel(widget.arguments);
+  late BookingArgs _args;
+  late final String _roomNumber;
 
   Timer? _timer;
   int _secs = 14 * 60 + 59;
@@ -41,6 +43,13 @@ class _PaymentProcessScreenState extends State<PaymentProcessScreen> {
   @override
   void initState() {
     super.initState();
+    _args = (widget.arguments is Map && widget.arguments['args'] != null)
+        ? BookingArgs.fromHotel(widget.arguments['args'])
+        : BookingArgs.fromHotel(widget.arguments);
+    _roomNumber =
+        (widget.arguments is Map && widget.arguments['roomNumber'] != null)
+            ? widget.arguments['roomNumber'].toString()
+            : '003';
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) return;
       if (_secs <= 1) {
@@ -92,8 +101,9 @@ class _PaymentProcessScreenState extends State<PaymentProcessScreen> {
     final bookingCode =
         'GT-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
 
+    final now = DateTime.now();
     final booking = BookingModel(
-      id: 'bkg-${DateTime.now().millisecondsSinceEpoch}',
+      id: 'bkg-${now.millisecondsSinceEpoch}',
       bookingCode: bookingCode,
       customerId: user?.id ?? '1',
       customerName: _args.guestName.isNotEmpty
@@ -105,6 +115,7 @@ class _PaymentProcessScreenState extends State<PaymentProcessScreen> {
       hotelName: _args.hotelName,
       roomId: _args.roomId.isNotEmpty ? _args.roomId : '1',
       roomTypeName: _args.roomName,
+      roomNumber: _roomNumber,
       checkInDate: _args.checkIn,
       checkOutDate: _args.checkOut,
       totalNights: _args.nights > 0 ? _args.nights : 1,
@@ -115,11 +126,17 @@ class _PaymentProcessScreenState extends State<PaymentProcessScreen> {
       totalAmount: _args.total,
       paymentMethod: paymentMethodName,
       paymentStatus: 'paid',
-      status: BookingStatus.confirmed,
+      status: BookingStatus.pendingVerification,
       isPaid: true,
-      paidAt: DateTime.now(),
+      paidAt: now,
+      createdAt: now,
       qrCodeData: '$bookingCode-CHECKIN',
     );
+
+    // Simpan ke storage lokal agar selalu muncul & persisten
+    try {
+      await UserBookingStorage.instance.saveBooking(booking);
+    } catch (_) {}
 
     try {
       await BookingService.instance.createBooking(booking);
@@ -129,7 +146,11 @@ class _PaymentProcessScreenState extends State<PaymentProcessScreen> {
     Navigator.pushReplacementNamed(
       context,
       CustomerRouter.paymentSuccess,
-      arguments: _args.copyWith(paymentMethod: paymentMethodName),
+      arguments: {
+        'args': _args.copyWith(paymentMethod: paymentMethodName),
+        'roomNumber': _roomNumber,
+        'booking': booking,
+      },
     );
   }
 

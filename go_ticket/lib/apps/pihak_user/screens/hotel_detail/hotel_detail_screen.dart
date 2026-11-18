@@ -6,6 +6,7 @@ import 'package:go_ticket/core/services/customer_data_service.dart';
 import 'package:go_ticket/core/services/review_service.dart';
 import '../../router/customer_router.dart';
 import 'package:go_ticket/core/widgets/gt_ui.dart';
+import '../../services/user_booking_storage.dart';
 
 /// Detail hotel (Figma: "USER Page Hotel").
 class HotelDetailScreen extends StatefulWidget {
@@ -32,15 +33,61 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
   Future<void> _checkSavedAndLoadReviews() async {
     final isSaved =
         await CustomerDataService.instance.isHotelSaved(_args.hotelId);
-    final reviews =
+    final remoteReviews =
         await ReviewService.instance.getReviewsByHotel(_args.hotelId);
+    final localReviews =
+        await UserBookingStorage.instance.getReviewsByHotel(_args.hotelId);
+
+    final Map<String, ReviewModel> reviewMap = {};
+    for (final r in localReviews) {
+      reviewMap[r.id] = r;
+    }
+    for (final r in remoteReviews) {
+      if (!reviewMap.containsKey(r.id)) {
+        reviewMap[r.id] = r;
+      }
+    }
+
     if (mounted) {
       setState(() {
         _fav = isSaved;
-        _reviews = reviews;
+        _reviews = reviewMap.values.toList();
         _loadingReviews = false;
       });
     }
+  }
+
+  List<String> get _galleryPhotos {
+    final list = <String>[];
+    if (_args.imageUrl.isNotEmpty) list.add(_args.imageUrl);
+    list.addAll(_thumbs);
+    const extras = [
+      'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=900',
+      'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=900',
+      'https://images.unsplash.com/photo-1584132967334-10e028bd69f7?w=900',
+      'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=900',
+    ];
+    for (final e in extras) {
+      if (!list.contains(e)) list.add(e);
+    }
+    return list;
+  }
+
+  void _openPhotoGallery(int initialIndex) {
+    final photos = _galleryPhotos;
+    final index = initialIndex.clamp(0, photos.length - 1);
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierDismissible: true,
+        barrierColor: Colors.black.withOpacity(0.94),
+        pageBuilder: (context, _, __) => _PhotoGalleryScreen(
+          photos: photos,
+          initialIndex: index,
+          title: _args.hotelName,
+        ),
+      ),
+    );
   }
 
   Future<void> _toggleFav() async {
@@ -263,7 +310,15 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
   Widget _hero() {
     return Stack(
       children: [
-        GTImage(_args.imageUrl, height: 230, width: double.infinity, radius: 24),
+        GestureDetector(
+          onTap: () => _openPhotoGallery(0),
+          child: GTImage(
+            _args.imageUrl,
+            height: 230,
+            width: double.infinity,
+            radius: 24,
+          ),
+        ),
         Positioned(
           left: 12,
           bottom: 12,
@@ -272,8 +327,14 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
         Positioned(
           right: 12,
           bottom: 12,
-          child: _overlayChip(Icons.photo_library_outlined, '+12 Foto',
-              dark: true),
+          child: GestureDetector(
+            onTap: () => _openPhotoGallery(0),
+            child: _overlayChip(
+              Icons.photo_library_outlined,
+              '+12 Foto',
+              dark: true,
+            ),
+          ),
         ),
         Positioned(
           right: 12,
@@ -319,21 +380,33 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
   Widget _thumbRow() {
     return Row(
       children: [
-        for (final t in _thumbs) ...[
-          Expanded(child: GTImage(t, height: 62, radius: 12)),
+        for (var i = 0; i < _thumbs.length; i++) ...[
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _openPhotoGallery(i + 1),
+              child: GTImage(_thumbs[i], height: 62, radius: 12),
+            ),
+          ),
           const SizedBox(width: 8),
         ],
         Expanded(
-          child: Container(
-            height: 62,
-            decoration: BoxDecoration(
-              color: GT.soft,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            alignment: Alignment.center,
-            child: const Text('+9 Lagi',
+          child: GestureDetector(
+            onTap: () => _openPhotoGallery(1),
+            child: Container(
+              height: 62,
+              decoration: BoxDecoration(
+                color: GT.soft,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              alignment: Alignment.center,
+              child: const Text(
+                '+9 Lagi',
                 style: TextStyle(
-                    fontWeight: FontWeight.w700, color: GT.teal)),
+                  fontWeight: FontWeight.w700,
+                  color: GT.teal,
+                ),
+              ),
+            ),
           ),
         ),
       ],
@@ -674,6 +747,175 @@ class _TimeBox extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _PhotoGalleryScreen extends StatefulWidget {
+  final List<String> photos;
+  final int initialIndex;
+  final String title;
+
+  const _PhotoGalleryScreen({
+    required this.photos,
+    required this.initialIndex,
+    required this.title,
+  });
+
+  @override
+  State<_PhotoGalleryScreen> createState() => _PhotoGalleryScreenState();
+}
+
+class _PhotoGalleryScreenState extends State<_PhotoGalleryScreen> {
+  late PageController _pageController;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Top Bar
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          '${_currentIndex + 1} dari ${widget.photos.length} Foto',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            // Photo View with InteractiveViewer
+            Expanded(
+              child: PageView.builder(
+                controller: _pageController,
+                itemCount: widget.photos.length,
+                onPageChanged: (idx) => setState(() => _currentIndex = idx),
+                itemBuilder: (context, index) {
+                  return InteractiveViewer(
+                    minScale: 0.8,
+                    maxScale: 3.5,
+                    child: Center(
+                      child: Image.network(
+                        widget.photos[index],
+                        fit: BoxFit.contain,
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) return child;
+                          return const Center(
+                            child: CircularProgressIndicator(color: GT.teal),
+                          );
+                        },
+                        errorBuilder: (_, __, ___) => const Center(
+                          child: Icon(
+                            Icons.broken_image,
+                            color: Colors.white54,
+                            size: 48,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            // Bottom Thumbnail Strip
+            Container(
+              height: 70,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: widget.photos.length,
+                itemBuilder: (context, idx) {
+                  final isSelected = idx == _currentIndex;
+                  return GestureDetector(
+                    onTap: () {
+                      _pageController.animateToPage(
+                        idx,
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeInOut,
+                      );
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      width: 54,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isSelected ? GT.teal : Colors.transparent,
+                          width: 2.5,
+                        ),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Image.network(
+                        widget.photos[idx],
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: Colors.grey[800],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
