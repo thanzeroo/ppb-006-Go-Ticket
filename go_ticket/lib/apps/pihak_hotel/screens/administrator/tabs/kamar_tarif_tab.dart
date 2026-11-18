@@ -339,6 +339,7 @@ class _KamarTarifTabState extends State<KamarTarifTab> {
                               builder: (_) => EditRoomTypeScreen(
                                 roomName: room.name,
                                 category: room.badge,
+                                initialImageUrl: room.imageUrl,
                               ),
                             ),
                           );

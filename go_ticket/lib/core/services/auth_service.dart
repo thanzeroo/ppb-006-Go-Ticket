@@ -675,6 +675,7 @@ class AuthService {
           final payload = <String, dynamic>{
             if (fullName != null) 'nama_lengkap': fullName.trim(),
             if (phone != null) 'no_telepon': phone.trim(),
+            if (avatarUrl != null) 'foto_profil': avatarUrl.trim(),
             if (birthDate != null)
               'tanggal_lahir':
                   '${birthDate.year.toString().padLeft(4, '0')}-${birthDate.month.toString().padLeft(2, '0')}-${birthDate.day.toString().padLeft(2, '0')}',

@@ -180,6 +180,7 @@ class _BerandaTabState extends State<BerandaTab> {
                     ),
                   ),
                   UserAvatar(
+                    imageUrl: user?.avatarUrl,
                     name: user?.fullName ?? 'Aditya Pratama',
                     radius: 19,
                     onTap: () => CustomerDashboardScreen.tabNotifier.value = 3,

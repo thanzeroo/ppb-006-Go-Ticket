@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 
 /// Warna & helper UI bersama untuk halaman alur pemesanan Go Ticket (sesuai Figma).
@@ -57,7 +58,7 @@ class GTAppBar extends StatelessWidget implements PreferredSizeWidget {
               Image.asset(
                 'assets/logo.png',
                 height: 28,
-                errorBuilder: (_, __, ___) => const Text('GO',
+                errorBuilder: (context, error, stackTrace) => const Text('GO',
                     style: TextStyle(
                         color: GT.primary, fontWeight: FontWeight.w900)),
               ),
@@ -188,7 +189,7 @@ class GTButton extends StatelessWidget {
   }
 }
 
-/// Gambar dari network dengan placeholder jika gagal dimuat.
+/// Gambar dari network atau berkas lokal perangkat dengan placeholder jika gagal dimuat.
 class GTImage extends StatelessWidget {
   final String url;
   final double? height;
@@ -199,25 +200,49 @@ class GTImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: Image.network(
-        url,
+    final cleanUrl = url.trim();
+    final isLocal = cleanUrl.startsWith('/') || cleanUrl.startsWith('file://');
+
+    Widget imageWidget;
+    if (isLocal) {
+      final path = cleanUrl.startsWith('file://') ? cleanUrl.substring(7) : cleanUrl;
+      final file = File(path);
+      if (file.existsSync()) {
+        imageWidget = Image.file(
+          file,
+          height: height,
+          width: width,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _placeholder(),
+        );
+      } else {
+        imageWidget = _placeholder();
+      }
+    } else {
+      imageWidget = Image.network(
+        cleanUrl,
         height: height,
         width: width,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Container(
-          height: height,
-          width: width,
-          color: GT.sky,
-          child: const Icon(Icons.hotel_rounded, color: GT.teal, size: 36),
-        ),
+        errorBuilder: (context, error, stackTrace) => _placeholder(),
         loadingBuilder: (c, child, p) => p == null
             ? child
             : Container(height: height, width: width, color: GT.soft),
-      ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: imageWidget,
     );
   }
+
+  Widget _placeholder() => Container(
+        height: height,
+        width: width,
+        color: GT.sky,
+        child: const Icon(Icons.hotel_rounded, color: GT.teal, size: 36),
+      );
 }
 
 /// Chip kecil (fasilitas, badge).

@@ -1,10 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'package:go_ticket/core/config/supabase_config.dart';
 import 'package:go_ticket/core/services/auth_service.dart';
 import 'package:go_ticket/core/services/supabase_service.dart';
 import 'package:go_ticket/core/widgets/gt_ui.dart';
 import 'package:go_ticket/core/widgets/user_avatar.dart';
+import '../../../pihak_hotel/services/hotel_image_upload_service.dart';
 
 /// Edit Profil Saya (Figma: "USER Page Profil Saya").
 class ProfileScreen extends StatefulWidget {
@@ -19,6 +22,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late final TextEditingController _phone;
   final _address = TextEditingController();
   late String _email;
+  String? _avatarUrl;
 
   DateTime? _birth;
   bool? _male;
@@ -33,6 +37,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _name = TextEditingController(text: user?.fullName ?? '');
     _phone = TextEditingController(text: user?.phoneNumber ?? '');
     _email = user?.email ?? 'user@goticket.com';
+    _avatarUrl = user?.avatarUrl;
     _loadProfileFromSupabase();
   }
 
@@ -76,6 +81,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 final d = DateTime.tryParse(res['tanggal_lahir'].toString());
                 if (d != null) _birth = d;
               }
+              if (res['foto_profil'] != null &&
+                  res['foto_profil'].toString().isNotEmpty) {
+                _avatarUrl = res['foto_profil'].toString();
+              } else if (res['avatar_url'] != null &&
+                  res['avatar_url'].toString().isNotEmpty) {
+                _avatarUrl = res['avatar_url'].toString();
+              }
             });
           }
         }
@@ -118,6 +130,137 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (d != null) setState(() => _birth = d);
   }
 
+  Future<void> _pickAvatar() async {
+    final picker = ImagePicker();
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Pilih Sumber Foto Profil',
+                style: TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w800, color: GT.ink),
+              ),
+              const SizedBox(height: 14),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: GT.sky,
+                  child: Icon(Icons.photo_camera, color: GT.teal),
+                ),
+                title: const Text('Ambil Foto Kamera',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Gunakan kamera perangkat langsung',
+                    style: TextStyle(fontSize: 12, color: GT.muted)),
+                onTap: () => Navigator.pop(ctx, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: GT.soft,
+                  child: Icon(Icons.photo_library, color: GT.teal),
+                ),
+                title: const Text('Pilih dari Galeri HP',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Upload gambar dari penyimpanan perangkat',
+                    style: TextStyle(fontSize: 12, color: GT.muted)),
+                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    try {
+      final XFile? picked = await picker.pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 1024,
+        maxHeight: 1024,
+      );
+
+      if (picked != null) {
+        final localFile = File(picked.path);
+        setState(() {
+          _avatarUrl = picked.path;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  ),
+                  SizedBox(width: 12),
+                  Text('Menyimpan foto profil...'),
+                ],
+              ),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
+
+        // Upload ke Supabase Storage (bucket avatars) jika memungkinkan
+        String finalUrl = picked.path;
+        try {
+          final uploaded = await HotelImageUploadService.instance.uploadFile(
+            localFile,
+            prefix: 'user_${AuthService.instance.currentUser?.id ?? 'profile'}',
+            bucket: 'avatars',
+          );
+          if (uploaded != null && uploaded.isNotEmpty) {
+            finalUrl = uploaded;
+          }
+        } catch (e) {
+          debugPrint('⚠️ Storage upload error: $e');
+        }
+
+        if (mounted) {
+          setState(() {
+            _avatarUrl = finalUrl;
+          });
+        }
+
+        // Simpan ke AuthService (lokal session & database)
+        await AuthService.instance.updateProfile(
+          avatarUrl: finalUrl,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Foto profil berhasil diperbarui!'),
+              backgroundColor: GT.green,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Gagal memilih foto: $e'),
+              backgroundColor: GT.red),
+        );
+      }
+    }
+  }
+
   Future<void> _save() async {
     if (_name.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -128,6 +271,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await AuthService.instance.updateProfile(
         fullName: _name.text.trim(),
         phone: _phone.text.trim(),
+        avatarUrl: _avatarUrl,
         birthDate: _birth,
         gender: _male == null ? null : (_male! ? 'Laki-laki' : 'Perempuan'),
         address: _address.text.trim().isNotEmpty ? _address.text.trim() : null,
@@ -182,6 +326,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Stack(
                 children: [
                   UserAvatar(
+                    imageUrl: _avatarUrl,
                     name: _name.text,
                     radius: 36,
                     showVerifiedBadge:
@@ -191,9 +336,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     right: 0,
                     bottom: 0,
                     child: GestureDetector(
-                      onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Ganti foto segera hadir'))),
+                      onTap: _pickAvatar,
                       child: const CircleAvatar(
                           radius: 14,
                           backgroundColor: GT.teal,

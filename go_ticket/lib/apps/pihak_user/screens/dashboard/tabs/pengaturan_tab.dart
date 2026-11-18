@@ -374,6 +374,7 @@ class _PengaturanTabState extends State<PengaturanTab> {
               ),
             ),
             UserAvatar(
+              imageUrl: user?.avatarUrl,
               name: user?.fullName ?? 'Aditya Pratama',
               radius: 19,
             ),
@@ -420,6 +421,7 @@ class _PengaturanTabState extends State<PengaturanTab> {
         children: [
           // Avatar
           UserAvatar(
+            imageUrl: user?.avatarUrl,
             name: fullName,
             radius: 30,
             showVerifiedBadge: isVerified,

@@ -488,6 +488,7 @@ class _CariTabState extends State<CariTab> {
                   Row(
                     children: [
                       UserAvatar(
+                        imageUrl: AuthService.instance.currentUser?.avatarUrl,
                         name: AuthService.instance.currentUser?.fullName,
                         radius: 17,
                         onTap: () =>

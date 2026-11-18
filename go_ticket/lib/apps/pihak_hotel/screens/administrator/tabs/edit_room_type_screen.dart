@@ -1,18 +1,24 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../../../core/config/supabase_config.dart';
 import '../../../../../../core/services/supabase_service.dart';
+import '../../../services/hotel_image_upload_service.dart';
+import 'add_room_type_screen.dart';
 
 class EditRoomTypeScreen extends StatefulWidget {
   final String? roomId;
   final String roomName;
   final String category;
+  final String? initialImageUrl;
 
   const EditRoomTypeScreen({
     super.key,
     this.roomId,
     this.roomName = 'Standar Twin Suite',
     this.category = 'Suite Mewah (Luxury Suite)',
+    this.initialImageUrl,
   });
 
   @override
@@ -36,6 +42,9 @@ class _EditRoomTypeScreenState extends State<EditRoomTypeScreen> {
   late TextEditingController _weekendPriceController;
   late TextEditingController _depositController;
   String _selectedCategory = 'Suite Mewah (Luxury Suite)';
+
+  final ImagePicker _picker = ImagePicker();
+  final List<RoomPhotoItem> _galleryPhotos = [];
 
   final List<String> _categories = [
     'Suite Room',
@@ -93,6 +102,26 @@ class _EditRoomTypeScreenState extends State<EditRoomTypeScreen> {
     }
     _selectedCategory = widget.category;
     _selectedFacilities = Set.from(_facilities);
+
+    // Initial default photos
+    if (widget.initialImageUrl != null && widget.initialImageUrl!.isNotEmpty) {
+      _galleryPhotos.add(RoomPhotoItem(url: widget.initialImageUrl!, label: 'Cover Utama'));
+    } else {
+      _galleryPhotos.add(RoomPhotoItem(
+        url: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800&auto=format&fit=crop',
+        label: 'Cover Utama',
+      ));
+    }
+    _galleryPhotos.add(RoomPhotoItem(
+      url: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&auto=format&fit=crop',
+      label: 'Kamar Mandi',
+    ));
+    _galleryPhotos.add(RoomPhotoItem(
+      url: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=400&auto=format&fit=crop',
+      label: 'Balkon',
+    ));
+
+    _fetchRoomDataFromSupabase();
   }
 
   @override
@@ -102,6 +131,174 @@ class _EditRoomTypeScreenState extends State<EditRoomTypeScreen> {
     _weekendPriceController.dispose();
     _depositController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchRoomDataFromSupabase() async {
+    final sb = SupabaseService.instance;
+    if (!sb.isReady) return;
+    try {
+      Map<String, dynamic>? data;
+      if (widget.roomId != null && widget.roomId!.isNotEmpty) {
+        final res = await sb.table(SupabaseConfig.tableTipeKamar)?.select().eq('id_tipe_kamar', widget.roomId!).maybeSingle();
+        if (res != null) data = Map<String, dynamic>.from(res);
+      } else {
+        final res = await sb.table(SupabaseConfig.tableTipeKamar)?.select().eq('nama_tipe', widget.roomName).maybeSingle();
+        if (res != null) data = Map<String, dynamic>.from(res);
+      }
+
+      if (data != null && mounted) {
+        setState(() {
+          if (data!['nama_tipe'] != null) {
+            _nameController.text = data['nama_tipe'].toString();
+          }
+          if (data['harga_dasar'] != null) {
+            final hg = (data['harga_dasar'] as num).toInt();
+            _weekdayPriceController.text = 'Rp ${_formatRupiah(hg)}';
+          }
+          if (data['harga_weekend'] != null) {
+            final hg = (data['harga_weekend'] as num).toInt();
+            _weekendPriceController.text = 'Rp ${_formatRupiah(hg)}';
+          }
+          final mainImg = data['main_image_url'] ?? data['image'];
+          if (mainImg != null && mainImg.toString().isNotEmpty) {
+            _galleryPhotos.removeWhere((p) => p.label == 'Cover Utama');
+            _galleryPhotos.insert(0, RoomPhotoItem(url: mainImg.toString(), label: 'Cover Utama'));
+          }
+          final dynamic extraImgs = data['image_urls'] ?? data['photo_urls'];
+          if (extraImgs is List && extraImgs.isNotEmpty) {
+            for (final u in extraImgs) {
+              final urlStr = u.toString();
+              if (urlStr.isNotEmpty && !_galleryPhotos.any((p) => p.displayPath == urlStr)) {
+                _galleryPhotos.add(RoomPhotoItem(url: urlStr, label: 'Foto Kamar #${_galleryPhotos.length + 1}'));
+              }
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('ℹ️ [EditRoomTypeScreen] Info fetch room data: $e');
+    }
+  }
+
+  String _formatRupiah(int val) {
+    final s = val.toString();
+    final buffer = StringBuffer();
+    int count = 0;
+    for (int i = s.length - 1; i >= 0; i--) {
+      buffer.write(s[i]);
+      count++;
+      if (count % 3 == 0 && i != 0) {
+        buffer.write('.');
+      }
+    }
+    return buffer.toString().split('').reversed.join('');
+  }
+
+  /// Buka kamera atau galeri untuk tambah foto kamar resolusi tinggi
+  Future<void> _pickGalleryImage(ImageSource source) async {
+    try {
+      final XFile? file = await _picker.pickImage(
+        source: source,
+        imageQuality: 85,
+      );
+      if (file != null) {
+        setState(() {
+          final count = _galleryPhotos.length + 1;
+          _galleryPhotos.add(
+            RoomPhotoItem(
+              file: File(file.path),
+              label: count == 1 ? 'Cover Utama' : 'Foto Kamar #$count',
+            ),
+          );
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Foto kamar berhasil ditambahkan dari perangkat lokal!'),
+              backgroundColor: Color(0xFF007A87),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal mengambil foto: $e'), backgroundColor: const Color(0xFFEF4444)),
+        );
+      }
+    }
+  }
+
+  void _showAddPhotoUrlDialog() {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Tambah URL Foto Kamar', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'https://images.unsplash.com/...',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          ElevatedButton(
+            onPressed: () {
+              final url = controller.text.trim();
+              if (url.isNotEmpty) {
+                setState(() {
+                  final count = _galleryPhotos.length + 1;
+                  _galleryPhotos.add(
+                    RoomPhotoItem(
+                      url: url,
+                      label: count == 1 ? 'Cover Utama' : 'Foto Kamar #$count',
+                    ),
+                  );
+                });
+              }
+              Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF007A87)),
+            child: const Text('Tambah', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _setAsCover(int index) {
+    if (index == 0 || index >= _galleryPhotos.length) return;
+    setState(() {
+      final selected = _galleryPhotos.removeAt(index);
+      selected.label = 'Cover Utama';
+      _galleryPhotos.insert(0, selected);
+      for (int i = 1; i < _galleryPhotos.length; i++) {
+        _galleryPhotos[i].label = 'Foto Kamar #${i + 1}';
+      }
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Foto berhasil dijadikan Cover Utama kamar!'),
+        backgroundColor: Color(0xFF007A87),
+        duration: Duration(seconds: 1),
+      ),
+    );
+  }
+
+  void _removePhoto(int index) {
+    if (index < 0 || index >= _galleryPhotos.length) return;
+    setState(() {
+      _galleryPhotos.removeAt(index);
+      if (_galleryPhotos.isNotEmpty) {
+        _galleryPhotos[0].label = 'Cover Utama';
+        for (int i = 1; i < _galleryPhotos.length; i++) {
+          _galleryPhotos[i].label = 'Foto Kamar #${i + 1}';
+        }
+      }
+    });
   }
 
   Future<void> _submitUpdateRoom() async {
@@ -126,27 +323,53 @@ class _EditRoomTypeScreenState extends State<EditRoomTypeScreen> {
       final weekendPrice =
           double.tryParse(rawWeekend) ?? (weekdayPrice * 1.15);
 
+      // Upload local photo files to Supabase Storage if any
+      for (int i = 0; i < _galleryPhotos.length; i++) {
+        final item = _galleryPhotos[i];
+        if (item.file != null && (item.url == null || item.url!.isEmpty)) {
+          final uploadedUrl = await HotelImageUploadService.instance.uploadFile(
+            item.file!,
+            prefix: 'room_type_${widget.roomId ?? "room"}',
+          );
+          if (uploadedUrl != null && uploadedUrl.isNotEmpty) {
+            _galleryPhotos[i] = RoomPhotoItem(
+              url: uploadedUrl,
+              file: item.file,
+              label: item.label,
+            );
+          }
+        }
+      }
+
+      final coverUrl = _galleryPhotos.isNotEmpty ? _galleryPhotos.first.displayPath : null;
+      final allUrls = _galleryPhotos.map((p) => p.displayPath).where((u) => u.isNotEmpty).toList();
+
       final sb = SupabaseService.instance;
       if (sb.isReady) {
+        final Map<String, dynamic> updateData = {
+          'nama_tipe': name,
+          'harga_dasar': weekdayPrice,
+          'harga_weekend': weekendPrice,
+        };
+        if (coverUrl != null && coverUrl.isNotEmpty) {
+          updateData['main_image_url'] = coverUrl;
+          updateData['image'] = coverUrl;
+        }
+        if (allUrls.isNotEmpty) {
+          updateData['image_urls'] = allUrls;
+        }
+
         if (widget.roomId != null && widget.roomId!.isNotEmpty) {
-          await sb.table(SupabaseConfig.tableTipeKamar)?.update({
-            'nama_tipe': name,
-            'harga_dasar': weekdayPrice,
-            'harga_weekend': weekendPrice,
-          }).eq('id_tipe_kamar', widget.roomId!);
+          await sb.table(SupabaseConfig.tableTipeKamar)?.update(updateData).eq('id_tipe_kamar', widget.roomId!);
         } else {
-          await sb.table(SupabaseConfig.tableTipeKamar)?.update({
-            'nama_tipe': name,
-            'harga_dasar': weekdayPrice,
-            'harga_weekend': weekendPrice,
-          }).eq('nama_tipe', widget.roomName);
+          await sb.table(SupabaseConfig.tableTipeKamar)?.update(updateData).eq('nama_tipe', widget.roomName);
         }
       }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Perubahan tipe kamar berhasil disimpan ke database!'),
+          content: Text('Perubahan tipe kamar & foto berhasil disimpan ke database!'),
           backgroundColor: Color(0xFF007A87),
         ),
       );
@@ -1133,137 +1356,260 @@ class _EditRoomTypeScreenState extends State<EditRoomTypeScreen> {
           color: const Color(0xFFF1F5F9),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: const Text('Min 3 Foto', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+        child: Text('${_galleryPhotos.length} Foto',
+            style: const TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF64748B))),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: _buildPhotoThumb(
-                  'Cover Utama',
-                  Icons.bed,
-                  'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800&auto=format&fit=crop',
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildPhotoThumb(
-                  'Kamar Mandi',
-                  Icons.bathtub,
-                  'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&auto=format&fit=crop',
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildPhotoThumb(
-                  'Balkon',
-                  Icons.deck,
-                  'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=400&auto=format&fit=crop',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
+          // Banner Unggah Foto
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 20),
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
             decoration: BoxDecoration(
               color: const Color(0xFFE6FAFF),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF00D1FF).withValues(alpha: 0.4), style: BorderStyle.solid),
+              border: Border.all(
+                  color: const Color(0xFF00D1FF).withValues(alpha: 0.4)),
             ),
             child: Column(
-              children: const [
-                Icon(Icons.cloud_upload_outlined, size: 32, color: Color(0xFF005E73)),
-                SizedBox(height: 6),
-                Text('Tarik & Lepaskan foto baru di sini', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
-                SizedBox(height: 2),
-                Text('Maksimal 10 foto (PNG, JPG, WEBP hingga 5MB)', style: TextStyle(fontSize: 9, color: Color(0xFF64748B))),
+              children: [
+                const Icon(Icons.cloud_upload_outlined,
+                    size: 32, color: Color(0xFF005E73)),
+                const SizedBox(height: 6),
+                const Text(
+                  'Unggah / Ganti Foto Kamar Resolusi Tinggi',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0F172A)),
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Pilih foto dari kamera ponsel, galeri file lokal, atau tautan URL.',
+                  style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () => _pickGalleryImage(ImageSource.camera),
+                      icon: const Icon(Icons.camera_alt, size: 14),
+                      label: const Text('Kamera',
+                          style: TextStyle(
+                              fontSize: 11, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF007A87),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => _pickGalleryImage(ImageSource.gallery),
+                      icon: const Icon(Icons.photo_library, size: 14),
+                      label: const Text('Galeri HP',
+                          style: TextStyle(
+                              fontSize: 11, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00C2FF),
+                        foregroundColor: const Color(0xFF003847),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _showAddPhotoUrlDialog,
+                      icon: const Icon(Icons.link, size: 14),
+                      label: const Text('URL Link',
+                          style: TextStyle(
+                              fontSize: 11, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFF007A87)),
+                        foregroundColor: const Color(0xFF007A87),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
+          const SizedBox(height: 14),
 
-  Widget _buildPhotoThumb(String label, IconData icon, String imageUrl) {
-    return Container(
-      height: 75,
-      decoration: BoxDecoration(
-        color: const Color(0xFF334155),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Image.network(
-              imageUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Center(
-                child: Icon(icon, color: Colors.white.withValues(alpha: 0.4), size: 32),
+          // Tampilan Foto Kamar
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Daftar Foto Kamar (Cover di posisi paling kiri):',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF475569)),
               ),
-              loadingBuilder: (context, child, progress) {
-                if (progress == null) return child;
-                return Center(
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    value: progress.expectedTotalBytes != null
-                        ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
-                        : null,
-                  ),
-                );
-              },
-            ),
+              if (_galleryPhotos.isNotEmpty)
+                Text(
+                  '${_galleryPhotos.length} item',
+                  style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          if (_galleryPhotos.isEmpty)
             Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.3),
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.65),
-                  ],
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: _cardBorder),
+              ),
+              child: const Center(
+                child: Text(
+                  'Belum ada foto kamar. Silakan tambah foto di atas.',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                 ),
               ),
-            ),
-            Positioned(
-              bottom: 4,
-              left: 4,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.6),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(label, style: const TextStyle(fontSize: 8, color: Colors.white, fontWeight: FontWeight.w600)),
+            )
+          else
+            SizedBox(
+              height: 120,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _galleryPhotos.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 10),
+                itemBuilder: (ctx, i) {
+                  final photo = _galleryPhotos[i];
+                  final isCover = i == 0;
+
+                  return Stack(
+                    children: [
+                      Container(
+                        width: 135,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF334155),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isCover
+                                ? const Color(0xFF00C2FF)
+                                : Colors.transparent,
+                            width: 2.5,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: HotelImageUploadService.instance.buildSafeImage(
+                            photo.displayPath,
+                            width: 135,
+                            height: 120,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+
+                      // Gradient overlay
+                      Positioned.fill(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.black.withValues(alpha: 0.3),
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: 0.75),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Label / Cover badge
+                      Positioned(
+                        top: 6,
+                        left: 6,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isCover
+                                ? const Color(0xFF007A87)
+                                : Colors.black.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            isCover ? 'Cover Utama' : photo.label,
+                            style: const TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white),
+                          ),
+                        ),
+                      ),
+
+                      // Set As Cover Button (jika bukan cover)
+                      if (!isCover)
+                        Positioned(
+                          bottom: 6,
+                          left: 6,
+                          child: GestureDetector(
+                            onTap: () => _setAsCover(i),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00C2FF),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'Jadikan Cover',
+                                style: TextStyle(
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF003847)),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      // Tombol Hapus Foto
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: GestureDetector(
+                          onTap: () => _removePhoto(i),
+                          child: const CircleAvatar(
+                            radius: 11,
+                            backgroundColor: Colors.black54,
+                            child:
+                                Icon(Icons.close, size: 12, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
-            Positioned(
-              top: 4,
-              right: 4,
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), shape: BoxShape.circle),
-                    child: const Icon(Icons.edit, size: 10, color: Colors.white),
-                  ),
-                  const SizedBox(width: 3),
-                  Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), shape: BoxShape.circle),
-                    child: const Icon(Icons.close, size: 10, color: Colors.white),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }

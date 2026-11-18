@@ -238,6 +238,16 @@ class HotelModel {
   // ---------------------------------------------------------------------------
 
   factory HotelModel.fromJson(Map<String, dynamic> json) {
+    double? lat = (json['latitude'] as num?)?.toDouble();
+    double? lng = (json['longitude'] as num?)?.toDouble();
+    if ((lat == null || lng == null) && json['koordinat_gps'] != null) {
+      final parts = json['koordinat_gps'].toString().split(',');
+      if (parts.length >= 2) {
+        lat = double.tryParse(parts[0].trim());
+        lng = double.tryParse(parts[1].trim());
+      }
+    }
+
     return HotelModel(
       id: json['id']?.toString() ?? json['id_penginapan']?.toString() ?? '',
       name: json['name'] ?? json['nama_properti'] ?? '',
@@ -250,8 +260,8 @@ class HotelModel {
               : null),
       fullDescription: json['full_description'] ?? json['description'],
       postalCode: json['postal_code'],
-      latitude: (json['latitude'] as num?)?.toDouble(),
-      longitude: (json['longitude'] as num?)?.toDouble(),
+      latitude: lat,
+      longitude: lng,
       phoneNumber: json['phone_number'] ??
           json['phone'] ??
           json['no_telepon'] ??

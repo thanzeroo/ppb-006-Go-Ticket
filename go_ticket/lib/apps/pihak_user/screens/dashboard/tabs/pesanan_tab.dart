@@ -316,6 +316,7 @@ class _PesananTabState extends State<PesananTab>
                   Row(
                     children: [
                       UserAvatar(
+                        imageUrl: AuthService.instance.currentUser?.avatarUrl,
                         name: AuthService.instance.currentUser?.fullName,
                         radius: 17,
                         onTap: () =>

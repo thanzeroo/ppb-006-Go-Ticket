@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -28,12 +29,18 @@ class UserAvatar extends StatelessWidget {
     return parts[0][0].toUpperCase();
   }
 
+  bool get _isLocalFile {
+    if (imageUrl == null) return false;
+    final url = imageUrl!.trim();
+    return url.startsWith('/') || url.startsWith('file://');
+  }
+
   bool get _hasValidCustomImage {
     if (imageUrl == null) return false;
     final url = imageUrl!.trim();
     if (url.isEmpty) return false;
     if (url.contains('pravatar.cc') || url.contains('placeholder')) return false;
-    return url.startsWith('http://') || url.startsWith('https://');
+    return url.startsWith('http://') || url.startsWith('https://') || _isLocalFile;
   }
 
   @override
@@ -41,36 +48,29 @@ class UserAvatar extends StatelessWidget {
     Widget avatarWidget;
 
     if (_hasValidCustomImage) {
-      avatarWidget = CircleAvatar(
-        radius: radius,
-        backgroundColor: const Color(0xFFE2E8F0),
-        backgroundImage: NetworkImage(imageUrl!),
-        onBackgroundImageError: (_, __) {},
-        child: _buildDefaultContent(),
-      );
+      ImageProvider? provider;
+      if (_isLocalFile) {
+        final filePath = imageUrl!.startsWith('file://') ? imageUrl!.substring(7) : imageUrl!;
+        final file = File(filePath);
+        if (file.existsSync()) {
+          provider = FileImage(file);
+        }
+      } else {
+        provider = NetworkImage(imageUrl!);
+      }
+
+      if (provider != null) {
+        avatarWidget = CircleAvatar(
+          radius: radius,
+          backgroundColor: const Color(0xFFE2E8F0),
+          backgroundImage: provider,
+          onBackgroundImageError: (exception, stackTrace) {},
+        );
+      } else {
+        avatarWidget = _buildGradientAvatar();
+      }
     } else {
-      avatarWidget = Container(
-        width: radius * 2,
-        height: radius * 2,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF00B4D8), Color(0xFF0077B6)],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF00B4D8).withOpacity(0.25),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Center(
-          child: _buildDefaultContent(),
-        ),
-      );
+      avatarWidget = _buildGradientAvatar();
     }
 
     if (showVerifiedBadge) {
@@ -114,6 +114,31 @@ class UserAvatar extends StatelessWidget {
     }
 
     return avatarWidget;
+  }
+
+  Widget _buildGradientAvatar() {
+    return Container(
+      width: radius * 2,
+      height: radius * 2,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF00B4D8), Color(0xFF0077B6)],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF00B4D8).withValues(alpha: 0.25),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Center(
+        child: _buildDefaultContent(),
+      ),
+    );
   }
 
   Widget _buildDefaultContent() {

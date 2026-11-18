@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'package:go_ticket/core/models/booking_args.dart';
@@ -783,6 +784,67 @@ class _PhotoGalleryScreenState extends State<_PhotoGalleryScreen> {
     super.dispose();
   }
 
+  bool _isLocalFile(String path) {
+    if (path.startsWith('http://') || path.startsWith('https://')) return false;
+    return path.startsWith('/') ||
+        path.startsWith('file://') ||
+        RegExp(r'^[a-zA-Z]:[\\/]').hasMatch(path);
+  }
+
+  Widget _buildPhotoView(String photo) {
+    if (_isLocalFile(photo)) {
+      final cleanPath = photo.replaceFirst('file://', '');
+      final file = File(cleanPath);
+      if (file.existsSync()) {
+        return Image.file(
+          file,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) => const Center(
+            child: Icon(Icons.broken_image, color: Colors.white54, size: 48),
+          ),
+        );
+      }
+    }
+    return Image.network(
+      photo,
+      fit: BoxFit.contain,
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return const Center(
+          child: CircularProgressIndicator(color: GT.teal),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) => const Center(
+        child: Icon(
+          Icons.broken_image,
+          color: Colors.white54,
+          size: 48,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThumbView(String photo) {
+    if (_isLocalFile(photo)) {
+      final cleanPath = photo.replaceFirst('file://', '');
+      final file = File(cleanPath);
+      if (file.existsSync()) {
+        return Image.file(
+          file,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey[800]),
+        );
+      }
+    }
+    return Image.network(
+      photo,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => Container(
+        color: Colors.grey[800],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -850,23 +912,7 @@ class _PhotoGalleryScreenState extends State<_PhotoGalleryScreen> {
                     minScale: 0.8,
                     maxScale: 3.5,
                     child: Center(
-                      child: Image.network(
-                        widget.photos[index],
-                        fit: BoxFit.contain,
-                        loadingBuilder: (context, child, progress) {
-                          if (progress == null) return child;
-                          return const Center(
-                            child: CircularProgressIndicator(color: GT.teal),
-                          );
-                        },
-                        errorBuilder: (_, __, ___) => const Center(
-                          child: Icon(
-                            Icons.broken_image,
-                            color: Colors.white54,
-                            size: 48,
-                          ),
-                        ),
-                      ),
+                      child: _buildPhotoView(widget.photos[index]),
                     ),
                   );
                 },
@@ -901,13 +947,7 @@ class _PhotoGalleryScreenState extends State<_PhotoGalleryScreen> {
                         ),
                       ),
                       clipBehavior: Clip.antiAlias,
-                      child: Image.network(
-                        widget.photos[idx],
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: Colors.grey[800],
-                        ),
-                      ),
+                      child: _buildThumbView(widget.photos[idx]),
                     ),
                   );
                 },

@@ -371,6 +371,7 @@ class HotelService {
     double? weekdayPrice,
     double? weekendPrice,
     List<String>? roomAmenities,
+    List<Map<String, dynamic>>? roomTypes,
   }) async {
     final sb = SupabaseService.instance;
     if (!sb.isReady || sb.client == null) {
@@ -394,9 +395,8 @@ class HotelService {
       'status_operasional': 'Aktif',
       'saldo_escrow': 0.0,
       'persentase_komisi': 10.0,
-      if (latitude != null) 'latitude': latitude,
-      if (longitude != null) 'longitude': longitude,
-      if (mainImageUrl != null && mainImageUrl.isNotEmpty) 'foto_utama': mainImageUrl,
+      if (latitude != null && longitude != null)
+        'koordinat_gps': '$latitude, $longitude',
     };
 
     final insertedHotel = await sb
@@ -412,60 +412,115 @@ class HotelService {
     final int newHotelId =
         int.tryParse(insertedHotel['id_penginapan'].toString()) ?? 0;
 
-    // 2. Insert tipe kamar awal jika diisi
-    if (newHotelId > 0 && roomName != null && roomName.trim().isNotEmpty) {
-      try {
-        final rName = roomName.trim();
-        final basePrice = weekdayPrice ?? 500000.0;
-        final wkndPrice = weekendPrice ?? (basePrice * 1.2);
-        final uniqueRoomTypeId =
-            '${newHotelId}_${DateTime.now().millisecondsSinceEpoch % 100000}';
-        final roomAmenitiesStr =
-            roomAmenities != null && roomAmenities.isNotEmpty
-                ? roomAmenities.join(', ')
-                : 'AC, WiFi, Kamar Mandi Dalam';
+    // 2. Insert tipe kamar (bisa satu atau banyak tipe kamar)
+    if (newHotelId > 0) {
+      final List<Map<String, dynamic>> roomsToInsert = [];
+      if (roomTypes != null && roomTypes.isNotEmpty) {
+        roomsToInsert.addAll(roomTypes);
+      } else if (roomName != null && roomName.trim().isNotEmpty) {
+        roomsToInsert.add({
+          'name': roomName.trim(),
+          'capacity': roomCapacity ?? 2,
+          'sizeM2': roomSizeM2 ?? 30.0,
+          'bedType': bedType ?? '1 King Bed',
+          'weekdayPrice': weekdayPrice ?? 500000.0,
+          'weekendPrice': weekendPrice ?? ((weekdayPrice ?? 500000.0) * 1.2),
+          'amenities': roomAmenities ?? const ['AC', 'WiFi', 'Kamar Mandi Dalam'],
+          'totalUnit': 5,
+        });
+      }
 
-        final roomTypeRow = <String, dynamic>{
-          'id_tipe_kamar': uniqueRoomTypeId,
-          'id_penginapan': newHotelId,
-          'nama_tipe': rName,
-          'kapasitas_tamu': roomCapacity ?? 2,
-          'luas_m2': roomSizeM2 ?? 30.0,
-          'tipe_bed': bedType ?? '1 King Bed',
-          'harga_dasar': basePrice,
-          'harga_weekend': wkndPrice,
-          'total_unit': 5,
-          'fasilitas_kamar': roomAmenitiesStr,
-        };
+      for (int i = 0; i < roomsToInsert.length; i++) {
+        final r = roomsToInsert[i];
+        final rName = (r['name'] ?? r['nama_tipe'] ?? '').toString().trim();
+        if (rName.isEmpty) continue;
 
-        await sb.table(SupabaseConfig.tableTipeKamar)?.insert(roomTypeRow);
+        try {
+          final basePrice = (r['weekdayPrice'] as num?)?.toDouble() ??
+              (r['harga_dasar'] as num?)?.toDouble() ??
+              500000.0;
+          final wkndPrice = (r['weekendPrice'] as num?)?.toDouble() ??
+              (r['harga_weekend'] as num?)?.toDouble() ??
+              (r['harga_akhir_pekan'] as num?)?.toDouble() ??
+              (basePrice * 1.2);
+          final uniqueRoomTypeId =
+              '${newHotelId}_${i + 1}_${DateTime.now().millisecondsSinceEpoch % 100000}';
+          final dynamic rawAmenities = r['amenities'] ?? r['fasilitas_kamar'];
+          final roomAmenitiesStr = rawAmenities is List
+              ? rawAmenities.join(', ')
+              : (rawAmenities?.toString() ?? 'AC, WiFi, Kamar Mandi Dalam');
+          final totalUnits = (r['totalUnit'] as num?)?.toInt() ??
+              (r['total_unit'] as num?)?.toInt() ??
+              5;
 
-        // 3. Insert unit fisik kamar di tabel kamar
-        final unitKamar = [
-          {
-            'id_kamar': '${uniqueRoomTypeId}_101',
+          final roomTypeRow = <String, dynamic>{
             'id_tipe_kamar': uniqueRoomTypeId,
             'id_penginapan': newHotelId,
-            'nomor_kamar': '101',
-            'lantai': '1',
-            'status_kamar': 'Tersedia',
-          },
-          {
-            'id_kamar': '${uniqueRoomTypeId}_102',
-            'id_tipe_kamar': uniqueRoomTypeId,
-            'id_penginapan': newHotelId,
-            'nomor_kamar': '102',
-            'lantai': '1',
-            'status_kamar': 'Tersedia',
-          },
-        ];
-        await sb.table(SupabaseConfig.tableKamar)?.insert(unitKamar);
-      } catch (e) {
-        debugPrint('⚠️ [HotelService] Gagal menambahkan kamar awal: $e');
+            'nama_tipe': rName,
+            'kapasitas_tamu': (r['capacity'] as num?)?.toInt() ??
+                (r['kapasitas'] as num?)?.toInt() ??
+                2,
+            'luas_m2': (r['sizeM2'] as num?)?.toDouble() ??
+                (r['ukuran_kamar'] as num?)?.toDouble() ??
+                30.0,
+            'tipe_bed': (r['bedType'] ?? r['tipe_kasur'] ?? '1 King Bed').toString(),
+            'harga_dasar': basePrice,
+            'harga_weekend': wkndPrice,
+            'total_unit': totalUnits,
+            'fasilitas_kamar': roomAmenitiesStr,
+          };
+
+          await sb.table(SupabaseConfig.tableTipeKamar)?.insert(roomTypeRow);
+
+          // 3. Insert unit fisik kamar di tabel kamar
+          final List<Map<String, dynamic>> unitKamar = [];
+          final int count = totalUnits > 0 ? (totalUnits > 10 ? 10 : totalUnits) : 2;
+          for (int u = 1; u <= count; u++) {
+            unitKamar.add({
+              'id_kamar': '${uniqueRoomTypeId}_${(i + 1) * 100 + u}',
+              'id_tipe_kamar': uniqueRoomTypeId,
+              'id_penginapan': newHotelId,
+              'nomor_kamar': '${(i + 1) * 100 + u}',
+              'lantai': '${i + 1}',
+              'status_kamar': 'Tersedia',
+            });
+          }
+          await sb.table(SupabaseConfig.tableKamar)?.insert(unitKamar);
+        } catch (e) {
+          debugPrint('⚠️ [HotelService] Gagal menambahkan kamar index $i: $e');
+        }
       }
     }
 
-    return HotelModel.fromJson(Map<String, dynamic>.from(insertedHotel));
+    // 3. Simpan fasilitas properti jika ada
+    if (newHotelId > 0 && facilities != null && facilities.isNotEmpty) {
+      try {
+        final facRows = facilities.map((f) => {
+          'id_penginapan': newHotelId,
+          'nama_fasilitas': f,
+        }).toList();
+        await sb.table(SupabaseConfig.tableFasilitasProperti)?.insert(facRows);
+      } catch (e) {
+        debugPrint('⚠️ [HotelService] Gagal simpan fasilitas properti: $e');
+      }
+    }
+
+    final resMap = Map<String, dynamic>.from(insertedHotel);
+    if (mainImageUrl != null && mainImageUrl.isNotEmpty) {
+      resMap['main_image_url'] = mainImageUrl;
+      resMap['foto_utama'] = mainImageUrl;
+    }
+    if (imageUrls != null && imageUrls.isNotEmpty) {
+      resMap['image_urls'] = imageUrls;
+      resMap['photo_urls'] = imageUrls;
+    }
+    if (latitude != null) resMap['latitude'] = latitude;
+    if (longitude != null) resMap['longitude'] = longitude;
+    if (facilities != null && facilities.isNotEmpty) {
+      resMap['amenities'] = facilities;
+    }
+
+    return HotelModel.fromJson(resMap);
   }
 
   /// Mengubah status verifikasi hotel (Approve / Reject oleh Super Admin)
@@ -537,10 +592,8 @@ class HotelService {
       if (cancellationPolicy != null) {
         updateData['kebijakan_batal'] = cancellationPolicy.trim();
       }
-      if (latitude != null) updateData['latitude'] = latitude;
-      if (longitude != null) updateData['longitude'] = longitude;
-      if (mainImageUrl != null && mainImageUrl.isNotEmpty) {
-        updateData['foto_utama'] = mainImageUrl;
+      if (latitude != null && longitude != null) {
+        updateData['koordinat_gps'] = '$latitude, $longitude';
       }
       if (ptName != null) updateData['nama_pt'] = ptName.trim();
       if (npwp != null) updateData['npwp_perusahaan'] = npwp.trim();
