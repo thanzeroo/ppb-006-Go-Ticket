@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../../../core/config/supabase_config.dart';
 import '../../../../../../core/services/auth_service.dart';
 import '../widgets/request_admin_email_sheet.dart';
+import '../../../services/hotel_image_upload_service.dart';
 
 /// Halaman Tambah Karyawan Baru untuk Administrator Hotel
 /// Mendukung 3 Role:
@@ -424,32 +425,13 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
       String? photoUrl = _selectedAvatarUrl;
       if (_selectedImageFile != null && _selectedImageFile!.existsSync()) {
         try {
-          final bytes = await _selectedImageFile!.readAsBytes();
-          final ext = _selectedImageFile!.path.split('.').last.toLowerCase();
-          final contentType = ext == 'png' ? 'image/png' : 'image/jpeg';
           final cleanId = idStaf.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
-          final filename =
-              'staf_${cleanId}_${DateTime.now().millisecondsSinceEpoch}.$ext';
-          final uploadUri = Uri.parse(
-              '${SupabaseConfig.supabaseUrl}/storage/v1/object/avatars/$filename');
-
-          final serviceKey = SupabaseConfig.supabaseServiceRoleKey.isNotEmpty
-              ? SupabaseConfig.supabaseServiceRoleKey
-              : SupabaseConfig.activeApiKey;
-
-          final uploadResp = await http.post(
-            uploadUri,
-            headers: {
-              'apikey': serviceKey,
-              'Authorization': 'Bearer $serviceKey',
-              'Content-Type': contentType,
-              'x-upsert': 'true',
-            },
-            body: bytes,
+          final uploaded = await HotelImageUploadService.instance.uploadFile(
+            _selectedImageFile!,
+            prefix: 'staf_$cleanId',
           );
-          if (uploadResp.statusCode == 200 || uploadResp.statusCode == 201) {
-            photoUrl =
-                '${SupabaseConfig.supabaseUrl}/storage/v1/object/public/avatars/$filename';
+          if (uploaded != null && uploaded.isNotEmpty) {
+            photoUrl = uploaded;
             debugPrint('✅ [AddStaff] Foto profil berhasil diunggah: $photoUrl');
           }
         } catch (uploadErr) {

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../widgets/lapor_kerusakan_sheet.dart';
 import '../../../../../core/models/maintenance_ticket_model.dart';
 import '../../../../../core/services/maintenance_service.dart';
+import '../../../services/hotel_image_upload_service.dart';
+import '../../../services/hotel_operations_store.dart';
 
 /// Tab 3: Tiket Kerusakan & Hub Pemeliharaan Maintenance
 /// 100% dinamis dari Supabase – tidak ada data mockup.
@@ -23,22 +25,47 @@ class _KerusakanTabState extends State<KerusakanTab> {
   void initState() {
     super.initState();
     _loadData();
+    HotelOperationsStore.instance.addListener(_onStoreChanged);
+  }
+
+  void _onStoreChanged() {
+    if (mounted) _loadData();
+  }
+
+  @override
+  void dispose() {
+    HotelOperationsStore.instance.removeListener(_onStoreChanged);
+    super.dispose();
   }
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      // Ambil tiket kerusakan (bukan kebersihan)
-      final data = await MaintenanceService.instance.getTickets();
+      final storeTickets = HotelOperationsStore.instance.damageTickets;
+      final serverData = await MaintenanceService.instance.getTickets();
+      final filteredServer =
+          serverData.where((t) => t.category != TicketCategory.cleaning).toList();
+
+      final List<MaintenanceTicketModel> combined = [...storeTickets];
+      for (final s in filteredServer) {
+        if (!combined.any((c) => c.id == s.id)) {
+          combined.add(s);
+        }
+      }
+
       if (mounted) {
         setState(() {
-          // Filter hanya kerusakan (bukan kategori kebersihan)
-          _tickets = data.where((t) => t.category != TicketCategory.cleaning).toList();
+          _tickets = combined;
           _isLoading = false;
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _tickets = [...HotelOperationsStore.instance.damageTickets];
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -363,24 +390,45 @@ class _KerusakanTabState extends State<KerusakanTab> {
           // Tampilkan Bukti Foto Kerusakan jika ada
           if (t.damagePhotoUrls.isNotEmpty) ...[
             const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: t.damagePhotoUrls.first.startsWith('http')
-                  ? Image.network(
-                      t.damagePhotoUrls.first,
-                      height: 120,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const SizedBox(),
-                    )
-                  : (File(t.damagePhotoUrls.first).existsSync()
-                      ? Image.file(
-                          File(t.damagePhotoUrls.first),
-                          height: 120,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                        )
-                      : const SizedBox()),
+            GestureDetector(
+              onTap: () => _showImagePreviewDialog(context, t.damagePhotoUrls.first),
+              child: Stack(
+                children: [
+                  HotelImageUploadService.instance.buildSafeImage(
+                    t.damagePhotoUrls.first,
+                    height: 140,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  Positioned(
+                    bottom: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.65),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.zoom_in, color: Colors.white, size: 13),
+                          SizedBox(width: 4),
+                          Text(
+                            'Lihat Bukti Foto',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
           const SizedBox(height: 12),
@@ -411,7 +459,10 @@ class _KerusakanTabState extends State<KerusakanTab> {
                     child: ElevatedButton.icon(
                       onPressed: () async {
                         final newStatus = isOpen ? MaintenanceStatus.inProgress : MaintenanceStatus.resolved;
-                        await MaintenanceService.instance.updateTicketStatus(t.id, newStatus);
+                        HotelOperationsStore.instance.updateDamageTicketStatus(t.id, newStatus);
+                        try {
+                          await MaintenanceService.instance.updateTicketStatus(t.id, newStatus);
+                        } catch (_) {}
                         _loadData();
                       },
                       icon: const Icon(Icons.check_circle_outline, color: Colors.white, size: 16),
@@ -515,6 +566,36 @@ class _KerusakanTabState extends State<KerusakanTab> {
             fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
             color: isSelected ? const Color(0xFF006D84) : const Color(0xFF475569),
           ),
+        ),
+      ),
+    );
+  }
+
+  void _showImagePreviewDialog(BuildContext context, String photoPath) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: HotelImageUploadService.instance.buildSafeImage(
+                photoPath,
+                fit: BoxFit.contain,
+              ),
+            ),
+            IconButton(
+              icon: const CircleAvatar(
+                backgroundColor: Colors.black54,
+                radius: 16,
+                child: Icon(Icons.close, color: Colors.white, size: 18),
+              ),
+              onPressed: () => Navigator.pop(ctx),
+            ),
+          ],
         ),
       ),
     );

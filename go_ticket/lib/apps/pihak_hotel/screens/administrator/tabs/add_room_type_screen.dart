@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../../../core/models/room_model.dart';
 import '../../../../../../core/services/auth_service.dart';
 import '../../../../../../core/services/hotel_service.dart';
+import '../../../services/hotel_image_upload_service.dart';
 
 /// Item foto di galeri kamar (bisa berasal dari file lokal kamera/galeri atau URL internet)
 class RoomPhotoItem {
@@ -342,7 +343,34 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
       final weekendPrice =
           double.tryParse(rawWeekend) ?? (weekdayPrice * 1.15);
 
-      final photosList = _galleryPhotos.map((p) => p.displayPath).where((s) => s.isNotEmpty).toList();
+      // 1. Upload semua berkas foto lokal ke Supabase Storage (agar foto bisa diakses di komputer lain)
+      final List<String> uploadedPhotos = [];
+      final cleanName = name.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_').toLowerCase();
+
+      for (int i = 0; i < _galleryPhotos.length; i++) {
+        final item = _galleryPhotos[i];
+        if (item.url != null && item.url!.isNotEmpty) {
+          uploadedPhotos.add(item.url!);
+        } else if (item.file != null && item.file!.existsSync()) {
+          try {
+            final uploadedUrl = await HotelImageUploadService.instance.uploadFile(
+              item.file!,
+              prefix: 'room_${cleanName}_p$i',
+            );
+            if (uploadedUrl != null && uploadedUrl.isNotEmpty) {
+              uploadedPhotos.add(uploadedUrl);
+            } else {
+              uploadedPhotos.add(item.file!.path);
+            }
+          } catch (_) {
+            uploadedPhotos.add(item.file!.path);
+          }
+        }
+      }
+
+      final photosList = uploadedPhotos.isNotEmpty
+          ? uploadedPhotos
+          : _galleryPhotos.map((p) => p.displayPath).where((s) => s.isNotEmpty).toList();
       final mainPhoto = photosList.isNotEmpty ? photosList.first : null;
       final roomNo = _roomNumbers.isNotEmpty ? _roomNumbers.first : '101';
 
@@ -937,18 +965,12 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: photo.url != null
-                            ? Image.network(
-                                photo.url!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Center(
-                                  child: Icon(Icons.broken_image, color: Colors.white38),
-                                ),
-                              )
-                            : Image.file(
-                                photo.file!,
-                                fit: BoxFit.cover,
-                              ),
+                        child: HotelImageUploadService.instance.buildSafeImage(
+                          photo.displayPath,
+                          width: 120,
+                          height: 100,
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
 

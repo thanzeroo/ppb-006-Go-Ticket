@@ -143,6 +143,9 @@ class HotelOperationsStore extends ChangeNotifier {
   // Daftar pengajuan akun administrator via email ke Go Ticket
   final List<AdminAccountRequest> _adminRequests = [];
 
+  // Daftar tiket laporan kerusakan fasilitas
+  final List<MaintenanceTicketModel> _damageTickets = [];
+
   // Perpanjangan durasi menginap lokal per booking ID (bookingId -> extraNights)
   final Map<String, int> _extendedNights = {};
   final Map<String, int> _extensionAdditionalCosts = {};
@@ -154,6 +157,7 @@ class HotelOperationsStore extends ChangeNotifier {
   List<CleaningTaskItem> get cleaningQueue => List.unmodifiable(_cleaningQueue);
   List<CleaningTaskItem> get cleanedHistory => List.unmodifiable(_cleanedHistory);
   List<AdminAccountRequest> get adminRequests => List.unmodifiable(_adminRequests);
+  List<MaintenanceTicketModel> get damageTickets => List.unmodifiable(_damageTickets);
 
   int getExtendedNights(String bookingId) => _extendedNights[bookingId] ?? 0;
   int getAdditionalCost(String bookingId) => _extensionAdditionalCosts[bookingId] ?? 0;
@@ -246,6 +250,82 @@ class HotelOperationsStore extends ChangeNotifier {
         processedBy: 'Staf FO - Budi',
       ),
     ]);
+
+    // Data inisial tiket laporan kerusakan kamar untuk Maintenance Kerusakan Tab
+    _damageTickets.addAll([
+      MaintenanceTicketModel(
+        id: 'TKT-${now.subtract(const Duration(minutes: 35)).millisecondsSinceEpoch}',
+        hotelId: '1',
+        roomId: '203',
+        roomNumber: 'Kamar 203 (Lt. 2)',
+        title: 'Keran Wastafel Bocor & Air Merembes',
+        description: 'Keran di bawah wastafel bocor cukup deras saat dibuka, perlu penggantian karet sil dan pipa fleksibel.',
+        category: 'Air/Ledeng',
+        priority: MaintenancePriority.high,
+        status: MaintenanceStatus.open,
+        reportedById: 'MT-2025-001',
+        reportedByName: 'Rudi Maintenance',
+        damagePhotoUrls: const [
+          'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=600'
+        ],
+        createdAt: now.subtract(const Duration(minutes: 35)),
+      ),
+      MaintenanceTicketModel(
+        id: 'TKT-${now.subtract(const Duration(hours: 1, minutes: 15)).millisecondsSinceEpoch}',
+        hotelId: '1',
+        roomId: '105',
+        roomNumber: 'Kamar 105 (Lt. 1)',
+        title: 'AC Kamar Tidak Dingin & Bunyi Bising',
+        description: 'Kompresor AC berbunyi getar dan hembusan udara hanya angin biasa, filter perlu dibersihkan & cek freon.',
+        category: 'AC / Pendingin',
+        priority: MaintenancePriority.medium,
+        status: MaintenanceStatus.inProgress,
+        assignedToName: 'Doni Kurniawan (Teknisi)',
+        reportedById: 'FO-2025-002',
+        reportedByName: 'Staf FO - Siti',
+        damagePhotoUrls: const [
+          'https://images.unsplash.com/photo-1621905251918-48416bd8575a?w=600'
+        ],
+        createdAt: now.subtract(const Duration(hours: 1, minutes: 15)),
+      ),
+      MaintenanceTicketModel(
+        id: 'TKT-${now.subtract(const Duration(hours: 4)).millisecondsSinceEpoch}',
+        hotelId: '1',
+        roomId: '302',
+        roomNumber: 'Kamar 302 (Lt. 3)',
+        title: 'Lampu Plafon Balkon Mati',
+        description: 'Lampu LED downlight balkon padam, sudah diganti dengan bohlam LED 9W baru dan berfungsi normal.',
+        category: 'Kelistrikan',
+        priority: MaintenancePriority.low,
+        status: MaintenanceStatus.resolved,
+        assignedToName: 'Rudi Maintenance',
+        reportedById: 'MT-2025-001',
+        reportedByName: 'Rudi Maintenance',
+        damagePhotoUrls: const [],
+        resolutionNotes: 'Sudah diganti dengan bohlam LED baru dan pengetesan saklar berhasil.',
+        createdAt: now.subtract(const Duration(hours: 4)),
+      ),
+    ]);
+  }
+
+  /// Tambah tiket kerusakan baru (Time log otomatis tercatat saat submit)
+  void addDamageTicket(MaintenanceTicketModel ticket) {
+    _damageTickets.insert(0, ticket);
+    notifyListeners();
+  }
+
+  /// Perbarui status tiket kerusakan (Open -> In Progress -> Resolved)
+  void updateDamageTicketStatus(String ticketId, MaintenanceStatus newStatus, {String? resolutionNotes}) {
+    final idx = _damageTickets.indexWhere((t) => t.id == ticketId);
+    if (idx != -1) {
+      final old = _damageTickets[idx];
+      _damageTickets[idx] = old.copyWith(
+        status: newStatus,
+        resolutionNotes: resolutionNotes ?? old.resolutionNotes,
+        resolvedAt: newStatus == MaintenanceStatus.resolved ? DateTime.now() : old.resolvedAt,
+      );
+      notifyListeners();
+    }
   }
 
   /// Verifikasi E-Tiket Tamu (setelah scan barcode / kamera)

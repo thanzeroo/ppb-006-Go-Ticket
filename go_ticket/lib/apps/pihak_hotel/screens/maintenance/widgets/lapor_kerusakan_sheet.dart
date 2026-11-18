@@ -5,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../../core/models/maintenance_ticket_model.dart';
 import '../../../../../core/services/auth_service.dart';
 import '../../../../../core/services/maintenance_service.dart';
+import '../../../services/hotel_image_upload_service.dart';
+import '../../../services/hotel_operations_store.dart';
 
 /// Modal Bottom Sheet: Lapor Kerusakan Fasilitas Kamar Hotel
 /// Sesuai instruksi:
@@ -114,6 +116,24 @@ class _LaporKerusakanModalContentState extends State<LaporKerusakanModalContent>
 
       final roomStr = 'Kamar $room (Lt. $_selectedFloor)';
 
+      // 1. Upload foto bukti kerusakan ke Supabase Storage (agar bisa dilihat di komputer lain)
+      List<String> photoUrls = [];
+      if (_damagePhoto != null && _damagePhoto!.existsSync()) {
+        try {
+          final uploadedUrl = await HotelImageUploadService.instance.uploadFile(
+            _damagePhoto!,
+            prefix: 'damage_lt${_selectedFloor}_kmr$room',
+          );
+          if (uploadedUrl != null && uploadedUrl.isNotEmpty) {
+            photoUrls.add(uploadedUrl);
+          } else {
+            photoUrls.add(_damagePhoto!.path);
+          }
+        } catch (_) {
+          photoUrls.add(_damagePhoto!.path);
+        }
+      }
+
       final ticket = MaintenanceTicketModel(
         id: 'TKT-${submitTime.millisecondsSinceEpoch}',
         hotelId: hotelId,
@@ -126,11 +146,19 @@ class _LaporKerusakanModalContentState extends State<LaporKerusakanModalContent>
         category: _selectedCategory,
         reportedById: (user != null && user.id.isNotEmpty) ? user.id : 'MT-2025-001',
         reportedByName: user?.fullName ?? 'Petugas Maintenance',
-        damagePhotoUrls: _damagePhoto != null ? [_damagePhoto!.path] : const [],
+        damagePhotoUrls: photoUrls,
         createdAt: submitTime, // Exact time log
       );
 
-      await MaintenanceService.instance.createTicket(ticket);
+      // Simpan ke reactive store lokal agar langsung muncul di UI seketika
+      HotelOperationsStore.instance.addDamageTicket(ticket);
+
+      // Sinkronkan ke server backend
+      try {
+        await MaintenanceService.instance.createTicket(ticket);
+      } catch (e) {
+        debugPrint('⚠️ [LaporKerusakan] Gagal sinkron ke backend (offline fallback aktif): $e');
+      }
 
       if (!mounted) return;
       Navigator.pop(context);
