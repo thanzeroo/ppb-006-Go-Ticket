@@ -157,6 +157,7 @@ class AuthService {
       if (userJson != null) {
         try {
           final userData = json.decode(userJson) as Map<String, dynamic>;
+          final savedAvatar = await StorageHelper.getAvatarUrl();
           _currentUser = UserModel(
             id: userData['id']?.toString() ?? '',
             fullName:
@@ -168,6 +169,7 @@ class AuthService {
             ),
             isVerified: userData['is_verified'] == true ||
                 userData['isVerified'] == 'true',
+            avatarUrl: savedAvatar,
             managedHotelId: userData['managed_hotel_id']?.toString() ??
                 userData['id_penginapan']?.toString(),
             managedHotelName: userData['managed_hotel_name'],
@@ -217,9 +219,14 @@ class AuthService {
       }
 
       final model = UserModel.fromJson(userRes);
-      _currentUser = model;
-      await _saveUserSession(model);
-      return model;
+      // DB doesn't have foto_profil column, load avatar from SharedPreferences
+      final savedAvatar = await StorageHelper.getAvatarUrl();
+      final enrichedModel = savedAvatar != null && savedAvatar.isNotEmpty
+          ? model.copyWith(avatarUrl: savedAvatar)
+          : model;
+      _currentUser = enrichedModel;
+      await _saveUserSession(enrichedModel);
+      return enrichedModel;
     } catch (e) {
       debugPrint('⚠️ [validateCustomerSession] error: $e');
       return null;
@@ -748,7 +755,6 @@ class AuthService {
           final payload = <String, dynamic>{
             if (fullName != null) 'nama_lengkap': fullName.trim(),
             if (phone != null) 'no_telepon': phone.trim(),
-            if (avatarUrl != null) 'foto_profil': avatarUrl.trim(),
             if (birthDate != null)
               'tanggal_lahir':
                   '${birthDate.year.toString().padLeft(4, '0')}-${birthDate.month.toString().padLeft(2, '0')}-${birthDate.day.toString().padLeft(2, '0')}',
@@ -831,6 +837,7 @@ class AuthService {
       email: user.email ?? '',
       role: user.role.apiValue,
       phone: user.phoneNumber,
+      avatarUrl: user.avatarUrl,
       isVerified: user.isVerified,
     );
   }

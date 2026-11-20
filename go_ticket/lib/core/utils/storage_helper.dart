@@ -153,6 +153,7 @@ class StorageHelper {
     required String email,
     required String role,
     String? phone,
+    String? avatarUrl,
     bool isVerified = false,
   }) async {
     final prefs = await _getPrefs();
@@ -161,7 +162,20 @@ class StorageHelper {
     await prefs.setString('user_email', email);
     await prefs.setString(AppConstants.keyUserRole, role);
     if (phone != null) await prefs.setString('user_phone', phone);
+    if (avatarUrl != null) await prefs.setString('user_avatar_url', avatarUrl);
     await prefs.setBool('user_is_verified', isVerified);
+  }
+
+  /// Simpan avatar URL saja (tanpa data lain)
+  static Future<void> saveAvatarUrl(String avatarUrl) async {
+    final prefs = await _getPrefs();
+    await prefs.setString('user_avatar_url', avatarUrl);
+  }
+
+  /// Ambil avatar URL dari SharedPreferences
+  static Future<String?> getAvatarUrl() async {
+    final prefs = await _getPrefs();
+    return prefs.getString('user_avatar_url');
   }
 
   /// Menyimpan Hotel ID yang dikelola oleh staff (Hotel Partner app)

@@ -164,7 +164,7 @@ class _AdministratorDashboardScreenState
                   isDuty ? const Color(0xFF22C55E) : const Color(0xFF94A3B8),
               akses: aksesList,
               wa: m['no_telepon'] ?? '-',
-              avatarUrl: m['foto_profil'] ??
+              avatarUrl:
                   'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop',
               shift: m['shift_tugas'] ?? 'Shift Pagi (07:00 – 15:00 WIB)',
               email: m['email'],

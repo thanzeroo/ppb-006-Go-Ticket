@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:go_ticket/core/config/supabase_config.dart';
 import 'package:go_ticket/core/services/auth_service.dart';
 import 'package:go_ticket/core/services/supabase_service.dart';
+import 'package:go_ticket/core/utils/storage_helper.dart';
 import 'package:go_ticket/core/widgets/gt_ui.dart';
 import 'package:go_ticket/core/widgets/user_avatar.dart';
 import '../../../pihak_hotel/services/hotel_image_upload_service.dart';
@@ -81,19 +82,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 final d = DateTime.tryParse(res['tanggal_lahir'].toString());
                 if (d != null) _birth = d;
               }
-              if (res['foto_profil'] != null &&
-                  res['foto_profil'].toString().isNotEmpty) {
-                _avatarUrl = res['foto_profil'].toString();
-              } else if (res['avatar_url'] != null &&
-                  res['avatar_url'].toString().isNotEmpty) {
-                _avatarUrl = res['avatar_url'].toString();
-              }
             });
           }
         }
       } catch (e) {
         debugPrint('⚠️ Error fetching profile: $e');
       }
+    }
+    // Muat avatar URL dari SharedPreferences (bukan dari DB — kolom tidak ada)
+    final savedAvatar = await StorageHelper.getAvatarUrl();
+    if (savedAvatar != null && savedAvatar.isNotEmpty && mounted) {
+      setState(() => _avatarUrl = savedAvatar);
     }
   }
 
