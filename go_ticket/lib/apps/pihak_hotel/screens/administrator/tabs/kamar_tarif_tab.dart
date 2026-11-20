@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:go_ticket/core/widgets/app_pagination_bar.dart';
 import '../../../../../core/theme/hotel_admin_theme.dart';
 import '../../../../../core/models/hotel_admin_model.dart';
 import 'add_room_type_screen.dart';
@@ -18,6 +19,7 @@ class KamarTarifTab extends StatefulWidget {
 
 class _KamarTarifTabState extends State<KamarTarifTab> {
   int _categoryIndex = 0;
+  int _currentPage = 1;
   final _categories = ['Semua Kamar (45)', 'Ocean View (15)', 'Private Villa (10)'];
 
   @override
@@ -118,8 +120,30 @@ class _KamarTarifTabState extends State<KamarTarifTab> {
               ],
             ),
           )
-        else
-          ...widget.rooms.map((r) => _buildRoomCard(r)),
+        else ...[
+          Builder(
+            builder: (ctx) {
+              final total = widget.rooms.length;
+              final maxPage = (total / 10).ceil();
+              final safePage = _currentPage.clamp(1, maxPage > 0 ? maxPage : 1);
+              final pagedRooms = paginateList(widget.rooms, safePage, pageSize: 10);
+
+              return Column(
+                children: [
+                  for (final r in pagedRooms) _buildRoomCard(r),
+                  AppPaginationBar(
+                    currentPage: safePage,
+                    totalItems: total,
+                    pageSize: 10,
+                    itemLabel: 'tipe kamar',
+                    primaryColor: cDarkActive,
+                    onPageChanged: (newPage) => setState(() => _currentPage = newPage),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
 
         const SizedBox(height: 20),
       ],

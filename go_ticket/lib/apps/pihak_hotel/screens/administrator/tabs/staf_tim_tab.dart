@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import 'package:go_ticket/core/widgets/app_pagination_bar.dart';
 import '../../../../../core/config/supabase_config.dart';
 import '../../../../../core/models/hotel_admin_model.dart';
 import '../../../../../core/theme/hotel_admin_theme.dart';
@@ -27,6 +28,7 @@ class StafTimTab extends StatefulWidget {
 class _StafTimTabState extends State<StafTimTab> {
   // 0: Semua, 1: Administrator, 2: Maintenance, 3: Staf
   int _roleFilterIndex = 0;
+  int _currentPage = 1;
 
   List<StaffData> get _filteredStaff {
     switch (_roleFilterIndex) {
@@ -258,8 +260,30 @@ class _StafTimTabState extends State<StafTimTab> {
               ],
             ),
           )
-        else
-          ...filtered.map((s) => _buildStaffCard(s)),
+        else ...[
+          Builder(
+            builder: (ctx) {
+              final total = filtered.length;
+              final maxPage = (total / 10).ceil();
+              final safePage = _currentPage.clamp(1, maxPage > 0 ? maxPage : 1);
+              final pagedStaff = paginateList(filtered, safePage, pageSize: 10);
+
+              return Column(
+                children: [
+                  for (final s in pagedStaff) _buildStaffCard(s),
+                  AppPaginationBar(
+                    currentPage: safePage,
+                    totalItems: total,
+                    pageSize: 10,
+                    itemLabel: 'karyawan',
+                    primaryColor: cDarkActive,
+                    onPageChanged: (newPage) => setState(() => _currentPage = newPage),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
 
         const SizedBox(height: 24),
       ],
@@ -317,7 +341,10 @@ class _StafTimTabState extends State<StafTimTab> {
   Widget _buildRoleFilterTab(int index, String label) {
     final sel = _roleFilterIndex == index;
     return GestureDetector(
-      onTap: () => setState(() => _roleFilterIndex = index),
+      onTap: () => setState(() {
+        _roleFilterIndex = index;
+        _currentPage = 1;
+      }),
       child: Container(
         margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),

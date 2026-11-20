@@ -13,27 +13,37 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // 1. Muat file .env sebelum inisialisasi Supabase
+  bool envLoaded = false;
   try {
     await dotenv.load(fileName: ".env");
+    envLoaded = true;
   } catch (e) {
     debugPrint('❌ [ENV ERROR] File .env tidak ditemukan atau gagal dimuat: $e');
   }
 
   // 2. Validasi keberadaan SUPABASE_URL dan SUPABASE_ANON_KEY
-  final supabaseUrl = dotenv.env['SUPABASE_URL']?.trim() ?? '';
-  final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY']?.trim() ?? '';
+  //    Jika .env gagal dimuat, gunakan nilai fallback hardcoded agar app tidak crash
+  String supabaseUrl = '';
+  String supabaseAnonKey = '';
 
+  if (envLoaded) {
+    supabaseUrl = dotenv.env['SUPABASE_URL']?.trim() ?? '';
+    supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY']?.trim() ?? '';
+  }
+
+  // Fallback jika env tidak terbaca
   if (supabaseUrl.isEmpty) {
-    debugPrint('❌ [ENV ERROR] SUPABASE_URL kosong atau tidak terdefinisi di file .env');
+    supabaseUrl = 'https://yujbnwaapualgliixsmm.supabase.co';
+    debugPrint('⚠️ [ENV] Menggunakan SUPABASE_URL fallback.');
   }
   if (supabaseAnonKey.isEmpty) {
-    debugPrint('❌ [ENV ERROR] SUPABASE_ANON_KEY kosong atau tidak terdefinisi di file .env');
+    supabaseAnonKey =
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1amJud2FhcHVhbGdsaWl4c21tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA3MTQyOTgsImV4cCI6MjEwNjI5MDI5OH0.1X577clY9bGzv0pvlcFEHu0nZa-f0BeGveOyBKk_UE8';
+    debugPrint('⚠️ [ENV] Menggunakan SUPABASE_ANON_KEY fallback.');
   }
 
-  // 3. Log hanya Project URL saat startup (JANGAN log anon key)
-  if (supabaseUrl.isNotEmpty) {
-    debugPrint('🚀 [Startup] Menghubungkan ke Supabase Project URL: $supabaseUrl');
-  }
+  // 3. Log Project URL saat startup
+  debugPrint('🚀 [Startup] Menghubungkan ke Supabase Project URL: $supabaseUrl');
 
   await SupabaseService.instance.initialize();
   await AuthService.instance.loadSavedSession();

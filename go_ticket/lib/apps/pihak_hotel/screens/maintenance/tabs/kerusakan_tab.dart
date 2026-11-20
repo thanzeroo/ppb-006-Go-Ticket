@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:go_ticket/core/widgets/app_pagination_bar.dart';
 import '../widgets/lapor_kerusakan_sheet.dart';
 import '../../../../../core/models/maintenance_ticket_model.dart';
 import '../../../../../core/services/maintenance_service.dart';
@@ -20,6 +21,7 @@ class _KerusakanTabState extends State<KerusakanTab> {
 
   List<MaintenanceTicketModel> _tickets = [];
   bool _isLoading = true;
+  int _currentPage = 1;
 
   @override
   void initState() {
@@ -212,8 +214,30 @@ class _KerusakanTabState extends State<KerusakanTab> {
                   ],
                 ),
               )
-            else
-              ..._filteredTickets.map((t) => _buildTicketCard(t)),
+            else ...[
+              Builder(
+                builder: (ctx) {
+                  final total = _filteredTickets.length;
+                  final maxPage = (total / 10).ceil();
+                  final safePage = _currentPage.clamp(1, maxPage > 0 ? maxPage : 1);
+                  final pagedTickets = paginateList(_filteredTickets, safePage, pageSize: 10);
+
+                  return Column(
+                    children: [
+                      for (final t in pagedTickets) _buildTicketCard(t),
+                      AppPaginationBar(
+                        currentPage: safePage,
+                        totalItems: total,
+                        pageSize: 10,
+                        itemLabel: 'tiket kerusakan',
+                        primaryColor: const Color(0xFF00758F),
+                        onPageChanged: (newPage) => setState(() => _currentPage = newPage),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
 
             const SizedBox(height: 14),
 

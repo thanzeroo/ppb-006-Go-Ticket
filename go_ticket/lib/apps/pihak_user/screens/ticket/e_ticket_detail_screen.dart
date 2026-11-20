@@ -1,183 +1,324 @@
 // =============================================================================
-// FILE: lib/apps/customer/screens/ticket/e_ticket_detail_screen.dart
-// RESPONSIBILITY: Halaman E-Tiket digital yang ditunjukkan Customer saat
-// Check-in di hotel. Data riil dari database (BookingModel / BookingArgs).
+// FILE: lib/apps/pihak_user/screens/ticket/e_ticket_detail_screen.dart
+// E-Tiket digital — terintegrasi dengan data dinamis, foto hotel & GT UI
 // =============================================================================
 
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../../../core/models/booking_args.dart';
 import '../../../../core/models/booking_model.dart';
-import '../../../../core/theme/text_styles.dart';
-import '../../../../core/widgets/custom_button.dart';
+import '../../../../core/widgets/gt_ui.dart';
 import '../../router/customer_router.dart';
 
 /// Halaman E-Tiket untuk Check-in Customer.
 class ETicketDetailScreen extends StatelessWidget {
   final dynamic arguments;
-
   const ETicketDetailScreen({super.key, this.arguments});
 
+  // --------------- Unpack Helpers ---------------
+
+  BookingModel? get _booking {
+    if (arguments is BookingModel) return arguments as BookingModel;
+    if (arguments is Map && arguments['booking'] is BookingModel) {
+      return arguments['booking'] as BookingModel;
+    }
+    return null;
+  }
+
+  BookingArgs? get _bookingArgs {
+    if (arguments is BookingArgs) return arguments as BookingArgs;
+    if (arguments is Map) {
+      if (arguments['args'] is BookingArgs) {
+        return arguments['args'] as BookingArgs;
+      }
+      if (arguments['args'] is Map) {
+        return BookingArgs.fromHotel(arguments['args']);
+      }
+      if (arguments['hotelName'] != null || arguments['roomName'] != null) {
+        return BookingArgs.fromHotel(arguments);
+      }
+    }
+    return null;
+  }
+
+  Map? get _argMap => arguments is Map ? (arguments as Map) : null;
+
+  // --------------- Data Getters ---------------
+
   String get hotelName {
-    if (arguments is BookingModel) return (arguments as BookingModel).hotelName;
-    if (arguments is BookingArgs) return (arguments as BookingArgs).hotelName;
-    if (arguments is Map) return arguments['hotelName']?.toString() ?? 'Hotel';
+    if (_booking != null && _booking!.hotelName.isNotEmpty) {
+      return _booking!.hotelName;
+    }
+    if (_bookingArgs != null && _bookingArgs!.hotelName.isNotEmpty) {
+      return _bookingArgs!.hotelName;
+    }
+    if (_argMap != null) {
+      final v = _argMap!['hotelName'] ??
+          _argMap!['hotel_name'] ??
+          _argMap!['nama_properti'];
+      if (v != null && v.toString().trim().isNotEmpty) {
+        return v.toString().trim();
+      }
+    }
     return 'Hotel';
   }
 
   String get hotelLocation {
-    if (arguments is BookingModel) {
-      return (arguments as BookingModel).hotelAddress ?? 'Indonesia';
+    if (_booking != null &&
+        _booking!.hotelAddress != null &&
+        _booking!.hotelAddress!.isNotEmpty) {
+      return _booking!.hotelAddress!;
     }
-    if (arguments is BookingArgs) return (arguments as BookingArgs).location;
-    if (arguments is Map) return arguments['location']?.toString() ?? 'Indonesia';
+    if (_bookingArgs != null && _bookingArgs!.location.isNotEmpty) {
+      return _bookingArgs!.location;
+    }
+    if (_argMap != null) {
+      final v = _argMap!['location'] ??
+          _argMap!['hotelAddress'] ??
+          _argMap!['alamat_lengkap'] ??
+          _argMap!['kota_wilayah'];
+      if (v != null && v.toString().trim().isNotEmpty) {
+        return v.toString().trim();
+      }
+    }
     return 'Indonesia';
   }
 
-  String get guestName {
-    if (arguments is BookingModel) {
-      final b = arguments as BookingModel;
-      return b.customerName.isNotEmpty ? b.customerName : 'Tamu Go Ticket';
+  String get hotelImageUrl {
+    if (_booking != null &&
+        _booking!.hotelImageUrl != null &&
+        _booking!.hotelImageUrl!.isNotEmpty) {
+      return _booking!.hotelImageUrl!;
     }
-    if (arguments is BookingArgs) {
-      final b = arguments as BookingArgs;
-      return b.guestName.isNotEmpty ? b.guestName : 'Tamu Go Ticket';
+    if (_bookingArgs != null && _bookingArgs!.imageUrl.isNotEmpty) {
+      return _bookingArgs!.imageUrl;
+    }
+    if (_argMap != null) {
+      final v = _argMap!['hotelImageUrl'] ??
+          _argMap!['imageUrl'] ??
+          _argMap!['main_image_url'] ??
+          _argMap!['thumbnail_url'];
+      if (v != null && v.toString().trim().isNotEmpty) {
+        return v.toString().trim();
+      }
+    }
+    return '';
+  }
+
+  String get guestName {
+    if (_booking != null && _booking!.customerName.isNotEmpty) {
+      return _booking!.customerName;
+    }
+    if (_bookingArgs != null && _bookingArgs!.guestName.isNotEmpty) {
+      return _bookingArgs!.guestName;
+    }
+    if (_argMap != null) {
+      final v = _argMap!['guestName'] ??
+          _argMap!['customerName'] ??
+          _argMap!['nama_tamu'];
+      if (v != null && v.toString().trim().isNotEmpty) {
+        return v.toString().trim();
+      }
     }
     return 'Tamu Go Ticket';
   }
 
   String get bookingCode {
-    if (arguments is BookingModel) return (arguments as BookingModel).bookingCode;
-    if (arguments is BookingArgs) {
-      return 'GT-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+    if (_booking != null && _booking!.bookingCode.isNotEmpty) {
+      return _booking!.bookingCode;
+    }
+    if (_argMap != null) {
+      final v = _argMap!['bookingCode'] ?? _argMap!['booking_code'];
+      if (v != null && v.toString().trim().isNotEmpty) {
+        return v.toString().trim();
+      }
     }
     return 'GT-RESERVASI';
   }
 
   String get roomName {
-    if (arguments is BookingModel) return (arguments as BookingModel).roomTypeName;
-    if (arguments is BookingArgs) return (arguments as BookingArgs).roomName;
+    if (_booking != null && _booking!.roomTypeName.isNotEmpty) {
+      return _booking!.roomTypeName;
+    }
+    if (_bookingArgs != null && _bookingArgs!.roomName.isNotEmpty) {
+      return _bookingArgs!.roomName;
+    }
+    if (_argMap != null) {
+      final v = _argMap!['roomName'] ??
+          _argMap!['roomTypeName'] ??
+          _argMap!['nama_tipe'];
+      if (v != null && v.toString().trim().isNotEmpty) {
+        return v.toString().trim();
+      }
+    }
     return 'Standard Room';
   }
 
   String get roomNumber {
-    if (arguments is BookingModel) {
-      return (arguments as BookingModel).roomNumber ?? '003';
+    if (_booking != null &&
+        _booking!.roomNumber != null &&
+        _booking!.roomNumber!.isNotEmpty) {
+      return _booking!.roomNumber!;
     }
-    if (arguments is Map && arguments['roomNumber'] != null) {
-      return arguments['roomNumber'].toString();
+    if (_argMap != null && _argMap!['roomNumber'] != null) {
+      return _argMap!['roomNumber'].toString();
     }
     return '003';
   }
 
   String get dateRange {
-    if (arguments is BookingModel) {
-      final b = arguments as BookingModel;
-      return '${b.checkInDate.day}/${b.checkInDate.month}/${b.checkInDate.year} – ${b.checkOutDate.day}/${b.checkOutDate.month}/${b.checkOutDate.year}';
+    if (_booking != null) {
+      final b = _booking!;
+      return '${b.checkInDate.day}/${b.checkInDate.month}/${b.checkInDate.year}'
+          ' – ${b.checkOutDate.day}/${b.checkOutDate.month}/${b.checkOutDate.year}';
     }
-    if (arguments is BookingArgs) return (arguments as BookingArgs).dateRange;
-    return '-';
+    if (_bookingArgs != null &&
+        _bookingArgs!.dateRange.isNotEmpty &&
+        _bookingArgs!.dateRange != '-') {
+      return _bookingArgs!.dateRange;
+    }
+    if (_argMap != null && _argMap!['dateRange'] != null) {
+      return _argMap!['dateRange'].toString();
+    }
+    final now = DateTime.now();
+    final checkOut = now.add(const Duration(days: 2));
+    return '${now.day}/${now.month}/${now.year} – ${checkOut.day}/${checkOut.month}/${checkOut.year}';
   }
 
   String get guestCount {
-    if (arguments is BookingModel) {
-      final b = arguments as BookingModel;
+    if (_booking != null) {
+      final b = _booking!;
       return '${b.guestCount} Tamu (${b.totalNights} Malam)';
     }
-    if (arguments is BookingArgs) {
-      final b = arguments as BookingArgs;
-      return '${b.adults} Dewasa${b.children > 0 ? ', ${b.children} Anak' : ''}';
+    if (_bookingArgs != null) {
+      final b = _bookingArgs!;
+      final night = b.nights > 0 ? ' (${b.nights} Malam)' : '';
+      return '${b.adults} Dewasa${b.children > 0 ? ', ${b.children} Anak' : ''}$night';
     }
-    return '2 Tamu';
+    return '2 Tamu (2 Malam)';
   }
 
   String get qrData {
-    if (arguments is BookingModel) {
-      final b = arguments as BookingModel;
-      return b.qrCodeData ?? '${b.bookingCode}-CHECKIN';
+    if (_booking != null &&
+        _booking!.qrCodeData != null &&
+        _booking!.qrCodeData!.isNotEmpty) {
+      return _booking!.qrCodeData!;
     }
     return '$bookingCode-CHECKIN';
   }
 
+  // --------------- Build ---------------
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
+      backgroundColor: GT.bg,
       appBar: AppBar(
-        title: const Text('E-Tiket'),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: GT.teal),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text('E-Tiket',
+            style: TextStyle(
+                color: GT.ink, fontWeight: FontWeight.w800, fontSize: 17)),
         actions: [
           IconButton(
             onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Tautan E-Tiket disalin'))),
-            icon: const Icon(Icons.share_outlined),
+            icon: const Icon(Icons.share_outlined, color: GT.teal),
           ),
           IconButton(
             onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('E-Tiket sedang diunduh'))),
-            icon: const Icon(Icons.download_outlined),
+            icon: const Icon(Icons.download_outlined, color: GT.teal),
           ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         child: Column(
           children: [
-            // Status badge
-            _buildStatusBadge(),
-            const SizedBox(height: 20),
+            // ---- Status badge ----
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF16A34A).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFF16A34A)),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check_circle_rounded,
+                      size: 16, color: Color(0xFF16A34A)),
+                  SizedBox(width: 6),
+                  Text('Booking Dikonfirmasi',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF16A34A))),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
 
-            // E-Tiket card
+            // ---- Tiket card ----
             _buildTicketCard(),
+            const SizedBox(height: 14),
+
+            // ---- QR Code check-in ----
+            _buildQrSection(),
+            const SizedBox(height: 14),
+
+            // ---- Instruksi check-in ----
+            _buildCheckinInfo(),
             const SizedBox(height: 20),
 
-            // QR Code utama
-            _buildQrCodeSection(),
-            const SizedBox(height: 20),
-
-            // Instruksi check-in
-            _buildCheckinInstructions(),
-            const SizedBox(height: 24),
-
-            // Tombol aksi
-            _buildActions(context),
+            // ---- Tombol aksi ----
+            GTButton(
+              label: 'Lihat Detail Reservasi',
+              leading: Icons.receipt_long_outlined,
+              onTap: () => Navigator.pushNamed(
+                context,
+                CustomerRouter.reservationDetail,
+                arguments: arguments,
+              ),
+            ),
+            const SizedBox(height: 10),
+            GTButton(
+              label: 'Kembali ke Beranda',
+              leading: Icons.home_outlined,
+              color: Colors.white,
+              textColor: GT.teal,
+              onTap: () => Navigator.of(context).pushNamedAndRemoveUntil(
+                CustomerRouter.dashboard,
+                (r) => false,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStatusBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.statusConfirmed.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.statusConfirmed),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.check_circle_rounded,
-              size: 18, color: AppColors.statusConfirmed),
-          const SizedBox(width: 6),
-          Text('Booking Dikonfirmasi',
-              style: AppTextStyles.labelMedium
-                  .copyWith(color: AppColors.statusConfirmed)),
-        ],
-      ),
-    );
-  }
-
+  // ---- Ticket card dengan foto hotel & gradient header ----
   Widget _buildTicketCard() {
+    final photo = hotelImageUrl;
+    final isLocal = photo.startsWith('/') || photo.startsWith('file://');
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: GT.teal.withValues(alpha: 0.08),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -185,44 +326,102 @@ class ETicketDetailScreen extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Header tiket — gradient
-          Container(
-            width: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: AppColors.primaryGradient,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            padding: const EdgeInsets.all(20),
-            child: Column(
+          // Header dengan foto hotel / gradient
+          ClipRRect(
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(20)),
+            child: Stack(
               children: [
-                const Icon(Icons.hotel_rounded,
-                    color: AppColors.white, size: 32),
-                const SizedBox(height: 8),
-                Text(
-                  hotelName,
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.headlineSmall
-                      .copyWith(color: AppColors.white),
+                // Background image or gradient
+                if (photo.isNotEmpty && !isLocal)
+                  Image.network(
+                    photo,
+                    height: 130,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _fallbackHeader(),
+                  )
+                else if (photo.isNotEmpty && isLocal)
+                  Image.file(
+                    File(photo.replaceFirst('file://', '')),
+                    height: 130,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _fallbackHeader(),
+                  )
+                else
+                  _fallbackHeader(),
+
+                // Dark gradient overlay
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.25),
+                          Colors.black.withValues(alpha: 0.78),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  hotelLocation,
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.bodySmall
-                      .copyWith(color: AppColors.white.withValues(alpha: 0.8)),
+
+                // Hotel Name and Address
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  bottom: 14,
+                  child: Column(
+                    children: [
+                      Text(
+                        hotelName,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.location_on,
+                              size: 13, color: Colors.white70),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              hotelLocation,
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.9),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
 
-          // Dotted line divider
+          // Dotted divider
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.symmetric(vertical: 10),
             child: Row(
               children: [
-                _buildCircleClip(isLeft: true),
+                _clip(isLeft: true),
                 Expanded(
-                  child: LayoutBuilder(builder: (context, constraints) {
+                  child: LayoutBuilder(builder: (ctx, constraints) {
                     return Flex(
                       direction: Axis.horizontal,
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -232,47 +431,29 @@ class ETicketDetailScreen extends StatelessWidget {
                           width: 4,
                           height: 1,
                           child: DecoratedBox(
-                            decoration: BoxDecoration(color: AppColors.grey300),
+                            decoration: BoxDecoration(color: GT.soft),
                           ),
                         ),
                       ),
                     );
                   }),
                 ),
-                _buildCircleClip(isLeft: false),
+                _clip(isLeft: false),
               ],
             ),
           ),
 
-          // Detail booking
+          // Detail baris
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
             child: Column(
               children: [
-                _buildTicketRow(
-                  'Nama Tamu',
-                  guestName,
-                ),
-                _buildTicketRow(
-                  'Kode Booking',
-                  bookingCode,
-                ),
-                _buildTicketRow(
-                  'Tipe Kamar',
-                  roomName,
-                ),
-                _buildTicketRow(
-                  'Nomor Kamar',
-                  'Kamar $roomNumber',
-                ),
-                _buildTicketRow(
-                  'Jadwal Menginap',
-                  dateRange,
-                ),
-                _buildTicketRow(
-                  'Jumlah Tamu',
-                  guestCount,
-                ),
+                _row('Nama Tamu', guestName),
+                _row('Kode Booking', bookingCode),
+                _row('Tipe Kamar', roomName),
+                _row('Nomor Kamar', 'Kamar $roomNumber'),
+                _row('Jadwal Menginap', dateRange),
+                _row('Jumlah Tamu', guestCount),
               ],
             ),
           ),
@@ -281,12 +462,29 @@ class ETicketDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCircleClip({required bool isLeft}) {
+  Widget _fallbackHeader() {
+    return Container(
+      height: 130,
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF00677F), Color(0xFF00C7F2)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: const Center(
+        child: Icon(Icons.hotel_rounded, color: Colors.white24, size: 48),
+      ),
+    );
+  }
+
+  Widget _clip({required bool isLeft}) {
     return Container(
       width: 16,
       height: 32,
       decoration: BoxDecoration(
-        color: AppColors.backgroundLight,
+        color: GT.bg,
         borderRadius: BorderRadius.horizontal(
           left: isLeft ? Radius.zero : const Radius.circular(16),
           right: isLeft ? const Radius.circular(16) : Radius.zero,
@@ -295,75 +493,67 @@ class ETicketDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTicketRow(String label, String value) {
+  Widget _row(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
-              style:
-                  AppTextStyles.bodyMedium.copyWith(color: AppColors.grey600)),
+          Expanded(
+            child: Text(label,
+                style: const TextStyle(fontSize: 13, color: GT.body)),
+          ),
           Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              style: AppTextStyles.labelLarge
-                  .copyWith(fontWeight: FontWeight.w600),
-            ),
+            child: Text(value,
+                textAlign: TextAlign.end,
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: GT.ink)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildQrCodeSection() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+  // ---- QR Code section ----
+  Widget _buildQrSection() {
+    return GTCard(
       child: Column(
         children: [
-          Text('Tunjukkan QR Code ini saat Check-in',
-              style: AppTextStyles.titleMedium),
-          const SizedBox(height: 6),
-          Text('Staff FO akan memindai untuk validasi reservasi',
-              style:
-                  AppTextStyles.bodySmall.copyWith(color: AppColors.grey600)),
-          const SizedBox(height: 20),
+          const Text('Tunjukkan QR Code ini saat Check-in',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: GT.ink)),
+          const SizedBox(height: 4),
+          const Text('Staff FO akan memindai untuk validasi reservasi',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11, color: GT.muted)),
+          const SizedBox(height: 16),
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.white,
+              color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.grey300, width: 2),
+              border: Border.all(color: GT.soft, width: 2),
             ),
             child: Column(
               children: [
-                const Icon(
-                  Icons.qr_code_2_rounded,
-                  size: 160,
-                  color: AppColors.primary,
+                QrImageView(
+                  data: qrData,
+                  version: QrVersions.auto,
+                  size: 180,
+                  backgroundColor: Colors.white,
+                  errorCorrectionLevel: QrErrorCorrectLevel.M,
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  bookingCode,
-                  style: AppTextStyles.labelMedium.copyWith(
-                    fontFamily: 'monospace',
-                    letterSpacing: 2,
-                    color: AppColors.grey600,
-                  ),
-                ),
+                Text(bookingCode,
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.5,
+                        color: GT.muted)),
               ],
             ),
           ),
@@ -372,75 +562,52 @@ class ETicketDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCheckinInstructions() {
-    final instructions = [
+  // ---- Instruksi check-in ----
+  Widget _buildCheckinInfo() {
+    final items = [
       'Waktu check-in standar mulai pukul 14:00 waktu setempat.',
       'Siapkan KTP/Paspor asli yang sesuai dengan nama pada tiket.',
       'Deposit dapat diperlukan saat check-in sesuai kebijakan hotel.',
       'Hubungi Front Office jika Anda tiba lebih lambat dari jadwal.',
     ];
-
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.infoLight,
+        color: GT.sky.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+        border: Border.all(color: GT.teal.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.info_outline_rounded,
-                  size: 18, color: AppColors.primary),
-              const SizedBox(width: 8),
-              Text('Petunjuk Check-in',
-                  style: AppTextStyles.titleSmall
-                      .copyWith(color: AppColors.primary)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ...instructions.map((inst) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
+          const Row(children: [
+            Icon(Icons.info_outline_rounded, size: 16, color: GT.teal),
+            SizedBox(width: 6),
+            Text('Petunjuk Check-in',
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: GT.teal)),
+          ]),
+          const SizedBox(height: 10),
+          ...items.map((inst) => Padding(
+                padding: const EdgeInsets.only(bottom: 5),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text('• ',
                         style: TextStyle(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.bold)),
+                            color: GT.teal, fontWeight: FontWeight.bold)),
                     Expanded(
                       child: Text(inst,
-                          style: AppTextStyles.bodySmall
-                              .copyWith(color: AppColors.grey700)),
+                          style: const TextStyle(
+                              fontSize: 12, color: GT.body, height: 1.4)),
                     ),
                   ],
                 ),
               )),
         ],
       ),
-    );
-  }
-
-  Widget _buildActions(BuildContext context) {
-    return Column(
-      children: [
-        GoTicketButton(
-          label: 'Lihat Detail Reservasi',
-          icon: Icons.receipt_long_outlined,
-          onPressed: () => Navigator.pushNamed(
-            context,
-            CustomerRouter.reservationDetail,
-            arguments: arguments,
-          ),
-        ),
-        const SizedBox(height: 10),
-        GoTicketOutlinedButton(
-          label: 'Kembali ke Beranda',
-          onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
-        ),
-      ],
     );
   }
 }

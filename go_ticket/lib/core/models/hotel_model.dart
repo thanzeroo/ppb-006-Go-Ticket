@@ -234,6 +234,46 @@ class HotelModel {
   String? get cancellationPolicy => _cancellationPolicy;
 
   // ---------------------------------------------------------------------------
+  // STATIC UTILS UNTUK RESOLVE FOTO & PENYIMPANAN CLOUD
+  // ---------------------------------------------------------------------------
+
+  static String extractStorageName(String urlOrPath) {
+    if (urlOrPath.contains('/storage/v1/object/public/avatars/')) {
+      return urlOrPath
+          .split('/storage/v1/object/public/avatars/')
+          .last
+          .split('?')
+          .first;
+    }
+    if (urlOrPath.contains('/avatars/')) {
+      return urlOrPath.split('/avatars/').last.split('?').first;
+    }
+    if (urlOrPath.length > 90) {
+      final uri = Uri.tryParse(urlOrPath);
+      if (uri != null && uri.pathSegments.isNotEmpty) {
+        final last = uri.pathSegments.last;
+        if (last.length <= 90) return last;
+      }
+      return urlOrPath.substring(0, 90);
+    }
+    return urlOrPath;
+  }
+
+  static String resolvePhotoUrl(String? nameOrUrl) {
+    if (nameOrUrl == null || nameOrUrl.trim().isEmpty) {
+      return 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800';
+    }
+    final trimmed = nameOrUrl.trim();
+    if (trimmed.startsWith('http://') ||
+        trimmed.startsWith('https://') ||
+        trimmed.startsWith('file://') ||
+        trimmed.startsWith('/')) {
+      return trimmed;
+    }
+    return 'https://yujbnwaapualgliixsmm.supabase.co/storage/v1/object/public/avatars/$trimmed';
+  }
+
+  // ---------------------------------------------------------------------------
   // SERIALIZATION
   // ---------------------------------------------------------------------------
 
@@ -247,6 +287,102 @@ class HotelModel {
         lng = double.tryParse(parts[1].trim());
       }
     }
+
+    // Resolusi foto dan fasilitas dari relasi fasilitas_properti (Supabase Join)
+    String? resolvedMainImage = json['main_image_url'] ??
+        json['thumbnail_url'] ??
+        json['image'] ??
+        json['foto_utama'];
+    final List<String> resolvedGallery = [];
+    final List<String> resolvedAmenities = [];
+
+    if (json['fasilitas_properti'] is List) {
+      final facList = json['fasilitas_properti'] as List;
+      for (final item in facList) {
+        if (item is Map) {
+          final cat = (item['kategori_fasilitas'] ?? '')
+              .toString()
+              .toLowerCase()
+              .trim();
+          final name = (item['nama_fasilitas'] ?? '').toString().trim();
+          if (name.isEmpty) continue;
+
+          if (cat == 'foto_utama') {
+            resolvedMainImage = resolvePhotoUrl(name);
+          } else if (cat == 'foto_galeri') {
+            resolvedGallery.add(resolvePhotoUrl(name));
+          } else {
+            resolvedAmenities.add(name);
+          }
+        }
+      }
+    }
+
+    // Fallback gallery dari json jika ada
+    if (json['image_urls'] is List) {
+      for (final u in (json['image_urls'] as List)) {
+        final r = resolvePhotoUrl(u.toString());
+        if (!resolvedGallery.contains(r)) resolvedGallery.add(r);
+      }
+    } else if (json['photo_urls'] is List) {
+      for (final u in (json['photo_urls'] as List)) {
+        final r = resolvePhotoUrl(u.toString());
+        if (!resolvedGallery.contains(r)) resolvedGallery.add(r);
+      }
+    }
+
+    if (resolvedMainImage == null || resolvedMainImage.isEmpty) {
+      if (resolvedGallery.isNotEmpty) {
+        resolvedMainImage = resolvedGallery.first;
+      } else {
+        resolvedMainImage =
+            'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600';
+      }
+    }
+
+    if (resolvedGallery.isEmpty) {
+      resolvedGallery.add(resolvedMainImage);
+    }
+
+    // Hitung startingPrice & totalRooms dari tipe_kamar jika di-join
+    int? resolvedStartingPrice = (json['starting_price'] as num?)?.toInt() ??
+        (json['deposit_nominal'] as num?)?.toInt() ??
+        (json['harga_dasar'] as num?)?.toInt();
+    int? resolvedTotalRooms =
+        json['total_rooms'] != null ? (json['total_rooms'] as num).toInt() : null;
+
+    if (json['tipe_kamar'] is List && (json['tipe_kamar'] as List).isNotEmpty) {
+      final rooms = json['tipe_kamar'] as List;
+      int minPrice = 999999999;
+      int sumRooms = 0;
+      for (final r in rooms) {
+        if (r is Map) {
+          final price = (r['harga_dasar'] as num?)?.toInt() ??
+              (r['weekdayPrice'] as num?)?.toInt();
+          if (price != null && price > 0 && price < minPrice) {
+            minPrice = price;
+          }
+          final units = (r['total_unit'] as num?)?.toInt() ??
+              (r['totalUnit'] as num?)?.toInt() ??
+              1;
+          sumRooms += units;
+        }
+      }
+      if (minPrice < 999999999) {
+        resolvedStartingPrice = minPrice;
+      }
+      if (sumRooms > 0) {
+        resolvedTotalRooms = sumRooms;
+      }
+    }
+
+    // Fasilitas
+    List<String> finalAmenities = resolvedAmenities.isNotEmpty
+        ? resolvedAmenities
+        : (json['amenities'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            const ['WiFi Cepat', 'Kolam Renang', 'Parkir Gratis', 'AC'];
 
     return HotelModel(
       id: json['id']?.toString() ?? json['id_penginapan']?.toString() ?? '',
@@ -268,39 +404,28 @@ class HotelModel {
           json['whatsapp'],
       email: json['email'],
       website: json['website'],
-      mainImageUrl: json['main_image_url'] ??
-          json['thumbnail_url'] ??
-          json['image'] ??
-          'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600',
-      imageUrls: (json['image_urls'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          (json['photo_urls'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          const [
-            'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800',
-            'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=800'
-          ],
-      amenities: (json['amenities'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          const ['WiFi Cepat', 'Kolam Renang', 'Parkir Gratis', 'AC'],
+      mainImageUrl: resolvedMainImage,
+      imageUrls: resolvedGallery,
+      amenities: finalAmenities,
       rating: (json['rating'] as num?)?.toDouble() ?? 4.8,
       reviewCount: json['review_count'] ?? 142,
-      status: (json['status_operasional'] ?? json['status'])?.toString().toLowerCase().contains('aktif') == true
+      status: (json['status_operasional'] ?? json['status'])
+                  ?.toString()
+                  .toLowerCase()
+                  .contains('aktif') ==
+              true
           ? HotelStatus.active
           : HotelStatusExtension.fromString(json['status'] ?? 'active'),
       adminUserId: json['admin_user_id']?.toString(),
-      startingPrice: (json['starting_price'] as num?)?.toInt() ??
-          (json['deposit_nominal'] as num?)?.toInt() ??
-          (json['harga_dasar'] as num?)?.toInt() ??
-          350000,
-      totalRooms: json['total_rooms'] ?? 20,
+      startingPrice: resolvedStartingPrice ?? 350000,
+      totalRooms: resolvedTotalRooms ?? 20,
       whatsapp: json['whatsapp']?.toString(),
-      checkInTime: json['waktu_checkin']?.toString() ?? json['check_in_time']?.toString(),
-      checkOutTime: json['waktu_checkout']?.toString() ?? json['check_out_time']?.toString(),
-      cancellationPolicy: json['kebijakan_batal']?.toString() ?? json['cancellation_policy']?.toString(),
+      checkInTime: json['waktu_checkin']?.toString() ??
+          json['check_in_time']?.toString(),
+      checkOutTime: json['waktu_checkout']?.toString() ??
+          json['check_out_time']?.toString(),
+      cancellationPolicy: json['kebijakan_batal']?.toString() ??
+          json['cancellation_policy']?.toString(),
       registeredAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'])
           : null,

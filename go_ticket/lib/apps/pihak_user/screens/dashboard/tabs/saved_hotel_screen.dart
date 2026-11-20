@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:go_ticket/core/widgets/app_pagination_bar.dart';
 import 'package:go_ticket/core/services/auth_service.dart';
 import 'package:go_ticket/core/services/customer_data_service.dart';
 import 'package:go_ticket/core/utils/currency_formatter.dart';
@@ -66,6 +67,7 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
 
   List<Map<String, dynamic>> _hotels = [];
   bool _isLoading = true;
+  int _currentPage = 1;
 
   @override
   void initState() {
@@ -347,11 +349,31 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
                           ),
                         ),
                       )
-                    : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                        itemCount: filteredHotels.length,
-                        itemBuilder: (ctx, i) =>
-                            _buildHotelCard(filteredHotels[i]),
+                    : Builder(
+                        builder: (ctx) {
+                          final total = filteredHotels.length;
+                          final maxPage = (total / 10).ceil();
+                          final safePage = _currentPage.clamp(1, maxPage > 0 ? maxPage : 1);
+                          final pagedHotels = paginateList(filteredHotels, safePage, pageSize: 10);
+
+                          return ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                            itemCount: pagedHotels.length + (total > 0 ? 1 : 0),
+                            itemBuilder: (ctx, i) {
+                              if (i < pagedHotels.length) {
+                                return _buildHotelCard(pagedHotels[i]);
+                              }
+                              return AppPaginationBar(
+                                currentPage: safePage,
+                                totalItems: total,
+                                pageSize: 10,
+                                itemLabel: 'hotel tersimpan',
+                                primaryColor: const Color(0xFF00B4D8),
+                                onPageChanged: (p) => setState(() => _currentPage = p),
+                              );
+                            },
+                          );
+                        },
                       ),
           ),
         ],

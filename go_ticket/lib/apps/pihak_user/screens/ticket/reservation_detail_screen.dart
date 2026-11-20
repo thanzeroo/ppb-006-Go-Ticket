@@ -46,12 +46,35 @@ class _ReservationDetailScreenState extends State<ReservationDetailScreen> {
     }
   }
 
-  String get _hotelName => _booking?.hotelName ?? _args?.hotelName ?? 'Hotel';
-  String get _hotelAddress => _booking?.hotelAddress ?? _args?.location ?? 'Indonesia';
-  String get _roomTypeName => _booking?.roomTypeName ?? _args?.roomName ?? 'Standard Room';
-  String get _roomNumber => _booking?.roomNumber ?? (widget.arguments is Map ? widget.arguments['roomNumber']?.toString() : null) ?? '003';
-  String get _bookingCode => _booking?.bookingCode ?? 'GT-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
-  String get _guestName => _booking?.customerName.isNotEmpty == true ? _booking!.customerName : (_args?.guestName.isNotEmpty == true ? _args!.guestName : 'Tamu Go Ticket');
+  String get _hotelName =>
+      _booking?.hotelName ??
+      _args?.hotelName ??
+      (widget.arguments is Map ? widget.arguments['hotelName']?.toString() : null) ??
+      'Hotel';
+  String get _hotelAddress =>
+      _booking?.hotelAddress ??
+      _args?.location ??
+      (widget.arguments is Map ? widget.arguments['location']?.toString() : null) ??
+      'Indonesia';
+  String get _roomTypeName =>
+      _booking?.roomTypeName ??
+      _args?.roomName ??
+      (widget.arguments is Map ? widget.arguments['roomName']?.toString() : null) ??
+      'Standard Room';
+  String get _roomNumber =>
+      _booking?.roomNumber ??
+      (widget.arguments is Map ? widget.arguments['roomNumber']?.toString() : null) ??
+      '003';
+  String get _bookingCode =>
+      _booking?.bookingCode ??
+      (widget.arguments is Map ? widget.arguments['bookingCode']?.toString() : null) ??
+      'GT-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+  String get _guestName => _booking?.customerName.isNotEmpty == true
+      ? _booking!.customerName
+      : (_args?.guestName.isNotEmpty == true
+          ? _args!.guestName
+          : ((widget.arguments is Map ? widget.arguments['guestName']?.toString() : null) ??
+              'Tamu Go Ticket'));
   String get _guestPhone => _booking?.customerPhone ?? _args?.phone ?? '-';
   int get _nights => _booking?.totalNights ?? _args?.nights ?? 1;
   int get _guestCount => _booking?.guestCount ?? ((_args?.adults ?? 2) + (_args?.children ?? 0));

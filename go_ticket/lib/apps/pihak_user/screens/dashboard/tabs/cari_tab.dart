@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:go_ticket/core/widgets/app_pagination_bar.dart';
 import 'package:go_ticket/core/services/auth_service.dart';
 import 'package:go_ticket/core/services/customer_data_service.dart';
 import 'package:go_ticket/core/services/hotel_service.dart';
@@ -41,25 +42,12 @@ class _CariTabState extends State<CariTab> {
   final Set<String> _savedHotelIds = {};
   bool _isLoading = false;
   String _sort = 'Terpopuler';
-  int _currentLimit = 10;
+  int _currentPage = 1;
 
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(_onScroll);
     _fetchHotels();
-  }
-
-  void _onScroll() {
-    if (_scrollController.hasClients &&
-        _scrollController.position.pixels >=
-            _scrollController.position.maxScrollExtent - 250) {
-      if (_currentLimit < _visibleHotels.length) {
-        setState(() {
-          _currentLimit += 10;
-        });
-      }
-    }
   }
 
   Future<void> _toggleSave(Map<String, dynamic> hotel) async {
@@ -363,8 +351,10 @@ class _CariTabState extends State<CariTab> {
   @override
   Widget build(BuildContext context) {
     final visibleHotels = _visibleHotels;
-    final displayedHotels = visibleHotels.take(_currentLimit).toList();
-    final hasMore = visibleHotels.length > displayedHotels.length;
+    final total = visibleHotels.length;
+    final maxPage = (total / 10).ceil();
+    final safePage = _currentPage.clamp(1, maxPage > 0 ? maxPage : 1);
+    final displayedHotels = paginateList(visibleHotels, safePage, pageSize: 10);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
@@ -392,40 +382,26 @@ class _CariTabState extends State<CariTab> {
                         : ListView.builder(
                             controller: _scrollController,
                             padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                            itemCount: displayedHotels.length + (hasMore ? 1 : 0),
+                            itemCount: displayedHotels.length + (total > 0 ? 1 : 0),
                             itemBuilder: (context, index) {
-                              if (index == displayedHotels.length) {
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  child: Center(
-                                    child: OutlinedButton.icon(
-                                      onPressed: () {
-                                        setState(() {
-                                          _currentLimit += 10;
-                                        });
-                                      },
-                                      style: OutlinedButton.styleFrom(
-                                        side: const BorderSide(
-                                            color: Color(0xFF00B4D8)),
-                                        shape: const StadiumBorder(),
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 18, vertical: 10),
-                                      ),
-                                      icon: const Icon(Icons.arrow_downward,
-                                          size: 16, color: Color(0xFF00B4D8)),
-                                      label: Text(
-                                        'Muat 10 Penginapan Berikutnya (${displayedHotels.length}/${visibleHotels.length})',
-                                        style: GoogleFonts.inter(
-                                          color: const Color(0xFF00B4D8),
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                );
+                              if (index < displayedHotels.length) {
+                                return _buildHotelCard(displayedHotels[index]);
                               }
-                              return _buildHotelCard(displayedHotels[index]);
+                              return AppPaginationBar(
+                                currentPage: safePage,
+                                totalItems: total,
+                                pageSize: 10,
+                                itemLabel: 'penginapan',
+                                primaryColor: const Color(0xFF00B4D8),
+                                onPageChanged: (newPage) {
+                                  setState(() => _currentPage = newPage);
+                                  _scrollController.animateTo(
+                                    0,
+                                    duration: const Duration(milliseconds: 300),
+                                    curve: Curves.easeOut,
+                                  );
+                                },
+                              );
                             },
                           ),
               ),
@@ -515,7 +491,7 @@ class _CariTabState extends State<CariTab> {
                         controller: _searchController,
                         onChanged: (value) => setState(() {
                           _searchQuery = value;
-                          _currentLimit = 10;
+                          _currentPage = 1;
                         }),
                         decoration: InputDecoration(
                           hintText: 'Cari nama hotel, kota, atau fasilitas...',
@@ -535,7 +511,7 @@ class _CariTabState extends State<CariTab> {
                                     _searchController.clear();
                                     setState(() {
                                       _searchQuery = '';
-                                      _currentLimit = 10;
+                                      _currentPage = 1;
                                     });
                                   },
                                   icon: const Icon(Icons.close, size: 18),

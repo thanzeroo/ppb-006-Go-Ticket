@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../../core/config/supabase_config.dart';
@@ -2327,6 +2329,8 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
           latitude: lat,
           longitude: long,
           mainImageUrl: mainImage,
+          imageUrls: finalPhotoUrls,
+          facilities: activeFacilities,
           ptName: _ptNameController.text.trim(),
           npwp: _npwpController.text.trim(),
           nib: _nibController.text.trim(),
@@ -2335,7 +2339,9 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
         // Update/insert kamar baru jika diedit
         final parsedHotelId = int.tryParse(hotelId) ?? 0;
         if (parsedHotelId > 0 && roomTypesPayload.isNotEmpty) {
-          final sb = SupabaseService.instance;
+          final svcKey = SupabaseConfig.supabaseServiceRoleKey.isNotEmpty
+              ? SupabaseConfig.supabaseServiceRoleKey
+              : SupabaseConfig.activeApiKey;
           for (int i = 0; i < roomTypesPayload.length; i++) {
             final r = roomTypesPayload[i];
             final rName = r['name'] as String;
@@ -2344,7 +2350,14 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
             final activeRoomAmenities =
                 (r['amenities'] as List<String>).join(', ');
             try {
-              await sb.table(SupabaseConfig.tableTipeKamar)?.insert({
+              final uri = Uri.parse(
+                  '${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableTipeKamar}');
+              await http.post(uri, headers: {
+                'apikey': svcKey,
+                'Authorization': 'Bearer $svcKey',
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal',
+              }, body: jsonEncode({
                 'id_tipe_kamar': uniqueRoomTypeId,
                 'id_penginapan': parsedHotelId,
                 'nama_tipe': rName,
@@ -2355,7 +2368,7 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
                 'harga_weekend': r['weekendPrice'],
                 'total_unit': r['totalUnit'],
                 'fasilitas_kamar': activeRoomAmenities,
-              });
+              }));
             } catch (_) {}
           }
         }

@@ -1,16 +1,18 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import 'package:go_ticket/core/models/booking_args.dart';
 import 'package:go_ticket/core/models/booking_model.dart';
 import 'package:go_ticket/core/services/auth_service.dart';
 import 'package:go_ticket/core/services/booking_service.dart';
+import 'package:go_ticket/core/services/qris_service.dart';
 import '../../router/customer_router.dart';
 import '../../services/user_booking_storage.dart';
 import 'package:go_ticket/core/widgets/gt_ui.dart';
 
-/// Pembayaran (Figma: "USER Page Payment").
+/// Layar pembayaran — hanya QRIS Dinamis.
 class PaymentProcessScreen extends StatefulWidget {
   final dynamic arguments;
   const PaymentProcessScreen({super.key, this.arguments});
@@ -26,19 +28,8 @@ class _PaymentProcessScreenState extends State<PaymentProcessScreen> {
   Timer? _timer;
   int _secs = 14 * 60 + 59;
 
-  int _method = 0;
-  int? _open = 0;
-
-  static const _methods = [
-    ['E-Wallet & QRIS Instan', 'Konfirmasi otomatis tanpa upload bukti',
-      'QRIS / GoPay Instan'],
-    ['Virtual Account Bank', 'BCA, Mandiri, BNI, BRI & Permata',
-      'Virtual Account Bank'],
-    ['Kartu Kredit / Debit', 'Visa, Mastercard, JCB & AMEX',
-      'Kartu Kredit / Debit'],
-    ['PayLater & Cicilan', 'Liburan sekarang, bayar bulan depan',
-      'PayLater & Cicilan'],
-  ];
+  // ---- State untuk bottom sheet QRIS ----
+  bool _paying = false;
 
   @override
   void initState() {
@@ -50,6 +41,10 @@ class _PaymentProcessScreenState extends State<PaymentProcessScreen> {
         (widget.arguments is Map && widget.arguments['roomNumber'] != null)
             ? widget.arguments['roomNumber'].toString()
             : '003';
+    _startTimer();
+  }
+
+  void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) return;
       if (_secs <= 1) {
@@ -68,6 +63,7 @@ class _PaymentProcessScreenState extends State<PaymentProcessScreen> {
   }
 
   void _expired() {
+    if (!mounted) return;
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -94,14 +90,39 @@ class _PaymentProcessScreenState extends State<PaymentProcessScreen> {
     return '$m:$s';
   }
 
-  Future<void> _pay() async {
-    _timer?.cancel();
-    final paymentMethodName = _methods[_method][2];
-    final user = AuthService.instance.currentUser;
-    final bookingCode =
-        'GT-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+  // ---- Tampilkan bottom sheet QR sebelum konfirmasi ----
+  void _showQrisSheet() {
+    final qrisData =
+        QrisService.convertToDynamic(_args.total.round());
 
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _QrisBottomSheet(
+        qrisData: qrisData,
+        amount: _args.total,
+        clock: _clock,
+        onConfirm: () {
+          Navigator.pop(ctx);
+          _pay();
+        },
+      ),
+    );
+  }
+
+  // ---- Proses booking setelah user konfirmasi ----
+  Future<void> _pay() async {
+    if (_paying) return;
+    setState(() => _paying = true);
+    _timer?.cancel();
+
+    const paymentMethodName = 'QRIS';
+    final user = AuthService.instance.currentUser;
     final now = DateTime.now();
+    final bookingCode =
+        'GT-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-${now.millisecondsSinceEpoch % 1000}';
+
     final booking = BookingModel(
       id: 'bkg-${now.millisecondsSinceEpoch}',
       bookingCode: bookingCode,
@@ -109,8 +130,7 @@ class _PaymentProcessScreenState extends State<PaymentProcessScreen> {
       customerName: _args.guestName.isNotEmpty
           ? _args.guestName
           : (user?.fullName ?? 'Tamu Go Ticket'),
-      customerPhone:
-          _args.phone.isNotEmpty ? _args.phone : user?.phoneNumber,
+      customerPhone: _args.phone.isNotEmpty ? _args.phone : user?.phoneNumber,
       hotelId: _args.hotelId.isNotEmpty ? _args.hotelId : '1',
       hotelName: _args.hotelName,
       roomId: _args.roomId.isNotEmpty ? _args.roomId : '1',
@@ -133,16 +153,16 @@ class _PaymentProcessScreenState extends State<PaymentProcessScreen> {
       qrCodeData: '$bookingCode-CHECKIN',
     );
 
-    // Simpan ke storage lokal agar selalu muncul & persisten
     try {
       await UserBookingStorage.instance.saveBooking(booking);
     } catch (_) {}
-
     try {
       await BookingService.instance.createBooking(booking);
     } catch (_) {}
 
     if (!mounted) return;
+    setState(() => _paying = false);
+
     Navigator.pushReplacementNamed(
       context,
       CustomerRouter.paymentSuccess,
@@ -150,6 +170,7 @@ class _PaymentProcessScreenState extends State<PaymentProcessScreen> {
         'args': _args.copyWith(paymentMethod: paymentMethodName),
         'roomNumber': _roomNumber,
         'booking': booking,
+        'bookingCode': bookingCode,
       },
     );
   }
@@ -162,6 +183,7 @@ class _PaymentProcessScreenState extends State<PaymentProcessScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
         children: [
+          // ---- Timer countdown ----
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -176,14 +198,14 @@ class _PaymentProcessScreenState extends State<PaymentProcessScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('BATAS WAKTU SELESAI',
+                    Text('BATAS WAKTU PEMBAYARAN',
                         style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
                             color: GT.muted)),
-                    Text('Selesaikan pembayaran dalam',
+                    Text('Selesaikan pembayaran sebelum waktu habis',
                         style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: GT.ink)),
                   ],
@@ -204,32 +226,54 @@ class _PaymentProcessScreenState extends State<PaymentProcessScreen> {
             ]),
           ),
           const SizedBox(height: 14),
+
+          // ---- Ringkasan pesanan ----
           _summaryCard(),
-          const SizedBox(height: 4),
+          const SizedBox(height: 14),
+
+          // ---- Metode pembayaran: hanya QRIS ----
           Row(children: const [
-            Icon(Icons.payments_outlined, color: GT.teal),
+            Icon(Icons.qr_code_2_rounded, color: GT.teal),
             SizedBox(width: 8),
             Expanded(
               child: Text('Metode Pembayaran',
                   style: TextStyle(
-                      fontSize: 20,
+                      fontSize: 18,
                       fontWeight: FontWeight.w800,
                       color: GT.ink)),
             ),
-            Text('Semua Transaksi Instan',
-                style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: GT.ink)),
           ]),
-          const SizedBox(height: 12),
-          _methodTile(0, badge: 'Terpopuler', chips: const [
-            'QRIS', 'GoPay', 'OVO', 'DANA'
-          ]),
-          _promoRow(),
-          _methodTile(1),
-          _methodTile(2, lock: true),
-          _methodTile(3, badge: 'Bunga 0%'),
+          const SizedBox(height: 10),
+          _qrisMethodCard(),
+          const SizedBox(height: 10),
+
+          // ---- Informasi keamanan ----
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+                color: GT.sky.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: GT.teal.withValues(alpha: 0.2))),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Icon(Icons.shield_outlined, color: GT.teal, size: 16),
+                  SizedBox(width: 6),
+                  Text('Pembayaran Aman & Terenkripsi',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: GT.teal)),
+                ]),
+                SizedBox(height: 6),
+                Text(
+                  'QRIS diterima di semua bank & e-wallet (GoPay, OVO, DANA, ShopeePay, BCA, Mandiri, BNI, BRI, dll.)',
+                  style: TextStyle(fontSize: 11, color: GT.body, height: 1.5),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: GTBottomBar(
@@ -252,10 +296,10 @@ class _PaymentProcessScreenState extends State<PaymentProcessScreen> {
                 ],
               ),
             ),
-            const Icon(Icons.hotel_outlined, size: 14, color: GT.teal),
+            const Icon(Icons.qr_code_rounded, size: 14, color: GT.teal),
             const SizedBox(width: 4),
-            Text('1 Kamar / ${_args.nights} Malam',
-                style: const TextStyle(
+            const Text('via QRIS',
+                style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     color: GT.teal)),
@@ -263,105 +307,148 @@ class _PaymentProcessScreenState extends State<PaymentProcessScreen> {
           const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
-            child: GTButton(
-              label: 'Bayar Sekarang ${rp(_args.total)}',
-              leading: Icons.shield_rounded,
-              onTap: _pay,
-            ),
+            child: _paying
+                ? const Center(
+                    child: Padding(
+                    padding: EdgeInsets.all(12),
+                    child: CircularProgressIndicator(),
+                  ))
+                : GTButton(
+                    label: 'Tampilkan QR & Bayar  ${rp(_args.total)}',
+                    leading: Icons.qr_code_2_rounded,
+                    onTap: _showQrisSheet,
+                  ),
           ),
         ]),
       ),
     );
   }
 
+  // ---- QRIS Method Card (satu pilihan saja) ----
+  Widget _qrisMethodCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: GT.teal, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: GT.teal.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: GT.teal.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child:
+                  const Icon(Icons.qr_code_2_rounded, color: GT.teal, size: 20),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('QRIS',
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: GT.ink)),
+                  Text('Scan QR — semua bank & e-wallet didukung',
+                      style: TextStyle(fontSize: 11, color: GT.muted)),
+                ],
+              ),
+            ),
+            GTChip('Terpopuler', bg: GT.sky),
+          ]),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: const [
+              _WalletChip('GoPay'),
+              _WalletChip('OVO'),
+              _WalletChip('DANA'),
+              _WalletChip('ShopeePay'),
+              _WalletChip('BCA'),
+              _WalletChip('Mandiri'),
+              _WalletChip('BNI'),
+              _WalletChip('BRI'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---- Ringkasan pesanan ----
   Widget _summaryCard() {
     return GTCard(
-      child: Column(children: [
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          GTImage(_args.roomImage, height: 64, width: 64, radius: 12),
+          GTImage(_args.roomImage, height: 60, width: 60, radius: 10),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const GTChip('Hotel • 1 Kamar',
-                    icon: Icons.hotel, bg: GT.soft),
-                const SizedBox(height: 4),
-                Text(_args.roomName,
-                    style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: GT.ink)),
-                Text('${_args.nights} Malam • ${_args.adults} Dewasa',
-                    style: const TextStyle(
-                        fontSize: 12, color: GT.muted)),
-              ],
-            ),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_args.hotelName,
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: GT.ink),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  Text(_args.roomName,
+                      style: const TextStyle(fontSize: 12, color: GT.muted)),
+                  Text(
+                    '${BookingArgs.monthShort(_args.checkIn.month)} ${_args.checkIn.day} – '
+                    '${BookingArgs.monthShort(_args.checkOut.month)} ${_args.checkOut.day}  •  ${_args.nights} malam',
+                    style:
+                        const TextStyle(fontSize: 11, color: GT.body),
+                  ),
+                ]),
           ),
         ]),
-        const SizedBox(height: 14),
-        _line('${_args.nights} Malam x ${rp(_args.roomPrice)}',
-            Text(rp(_args.subtotal),
-                style: const TextStyle(
-                    fontWeight: FontWeight.w800, color: GT.ink))),
-        const SizedBox(height: 8),
-        _line('Layanan & Kebersihan',
-            const GTChip('GRATIS',
-                bg: Color(0xFFDCFCE7), fg: GT.green)),
-        const SizedBox(height: 8),
-        _line('Pajak Pemerintah & Daerah (10%)',
-            const Text('Termasuk',
-                style: TextStyle(fontSize: 12, color: GT.muted))),
-        if (_args.promoApplied) ...[
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-                color: const Color(0xFFE6F6F0),
-                borderRadius: BorderRadius.circular(14)),
-            child: Row(children: [
-              const CircleAvatar(
-                  radius: 16,
-                  backgroundColor: GT.sky,
-                  child:
-                      Icon(Icons.sell_outlined, size: 16, color: GT.teal)),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('STAYHEMAT ✓',
-                        style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: GT.teal)),
-                    Text('Kupon potongan berhasil terpasang',
-                        style: TextStyle(fontSize: 11, color: GT.body)),
-                  ],
-                ),
-              ),
+        const Divider(height: 20),
+        _line('Harga Kamar', Text(rp(_args.roomPrice),
+            style: const TextStyle(fontWeight: FontWeight.w700, color: GT.ink))),
+        const SizedBox(height: 6),
+        _line('${_args.nights} Malam', Text(rp(_args.subtotal),
+            style: const TextStyle(fontWeight: FontWeight.w700, color: GT.ink))),
+        if (_args.discount > 0) ...[
+          const SizedBox(height: 6),
+          _line('Diskon Promo',
               Text('- ${rp(_args.discount)}',
                   style: const TextStyle(
-                      fontWeight: FontWeight.w800, color: GT.teal)),
-            ]),
-          ),
+                      fontWeight: FontWeight.w700, color: GT.teal))),
         ],
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-              color: GT.soft, borderRadius: BorderRadius.circular(14)),
+              color: GT.soft, borderRadius: BorderRadius.circular(12)),
           child: Row(children: [
             const Expanded(
               child: Text('Total Tagihan',
                   style: TextStyle(
-                      fontSize: 15,
+                      fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: GT.ink)),
             ),
             Text(rp(_args.total),
                 style: const TextStyle(
-                    fontSize: 22,
+                    fontSize: 20,
                     fontWeight: FontWeight.w800,
                     color: GT.teal)),
           ]),
@@ -372,103 +459,192 @@ class _PaymentProcessScreenState extends State<PaymentProcessScreen> {
 
   Widget _line(String l, Widget r) => Row(children: [
         Expanded(
-            child: Text(l,
-                style: const TextStyle(fontSize: 13, color: GT.body))),
+            child:
+                Text(l, style: const TextStyle(fontSize: 13, color: GT.body))),
         r,
       ]);
+}
 
-  Widget _promoRow() {
-    return GTCard(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Row(children: [
-        const Icon(Icons.confirmation_number_outlined, color: GT.teal),
-        const SizedBox(width: 10),
-        const Expanded(
-          child: Text('Pilih Kode Promo',
-              style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: GT.ink)),
-        ),
-        GTButton(
-          label: _args.promoApplied ? 'Lepas' : 'Terapkan',
-          height: 44,
-          onTap: () => setState(
-              () => _args = _args.copyWith(promoApplied: !_args.promoApplied)),
-        ),
-      ]),
+// ---------------------------------------------------------------------------
+// Chip kecil wallet
+// ---------------------------------------------------------------------------
+class _WalletChip extends StatelessWidget {
+  final String label;
+  const _WalletChip(this.label);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: GT.soft,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: GT.teal.withValues(alpha: 0.2)),
+      ),
+      child: Text(label,
+          style: const TextStyle(
+              fontSize: 10, fontWeight: FontWeight.w600, color: GT.ink)),
     );
   }
+}
 
-  Widget _methodTile(int i,
-      {String? badge, List<String>? chips, bool lock = false}) {
-    final m = _methods[i];
-    final selected = _method == i;
-    final open = _open == i;
-    return GTCard(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: EdgeInsets.zero,
-      child: Column(children: [
-        InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () => setState(() {
-            _method = i;
-            _open = open ? null : i;
-          }),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(children: [
-              Container(
-                width: 26,
-                height: 26,
-                decoration: BoxDecoration(
-                    color: selected ? GT.primary : GT.soft,
-                    shape: BoxShape.circle),
-                child: selected
-                    ? const Icon(Icons.check, size: 16, color: GT.teal)
-                    : null,
+// ---------------------------------------------------------------------------
+// Bottom Sheet QRIS — QR dinamis + konfirmasi
+// ---------------------------------------------------------------------------
+class _QrisBottomSheet extends StatefulWidget {
+  final String qrisData;
+  final int amount;
+  final String clock;
+  final VoidCallback onConfirm;
+
+  const _QrisBottomSheet({
+    required this.qrisData,
+    required this.amount,
+    required this.clock,
+    required this.onConfirm,
+  });
+
+  @override
+  State<_QrisBottomSheet> createState() => _QrisBottomSheetState();
+}
+
+class _QrisBottomSheetState extends State<_QrisBottomSheet> {
+  bool _confirming = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+          20, 16, 20, MediaQuery.of(context).viewInsets.bottom + 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle bar
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(99),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Judul
+          Row(children: [
+            const Icon(Icons.qr_code_2_rounded, color: GT.teal, size: 22),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text('Scan QRIS untuk Bayar',
+                  style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: GT.ink)),
+            ),
+            // Countdown kecil
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                  color: GT.primary, borderRadius: BorderRadius.circular(20)),
+              child: Text(widget.clock,
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: GT.ink)),
+            ),
+          ]),
+          const SizedBox(height: 16),
+
+          // QR Code
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: GT.soft, width: 2),
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 20,
+                    offset: const Offset(0, 4))
+              ],
+            ),
+            padding: const EdgeInsets.all(16),
+            child: Column(children: [
+              QrImageView(
+                data: widget.qrisData,
+                version: QrVersions.auto,
+                size: 220,
+                backgroundColor: Colors.white,
+                errorCorrectionLevel: QrErrorCorrectLevel.M,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 6,
-                      children: [
-                        Text(m[0],
-                            style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                color: GT.ink)),
-                        if (lock)
-                          const Icon(Icons.lock_rounded,
-                              size: 14, color: GT.green),
-                        if (badge != null)
-                          GTChip(badge, bg: GT.sky),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(m[1],
-                        style: const TextStyle(
-                            fontSize: 12, color: GT.muted)),
-                  ],
-                ),
-              ),
-              Icon(open ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                  color: GT.teal),
+              const SizedBox(height: 10),
+              Text('QRIS Go Ticket',
+                  style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: GT.muted)),
             ]),
           ),
-        ),
-        if (open && chips != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-            child: Wrap(spacing: 8, runSpacing: 8, children: [
-              for (final c in chips) GTChip(c, bg: GT.soft, fg: GT.ink),
+          const SizedBox(height: 14),
+
+          // Nominal
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+                color: GT.soft, borderRadius: BorderRadius.circular(14)),
+            child: Column(children: [
+              const Text('NOMINAL PEMBAYARAN',
+                  style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: GT.muted)),
+              const SizedBox(height: 2),
+              Text(rp(widget.amount),
+                  style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: GT.teal)),
             ]),
           ),
-      ]),
+          const SizedBox(height: 10),
+
+          // Instruksi
+          const Text(
+            'Buka GoPay, OVO, DANA, ShopeePay, atau m-Banking,\n'
+            'lalu scan QR di atas untuk menyelesaikan pembayaran.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: GT.body, height: 1.5),
+          ),
+          const SizedBox(height: 16),
+
+          // Tombol konfirmasi
+          SizedBox(
+            width: double.infinity,
+            child: _confirming
+                ? const Center(child: CircularProgressIndicator())
+                : GTButton(
+                    label: 'Saya Sudah Bayar — Konfirmasi',
+                    leading: Icons.check_circle_outline_rounded,
+                    onTap: () {
+                      setState(() => _confirming = true);
+                      widget.onConfirm();
+                    },
+                  ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Belum Bayar — Kembali',
+                style: TextStyle(color: GT.muted, fontSize: 12)),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:go_ticket/core/widgets/app_pagination_bar.dart';
 import '../../../../../core/models/booking_model.dart';
 import '../../../../../core/services/auth_service.dart';
 import '../../../../../core/services/booking_service.dart';
@@ -27,6 +28,7 @@ class _FoCheckOutTabState extends State<FoCheckOutTab> {
   String _searchQuery = '';
   List<BookingModel> _activeGuests = [];
   bool _isLoading = true;
+  int _currentPage = 1;
 
   @override
   void initState() {
@@ -328,11 +330,33 @@ class _FoCheckOutTabState extends State<FoCheckOutTab> {
                   ],
                 ),
               )
-            else
-              for (final rec in _filteredHistory) ...[
-                _buildHistoryRecordCard(rec),
-                const SizedBox(height: 12),
-              ],
+            else ...[
+              Builder(
+                builder: (ctx) {
+                  final total = _filteredHistory.length;
+                  final maxPage = (total / 10).ceil();
+                  final safePage = _currentPage.clamp(1, maxPage > 0 ? maxPage : 1);
+                  final pagedHistory = paginateList(_filteredHistory, safePage, pageSize: 10);
+
+                  return Column(
+                    children: [
+                      for (final rec in pagedHistory) ...[
+                        _buildHistoryRecordCard(rec),
+                        const SizedBox(height: 12),
+                      ],
+                      AppPaginationBar(
+                        currentPage: safePage,
+                        totalItems: total,
+                        pageSize: 10,
+                        itemLabel: 'histori check-out',
+                        primaryColor: const Color(0xFF007A87),
+                        onPageChanged: (newPage) => setState(() => _currentPage = newPage),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
 
             const SizedBox(height: 24),
           ],

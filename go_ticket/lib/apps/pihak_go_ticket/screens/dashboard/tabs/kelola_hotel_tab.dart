@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:go_ticket/core/widgets/app_pagination_bar.dart';
 import '../../../../../core/models/hotel_model.dart';
 import '../../../../../core/services/hotel_service.dart';
 import 'input_hotel_screen.dart';
@@ -21,6 +22,7 @@ class _KelolaHotelTabState extends State<KelolaHotelTab> {
 
   List<HotelModel> _hotels = [];
   bool _isLoading = true;
+  int _currentPage = 1;
 
   @override
   void initState() {
@@ -186,6 +188,27 @@ class _KelolaHotelTabState extends State<KelolaHotelTab> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if ((h.thumbnailUrl != null && h.thumbnailUrl!.isNotEmpty) ||
+                  h.photoUrls.isNotEmpty) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    h.thumbnailUrl ?? h.photoUrls.first,
+                    height: 140,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      height: 90,
+                      color: const Color(0xFFE2E8F0),
+                      child: const Center(
+                        child: Icon(Icons.apartment_rounded,
+                            color: Colors.grey, size: 36),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               _buildDetailRow('ID Penginapan', h.id),
               _buildDetailRow('Kota/Wilayah', h.city),
               _buildDetailRow('Alamat', h.address),
@@ -556,11 +579,33 @@ class _KelolaHotelTabState extends State<KelolaHotelTab> {
                 ],
               ),
             )
-          else
-            for (final h in _filteredHotels) ...[
-              _buildHotelCard(h),
-              const SizedBox(height: 12),
-            ],
+          else ...[
+            Builder(
+              builder: (ctx) {
+                final total = _filteredHotels.length;
+                final maxPage = (total / 10).ceil();
+                final safePage = _currentPage.clamp(1, maxPage > 0 ? maxPage : 1);
+                final pagedHotels = paginateList(_filteredHotels, safePage, pageSize: 10);
+
+                return Column(
+                  children: [
+                    for (final h in pagedHotels) ...[
+                      _buildHotelCard(h),
+                      const SizedBox(height: 12),
+                    ],
+                    AppPaginationBar(
+                      currentPage: safePage,
+                      totalItems: total,
+                      pageSize: 10,
+                      itemLabel: 'hotel mitra',
+                      primaryColor: const Color(0xFF00758F),
+                      onPageChanged: (newPage) => setState(() => _currentPage = newPage),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
 
           const SizedBox(height: 24),
         ],

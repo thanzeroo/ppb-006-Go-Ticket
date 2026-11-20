@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:go_ticket/core/widgets/app_pagination_bar.dart';
 import 'package:go_ticket/core/models/booking_args.dart';
 import 'package:go_ticket/core/models/hotel_model.dart';
 import 'package:go_ticket/core/services/auth_service.dart';
@@ -22,6 +23,7 @@ class BerandaTab extends StatefulWidget {
 
 class _BerandaTabState extends State<BerandaTab> {
   final Set<String> _savedHotelIds = {};
+  int _rekomendasiPage = 1;
   late Future<List<Map<String, dynamic>>> _promosFuture;
   late Future<List<HotelModel>> _featuredHotelsFuture;
 
@@ -473,8 +475,28 @@ class _BerandaTabState extends State<BerandaTab> {
               ],
             ),
             const SizedBox(height: 12),
-            Column(
-              children: list.take(5).map((h) => _buildHotelCard(h)).toList(),
+            Builder(
+              builder: (ctx) {
+                final total = list.length;
+                final maxPage = (total / 10).ceil();
+                final safePage = _rekomendasiPage.clamp(1, maxPage > 0 ? maxPage : 1);
+                final pagedHotels = paginateList(list, safePage, pageSize: 10);
+
+                return Column(
+                  children: [
+                    ...pagedHotels.map((h) => _buildHotelCard(h)),
+                    if (total > 10)
+                      AppPaginationBar(
+                        currentPage: safePage,
+                        totalItems: total,
+                        pageSize: 10,
+                        itemLabel: 'hotel rekomendasi',
+                        primaryColor: const Color(0xFF0077B6),
+                        onPageChanged: (p) => setState(() => _rekomendasiPage = p),
+                      ),
+                  ],
+                );
+              },
             ),
           ],
         );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:go_ticket/core/widgets/app_pagination_bar.dart';
 import '../../../../../core/models/hotel_admin_model.dart';
 import '../../../../../core/theme/hotel_admin_theme.dart';
 
@@ -15,6 +16,7 @@ class KeuanganTab extends StatefulWidget {
 
 class _KeuanganTabState extends State<KeuanganTab> {
   int _periodIndex = 0;
+  int _currentPage = 1;
   final _periods = ['Semua', '7 Hari', 'Bulan Ini', 'Kustom'];
 
   // ── Hitung total dari amount string '+Rp x.xxx.xxx' ─────────────────────
@@ -254,11 +256,32 @@ class _KeuanganTabState extends State<KeuanganTab> {
                       color: Color(0xFF0F172A)),
                 ),
                 const SizedBox(height: 12),
-                for (final tx in widget.transactions) ...[
-                  _buildTxRow(tx),
-                  if (tx != widget.transactions.last)
-                    const Divider(height: 16),
-                ],
+                Builder(
+                  builder: (ctx) {
+                    final total = widget.transactions.length;
+                    final maxPage = (total / 10).ceil();
+                    final safePage = _currentPage.clamp(1, maxPage > 0 ? maxPage : 1);
+                    final pagedTx = paginateList(widget.transactions, safePage, pageSize: 10);
+
+                    return Column(
+                      children: [
+                        for (final tx in pagedTx) ...[
+                          _buildTxRow(tx),
+                          if (tx != pagedTx.last)
+                            const Divider(height: 16),
+                        ],
+                        AppPaginationBar(
+                          currentPage: safePage,
+                          totalItems: total,
+                          pageSize: 10,
+                          itemLabel: 'transaksi',
+                          primaryColor: cDarkActive,
+                          onPageChanged: (newPage) => setState(() => _currentPage = newPage),
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ],
             ),
           ),

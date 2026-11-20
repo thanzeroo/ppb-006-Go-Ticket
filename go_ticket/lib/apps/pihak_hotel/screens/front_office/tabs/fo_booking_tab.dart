@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:go_ticket/core/widgets/app_pagination_bar.dart';
 import '../../../../../core/models/booking_model.dart';
 import '../../../../../core/services/auth_service.dart';
 import '../../../../../core/services/booking_service.dart';
@@ -25,6 +26,7 @@ class _FoBookingTabState extends State<FoBookingTab> {
   String _searchQuery = '';
   List<BookingModel> _bookings = [];
   bool _isLoading = true;
+  int _currentPage = 1;
 
   @override
   void initState() {
@@ -313,11 +315,33 @@ class _FoBookingTabState extends State<FoBookingTab> {
                   ),
                 ),
               )
-            else
-              for (final b in _filteredBookings) ...[
-                _buildBookingItemCard(b),
-                const SizedBox(height: 14),
-              ],
+            else ...[
+              Builder(
+                builder: (ctx) {
+                  final total = _filteredBookings.length;
+                  final maxPage = (total / 10).ceil();
+                  final safePage = _currentPage.clamp(1, maxPage > 0 ? maxPage : 1);
+                  final pagedBookings = paginateList(_filteredBookings, safePage, pageSize: 10);
+
+                  return Column(
+                    children: [
+                      for (final b in pagedBookings) ...[
+                        _buildBookingItemCard(b),
+                        const SizedBox(height: 14),
+                      ],
+                      AppPaginationBar(
+                        currentPage: safePage,
+                        totalItems: total,
+                        pageSize: 10,
+                        itemLabel: 'reservasi',
+                        primaryColor: const Color(0xFF007A87),
+                        onPageChanged: (newPage) => setState(() => _currentPage = newPage),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
 
             const SizedBox(height: 20),
           ],

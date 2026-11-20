@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:go_ticket/core/widgets/app_pagination_bar.dart';
 import '../../../../../core/models/hotel_model.dart';
 import '../../../../../core/models/user_model.dart';
 import '../../../../../core/services/hotel_service.dart';
@@ -23,6 +24,7 @@ class _UserTabState extends State<UserTab> {
   List<HotelModel> _hotels = [];
   Map<String, HotelModel> _hotelMap = {};
   bool _isLoading = true;
+  int _currentPage = 1;
 
   @override
   void initState() {
@@ -1089,7 +1091,28 @@ class _UserTabState extends State<UserTab> {
               ),
             )
           else ...[
-            ..._buildGroupedUserList(),
+            Builder(
+              builder: (ctx) {
+                final total = _filteredUsers.length;
+                final maxPage = (total / 10).ceil();
+                final safePage = _currentPage.clamp(1, maxPage > 0 ? maxPage : 1);
+                final pagedUsers = paginateList(_filteredUsers, safePage, pageSize: 10);
+
+                return Column(
+                  children: [
+                    ..._buildGroupedUserList(pagedUsers),
+                    AppPaginationBar(
+                      currentPage: safePage,
+                      totalItems: total,
+                      pageSize: 10,
+                      itemLabel: 'pengguna',
+                      primaryColor: const Color(0xFF00758F),
+                      onPageChanged: (newPage) => setState(() => _currentPage = newPage),
+                    ),
+                  ],
+                );
+              },
+            ),
           ],
 
           const SizedBox(height: 24),
@@ -1164,13 +1187,13 @@ class _UserTabState extends State<UserTab> {
     );
   }
 
-  List<Widget> _buildGroupedUserList() {
+  List<Widget> _buildGroupedUserList(List<UserModel> userList) {
     final widgets = <Widget>[];
 
     final hotelStaffList =
-        _filteredUsers.where((u) => u.isHotelStaff).toList();
+        userList.where((u) => u.isHotelStaff).toList();
     final customerList =
-        _filteredUsers.where((u) => u.role == UserRole.customer).toList();
+        userList.where((u) => u.role == UserRole.customer).toList();
 
     // 1. Tampilkan Karyawan Hotel (Dikelompokkan berdasarkan Mitra Hotel)
     if (_selectedRoleFilter != 'Tamu' && hotelStaffList.isNotEmpty) {

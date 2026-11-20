@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:go_ticket/core/widgets/app_pagination_bar.dart';
 import '../../../../../core/services/promo_service.dart';
 import 'tambah_promo_screen.dart';
 
@@ -20,6 +21,7 @@ class _PromoTabState extends State<PromoTab> {
 
   List<Map<String, dynamic>> _promos = [];
   bool _isLoading = true;
+  int _currentPage = 1;
 
   @override
   void initState() {
@@ -461,11 +463,33 @@ class _PromoTabState extends State<PromoTab> {
                 ],
               ),
             )
-          else
-            for (final p in _filteredPromos) ...[
-              _buildDynamicPromoCard(p),
-              const SizedBox(height: 12),
-            ],
+          else ...[
+            Builder(
+              builder: (ctx) {
+                final total = _filteredPromos.length;
+                final maxPage = (total / 10).ceil();
+                final safePage = _currentPage.clamp(1, maxPage > 0 ? maxPage : 1);
+                final pagedPromos = paginateList(_filteredPromos, safePage, pageSize: 10);
+
+                return Column(
+                  children: [
+                    for (final p in pagedPromos) ...[
+                      _buildDynamicPromoCard(p),
+                      const SizedBox(height: 12),
+                    ],
+                    AppPaginationBar(
+                      currentPage: safePage,
+                      totalItems: total,
+                      pageSize: 10,
+                      itemLabel: 'voucher promo',
+                      primaryColor: const Color(0xFF00758F),
+                      onPageChanged: (newPage) => setState(() => _currentPage = newPage),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
 
           const SizedBox(height: 24),
         ],

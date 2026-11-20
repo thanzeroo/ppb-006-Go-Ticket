@@ -8,6 +8,7 @@ import 'package:go_ticket/core/services/booking_service.dart';
 import 'package:go_ticket/core/utils/currency_formatter.dart';
 import 'package:go_ticket/core/widgets/user_avatar.dart';
 import '../../../../pihak_hotel/services/hotel_operations_store.dart';
+import 'package:go_ticket/core/widgets/app_pagination_bar.dart';
 import '../../../router/customer_router.dart';
 import '../../../services/user_booking_storage.dart';
 import '../customer_dashboard_screen.dart';
@@ -30,6 +31,13 @@ class _PesananTabState extends State<PesananTab>
   late final PageController _subPageController;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  final Map<String, int> _tabPages = {
+    'all': 1,
+    'pending': 1,
+    'confirmed': 1,
+    'selesai': 1,
+    'dibatalkan': 1,
+  };
 
   @override
   void initState() {
@@ -521,21 +529,41 @@ class _PesananTabState extends State<PesananTab>
       return _buildEmptyOrdersState();
     }
 
+    final total = filtered.length;
+    final curPage = _tabPages[filterStatus] ?? 1;
+    final maxPage = (total / 10).ceil();
+    final safePage = curPage.clamp(1, maxPage > 0 ? maxPage : 1);
+    final pagedBookings = paginateList(filtered, safePage, pageSize: 10);
+
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      itemCount: filtered.length + 1, // +1 untuk bantuan card
+      itemCount: pagedBookings.length + (total > 0 ? 1 : 0) + 1, // items + pagination bar + bantuan card
       itemBuilder: (context, index) {
-        if (index == filtered.length) {
+        if (index < pagedBookings.length) {
+          final b = pagedBookings[index];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _buildBookingCard(b),
+          );
+        } else if (index == pagedBookings.length) {
+          return AppPaginationBar(
+            currentPage: safePage,
+            totalItems: total,
+            pageSize: 10,
+            itemLabel: 'pesanan',
+            primaryColor: const Color(0xFF00B4D8),
+            onPageChanged: (newPage) {
+              setState(() {
+                _tabPages[filterStatus] = newPage;
+              });
+            },
+          );
+        } else {
           return Padding(
             padding: const EdgeInsets.only(top: 8, bottom: 80),
             child: _buildBantuanCard(),
           );
         }
-        final b = filtered[index];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: _buildBookingCard(b),
-        );
       },
     );
   }
