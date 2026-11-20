@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../../pihak_user/screens/auth/terms_and_policy_screen.dart';
+import 'package:go_ticket/core/widgets/terms_and_policy_screen.dart';
 import '../../../../../core/models/booking_model.dart';
 import '../../../../../core/models/room_model.dart';
 import '../../../../../core/models/user_model.dart';

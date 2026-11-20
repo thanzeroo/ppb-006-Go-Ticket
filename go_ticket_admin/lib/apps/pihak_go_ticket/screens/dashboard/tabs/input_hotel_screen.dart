@@ -1,0 +1,2582 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
+
+import '../../../../../core/config/supabase_config.dart';
+import '../../../../../core/models/hotel_model.dart';
+import '../../../../../core/services/hotel_service.dart';
+import '../../../../../core/services/supabase_service.dart';
+import 'package:go_ticket_admin/core/services/hotel_image_upload_service.dart';
+import 'formatters.dart';
+
+/// Data model form untuk tipe kamar di Section D
+class RoomTypeFormData {
+  final TextEditingController nameController;
+  final TextEditingController sizeController;
+  final TextEditingController capacityController;
+  final TextEditingController weekdayPriceController;
+  final TextEditingController weekendPriceController;
+  final TextEditingController extraBedController;
+  final TextEditingController totalUnitController;
+  int guestCapacity;
+  String selectedBedType;
+  Map<String, bool> roomAmenities;
+
+  RoomTypeFormData({
+    String name = '',
+    String size = '',
+    int capacity = 2,
+    String weekdayPrice = '',
+    String weekendPrice = '',
+    String extraBed = '',
+    String totalUnit = '10',
+    String bedType = '1 King Bed (180x200)',
+    Map<String, bool>? amenities,
+  })  : nameController = TextEditingController(text: name),
+        sizeController = TextEditingController(text: size),
+        capacityController = TextEditingController(text: '$capacity'),
+        weekdayPriceController = TextEditingController(text: weekdayPrice),
+        weekendPriceController = TextEditingController(text: weekendPrice),
+        extraBedController = TextEditingController(text: extraBed),
+        totalUnitController = TextEditingController(text: totalUnit),
+        guestCapacity = capacity,
+        selectedBedType = bedType,
+        roomAmenities = amenities ??
+            {
+              'Smart TV 55"': false,
+              'Bathtub Ocean View': false,
+              'Mesin Espresso': false,
+              'Balkon Pribadi': false,
+              'AC Inverter': false,
+              'Safe Deposit Box': false,
+            };
+
+  void dispose() {
+    nameController.dispose();
+    sizeController.dispose();
+    capacityController.dispose();
+    weekdayPriceController.dispose();
+    weekendPriceController.dispose();
+    extraBedController.dispose();
+    totalUnitController.dispose();
+  }
+}
+
+/// Form Input & Edit Hotel & Kamar (Section A - Section E)
+/// Sesuai dengan desain visual pada Gambar 1 (Input Hotel).
+class InputHotelScreen extends StatefulWidget {
+  final HotelModel? hotelToEdit;
+
+  const InputHotelScreen({super.key, this.hotelToEdit});
+
+  @override
+  State<InputHotelScreen> createState() => _InputHotelScreenState();
+}
+
+class _InputHotelScreenState extends State<InputHotelScreen> {
+  bool _isSubmitting = false;
+
+  bool get _isEditMode => widget.hotelToEdit != null;
+
+  // Section A: Informasi Properti (kosongan saat buat mitra baru)
+  late final TextEditingController _hotelNameController;
+  late final TextEditingController _nibController;
+  late final TextEditingController _npwpController;
+  late final TextEditingController _ptNameController;
+  late final TextEditingController _addressController;
+  late final TextEditingController _kecamatanController;
+  late final TextEditingController _cityController;
+  late final TextEditingController _postalController;
+  late final TextEditingController _phoneController;
+  late final TextEditingController _waController;
+  late final TextEditingController _emailController;
+
+  // Koordinat Latitude & Longitude (Editable)
+  late final TextEditingController _latitudeController;
+  late final TextEditingController _longitudeController;
+
+  int _selectedCategory = 0; // 0 = Resor Bintang 5
+
+  // Section B: Facilities (semua default false saat awal buat mitra baru)
+  final Map<String, bool> _facilities = {
+    'Infinity Pool': false,
+    'WiFi 100Mbps': false,
+    'Spa & Wellness': false,
+    'Sarapan Buffet': false,
+    'Parkir Valet Gratis': false,
+    'Shuttle Bandara': false,
+    'Resto & Bar 24 Jam': false,
+    'Pet-Friendly': false,
+  };
+
+  // Section C: Foto Galeri (kosong dari awal saat buat mitra baru)
+  List<String> _photoUrls = [];
+
+  // Section D: List Tipe Kamar (bisa banyak tipe kamar)
+  List<RoomTypeFormData> _roomTypes = [];
+
+  final List<String> _bedTypeOptions = [
+    '1 Super King (200x200)',
+    '1 King Bed (180x200)',
+    '1 Queen Bed (160x200)',
+    '2 Twin Bed (100x200)',
+    '1 Double Bed (140x200)',
+    '1 Single Bed (90x200)',
+    'Bunk Bed (Tingkat)',
+  ];
+
+  // Section E: Policy
+  late final TextEditingController _checkInController;
+  late final TextEditingController _checkOutController;
+  late final TextEditingController _depositController;
+  int _cancellationPolicy = 0; // 0 = Bebas Pembatalan (H-3), 1 = Non-Refundable
+
+  bool _isLocalFile(String path) {
+    if (path.startsWith('http://') || path.startsWith('https://')) return false;
+    return path.startsWith('/') ||
+        path.startsWith('file://') ||
+        RegExp(r'^[a-zA-Z]:[\\/]').hasMatch(path);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final h = widget.hotelToEdit;
+
+    // Section A: Kosongkan semua data saat awal buat mitra baru
+    _hotelNameController = TextEditingController(text: h?.name ?? '');
+    _nibController = TextEditingController(text: '');
+    _npwpController = TextEditingController(text: '');
+    _ptNameController = TextEditingController(text: '');
+    _addressController = TextEditingController(text: h?.address ?? '');
+    _kecamatanController = TextEditingController(text: '');
+    _cityController = TextEditingController(text: h?.city ?? '');
+    _postalController = TextEditingController(text: '');
+    _phoneController = TextEditingController(text: h?.phone ?? '');
+    _waController = TextEditingController(text: h?.whatsapp ?? '');
+    _emailController = TextEditingController(text: '');
+
+    _latitudeController = TextEditingController(
+      text: h?.latitude != null ? h!.latitude.toString() : '',
+    );
+    _longitudeController = TextEditingController(
+      text: h?.longitude != null ? h!.longitude.toString() : '',
+    );
+
+    _selectedCategory = 0;
+
+    // Section B: Fasilitas dicentang jika edit hotel, kosong jika buat baru
+    if (h != null && h.amenities.isNotEmpty) {
+      for (final f in _facilities.keys.toList()) {
+        _facilities[f] = h.amenities.contains(f);
+      }
+    } else {
+      for (final f in _facilities.keys.toList()) {
+        _facilities[f] = false;
+      }
+    }
+
+    // Section C: Galeri foto kosong dari awal saat tambah mitra baru
+    if (h != null && h.photoUrls.isNotEmpty) {
+      _photoUrls = List<String>.from(h.photoUrls);
+    } else if (h != null && h.mainImageUrl != null && h.mainImageUrl!.isNotEmpty) {
+      _photoUrls = [h.mainImageUrl!];
+    } else {
+      _photoUrls = [];
+    }
+
+    // Section D: Tipe Kamar (bisa banyak tipe kamar)
+    if (_isEditMode) {
+      _fetchExistingRoomData();
+    } else {
+      _roomTypes = [
+        RoomTypeFormData(), // 1 tipe kamar kosong di awal
+      ];
+    }
+
+    // Section E: Policy (kosongan saat buat baru)
+    _checkInController = TextEditingController(text: h?.checkInTime ?? '');
+    _checkOutController = TextEditingController(text: h?.checkOutTime ?? '');
+    _depositController = TextEditingController(text: '');
+    _cancellationPolicy =
+        (h?.cancellationPolicy?.contains('Non-Refundable') ?? false) ? 1 : 0;
+  }
+
+  Future<void> _fetchExistingRoomData() async {
+    final h = widget.hotelToEdit;
+    if (h == null) return;
+    try {
+      final sb = SupabaseService.instance;
+
+      // Ambil data legalitas & deposit dari tabel mitra_penginapan
+      final hotelRow = await sb
+          .table(SupabaseConfig.tableMitraPenginapan)
+          ?.select()
+          .eq('id_penginapan', int.tryParse(h.id) ?? 0)
+          .maybeSingle();
+
+      if (hotelRow != null && mounted) {
+        setState(() {
+          if (hotelRow['nib_perusahaan'] != null) {
+            _nibController.text = hotelRow['nib_perusahaan'].toString();
+          }
+          if (hotelRow['npwp_perusahaan'] != null) {
+            _npwpController.text = hotelRow['npwp_perusahaan'].toString();
+          }
+          if (hotelRow['nama_pt'] != null) {
+            _ptNameController.text = hotelRow['nama_pt'].toString();
+          }
+          if (hotelRow['deposit_nominal'] != null) {
+            _depositController.text =
+                ThousandsSeparatorInputFormatter.format(hotelRow['deposit_nominal']);
+          }
+        });
+      }
+
+      final dbRooms = await HotelService.instance.getRoomsByHotel(h.id);
+      if (dbRooms.isNotEmpty && mounted) {
+        setState(() {
+          _roomTypes = dbRooms.map((r) {
+            final Map<String, bool> amenities = {
+              'Smart TV 55"': false,
+              'Bathtub Ocean View': false,
+              'Mesin Espresso': false,
+              'Balkon Pribadi': false,
+              'AC Inverter': false,
+              'Safe Deposit Box': false,
+            };
+            for (final a in r.amenities) {
+              if (amenities.containsKey(a)) {
+                amenities[a] = true;
+              }
+            }
+            final bed = r.bedType ?? '1 King Bed (180x200)';
+            if (!_bedTypeOptions.contains(bed)) {
+              _bedTypeOptions.add(bed);
+            }
+            return RoomTypeFormData(
+              name: r.name,
+              size: r.roomSizeM2 != null ? '${r.roomSizeM2!.toInt()}' : '',
+              capacity: r.capacity > 0 ? r.capacity : 2,
+              weekdayPrice: ThousandsSeparatorInputFormatter.format(r.priceWeekday),
+              weekendPrice: ThousandsSeparatorInputFormatter.format(
+                  r.weekendPrice ?? (r.priceWeekday * 1.2).toInt()),
+              extraBed: '',
+              totalUnit: '${r.totalUnits}',
+              bedType: bed,
+              amenities: amenities,
+            );
+          }).toList();
+        });
+        return;
+      }
+
+      final res = await sb
+          .table(SupabaseConfig.tableTipeKamar)
+          ?.select()
+          .eq('id_penginapan', int.tryParse(h.id) ?? 0)
+          .maybeSingle();
+
+      if (res != null && mounted) {
+        setState(() {
+          final bed = res['tipe_bed']?.toString() ?? '1 King Bed (180x200)';
+          if (!_bedTypeOptions.contains(bed)) {
+            _bedTypeOptions.add(bed);
+          }
+          final room = RoomTypeFormData(
+            name: res['nama_tipe']?.toString() ?? '',
+            size: res['luas_m2']?.toString() ?? '',
+            capacity: (res['kapasitas_tamu'] as num?)?.toInt() ?? 2,
+            weekdayPrice: res['harga_dasar'] != null
+                ? ThousandsSeparatorInputFormatter.format(res['harga_dasar'])
+                : '',
+            weekendPrice: res['harga_weekend'] != null
+                ? ThousandsSeparatorInputFormatter.format(res['harga_weekend'])
+                : '',
+            totalUnit: res['total_unit']?.toString() ?? '10',
+            bedType: bed,
+          );
+          _roomTypes = [room];
+        });
+      } else if (mounted && _roomTypes.isEmpty) {
+        setState(() {
+          _roomTypes = [RoomTypeFormData()];
+        });
+      }
+    } catch (_) {
+      if (mounted && _roomTypes.isEmpty) {
+        setState(() {
+          _roomTypes = [RoomTypeFormData()];
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _hotelNameController.dispose();
+    _nibController.dispose();
+    _npwpController.dispose();
+    _ptNameController.dispose();
+    _addressController.dispose();
+    _kecamatanController.dispose();
+    _cityController.dispose();
+    _postalController.dispose();
+    _phoneController.dispose();
+    _waController.dispose();
+    _emailController.dispose();
+    _latitudeController.dispose();
+    _longitudeController.dispose();
+    for (final room in _roomTypes) {
+      room.dispose();
+    }
+    _checkInController.dispose();
+    _checkOutController.dispose();
+    _depositController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFD),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Top Bar
+            _buildTopAppBar(),
+
+            // Form Body
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                children: [
+                  // Section A: Info Dasar & Koordinat
+                  _buildSectionA(),
+                  const SizedBox(height: 16),
+
+                  // Section B: Fasilitas Unggulan
+                  _buildSectionB(),
+                  const SizedBox(height: 16),
+
+                  // Section C: Galeri Media & Foto
+                  _buildSectionC(),
+                  const SizedBox(height: 16),
+
+                  // Section D: Tipe Kamar, Ranjang & Harga
+                  _buildSectionD(),
+                  const SizedBox(height: 16),
+
+                  // Section E: Kebijakan Check-In & Pembatalan
+                  _buildSectionE(),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+
+            // Bottom Action Bar
+            _buildBottomActionBar(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Top App Bar
+  // ---------------------------------------------------------------------------
+  Widget _buildTopAppBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
+                onPressed: () => Navigator.pop(context),
+              ),
+              Container(
+                width: 32,
+                height: 32,
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0F7FA),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Image.asset(
+                  'assets/logo.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => const Icon(
+                    Icons.confirmation_number_rounded,
+                    color: Color(0xFF00B4D8),
+                    size: 18,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _isEditMode ? 'Kelola & Edit Hotel' : 'Input Hotel & Kamar',
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 5,
+                        height: 5,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF10B981),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _isEditMode
+                            ? 'Mode Edit: ${widget.hotelToEdit!.name}'
+                            : 'Pendaftaran Properti Baru',
+                        style: const TextStyle(fontSize: 9.5, color: Color(0xFF64748B)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFCFFAFE),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              _isEditMode ? 'EDIT' : 'BARU',
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF0891B2),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Section A: Informasi Legalitas & Profil Properti
+  // ---------------------------------------------------------------------------
+  Widget _buildSectionA() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0F7FA),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.apartment_rounded,
+                    size: 18, color: Color(0xFF0096B4)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'Section A: Informasi Legalitas\n& Profil Properti',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                        height: 1.2,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Identitas badan usaha dan izin operasional pariwisata',
+                      style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFBAE6FD),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text(
+                  'Wajib\nSuperAdmin',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0284C7),
+                    height: 1.1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Nama Hotel / Properti Komersial *
+          const Text(
+            'Nama Hotel / Properti Komersial *',
+            style: TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 6),
+          _buildInputBox(
+            controller: _hotelNameController,
+            hint: 'Contoh: Grand Amora Hotel & Resort',
+          ),
+          const SizedBox(height: 12),
+
+          // Kategori Penginapan
+          const Text(
+            'Kategori Penginapan',
+            style: TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 8),
+          _buildCategoryGrid(),
+          const SizedBox(height: 14),
+
+          // Verifikasi Dokumen Badan Usaha Subcard
+          _buildLegalVerificationSubcard(),
+          const SizedBox(height: 14),
+
+          // Alamat Fisik Lengkap
+          const Text(
+            'Alamat Fisik Lengkap & Wilayah Hukum *',
+            style: TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 6),
+          _buildInputBox(
+            controller: _addressController,
+            hint: 'Nama Jalan, Nomor, RT/RW',
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: _buildInputBox(
+                  controller: _cityController,
+                  hint: 'Kota / Kabupaten *',
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _buildInputBox(
+                  controller: _postalController,
+                  hint: 'Kode Pos',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Koordinat Latitude & Longitude (Point 3: Bisa diedit dan disambung Google Maps)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: const [
+                  Icon(Icons.location_on_outlined, size: 14, color: Color(0xFF007A94)),
+                  SizedBox(width: 4),
+                  Text(
+                    'Koordinat GPS (Google Maps)',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+              InkWell(
+                onTap: _showCoordinatesHelperDialog,
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0F2FE),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFFBAE6FD)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.content_paste_rounded, size: 12, color: Color(0xFF0284C7)),
+                      SizedBox(width: 4),
+                      Text(
+                        'Tempel dari Maps',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF0284C7)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: _buildInputBox(
+                  controller: _latitudeController,
+                  hint: 'Latitude (mis. -8.691200)',
+                  prefixIcon: Icons.my_location_rounded,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildInputBox(
+                  controller: _longitudeController,
+                  hint: 'Longitude (mis. 115.168333)',
+                  prefixIcon: Icons.explore_outlined,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Kontak Operasional & Concierge
+          const Text(
+            'Kontak Operasional & Concierge',
+            style: TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 8),
+          _buildInputBox(
+            controller: _phoneController,
+            hint: 'Nomor Telepon Kantor',
+            prefixIcon: Icons.phone_outlined,
+            keyboardType: TextInputType.phone,
+          ),
+          const SizedBox(height: 8),
+          _buildInputBox(
+            controller: _waController,
+            hint: 'WhatsApp Layanan Tamu',
+            prefixIcon: Icons.chat_bubble_outline_rounded,
+            keyboardType: TextInputType.phone,
+          ),
+          const SizedBox(height: 8),
+          _buildInputBox(
+            controller: _emailController,
+            hint: 'Email Reservasi',
+            prefixIcon: Icons.email_outlined,
+            keyboardType: TextInputType.emailAddress,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCoordinatesHelperDialog() {
+    final pasteCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.pin_drop_rounded, color: Color(0xFF00758F)),
+            SizedBox(width: 8),
+            Text('Input Koordinat Google Maps',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Tempel link Google Maps atau format "Latitude, Longitude" langsung:',
+              style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: pasteCtrl,
+              decoration: InputDecoration(
+                hintText: 'Contoh: -8.691200, 115.168333 atau link Maps',
+                hintStyle: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00758F),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              final raw = pasteCtrl.text.trim();
+              Navigator.pop(ctx);
+              _parseAndSetCoordinates(raw);
+            },
+            child: const Text('Terapkan', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _parseAndSetCoordinates(String raw) {
+    if (raw.isEmpty) return;
+
+    // Cek format "-8.123, 115.123"
+    final directMatch =
+        RegExp(r'(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)').firstMatch(raw);
+    if (directMatch != null) {
+      setState(() {
+        _latitudeController.text = directMatch.group(1)!;
+        _longitudeController.text = directMatch.group(2)!;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Koordinat berhasil diterapkan!'),
+          backgroundColor: Color(0xFF16A34A),
+        ),
+      );
+      return;
+    }
+
+    // Cek format link Google Maps @-8.123,115.123
+    final linkMatch =
+        RegExp(r'@(-?\d+\.\d+),(-?\d+\.\d+)').firstMatch(raw);
+    if (linkMatch != null) {
+      setState(() {
+        _latitudeController.text = linkMatch.group(1)!;
+        _longitudeController.text = linkMatch.group(2)!;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Koordinat dari link Google Maps berhasil diserap!'),
+          backgroundColor: Color(0xFF16A34A),
+        ),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Format koordinat tidak dikenali. Masukkan contoh: -8.691200, 115.168333'),
+        backgroundColor: Colors.orange,
+      ),
+    );
+  }
+
+  Widget _buildCategoryGrid() {
+    final categories = [
+      {'label': 'Resor Bintang 5', 'icon': Icons.apartment_rounded},
+      {'label': 'Hotel Butik Modern', 'icon': Icons.hotel_rounded},
+      {'label': 'Villa Mewah Privat', 'icon': Icons.holiday_village_rounded},
+      {'label': 'Glamping Eksklusif', 'icon': Icons.terrain_rounded},
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: 4,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 2.8,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+      ),
+      itemBuilder: (context, index) {
+        final isSelected = _selectedCategory == index;
+        final cat = categories[index];
+        return InkWell(
+          onTap: () => setState(() => _selectedCategory = index),
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: isSelected ? const Color(0xFF006678) : Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isSelected ? const Color(0xFF006678) : const Color(0xFFE2E8F0),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  cat['icon'] as IconData,
+                  size: 15,
+                  color: isSelected ? Colors.white : const Color(0xFF64748B),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    cat['label'] as String,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                      color: isSelected ? Colors.white : const Color(0xFF334155),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLegalVerificationSubcard() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.verified_outlined, size: 14, color: Color(0xFF007A94)),
+              SizedBox(width: 6),
+              Text(
+                'Verifikasi Dokumen Badan Usaha\n(Kemeninves/BKPM)',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                  height: 1.2,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Nomor Induk Berusaha (NIB OSS)',
+            style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+          ),
+          const SizedBox(height: 4),
+          _buildInputBox(
+            controller: _nibController,
+            hint: 'Contoh: 9120005431100',
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'NPWP Perusahaan / PT',
+            style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+          ),
+          const SizedBox(height: 4),
+          _buildInputBox(
+            controller: _npwpController,
+            hint: 'Contoh: 01.590.342.1-901.000',
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Nama PT / CV Penanggung Jawab Hukum',
+            style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+          ),
+          const SizedBox(height: 4),
+          _buildInputBox(
+            controller: _ptNameController,
+            hint: 'Contoh: PT Graha Wisata Indonesia',
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Section B: Fasilitas Unggulan Properti
+  // ---------------------------------------------------------------------------
+  Widget _buildSectionB() {
+    final facilityIcons = {
+      'Infinity Pool': Icons.pool_rounded,
+      'WiFi 100Mbps': Icons.wifi_rounded,
+      'Spa & Wellness': Icons.spa_rounded,
+      'Sarapan Buffet': Icons.restaurant_rounded,
+      'Parkir Valet Gratis': Icons.local_parking_rounded,
+      'Shuttle Bandara': Icons.directions_bus_rounded,
+      'Resto & Bar 24 Jam': Icons.local_bar_rounded,
+      'Pet-Friendly': Icons.pets_rounded,
+    };
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0F7FA),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.stars_rounded, size: 18, color: Color(0xFF0096B4)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'Section B: Fasilitas Unggulan\nProperti',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                        height: 1.2,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Fasilitas publik & layanan utama yang tampil di badge pencarian',
+                      style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // 8 Checklist Fasilitas
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _facilities.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 2.7,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+            ),
+            itemBuilder: (context, index) {
+              final key = _facilities.keys.elementAt(index);
+              final isChecked = _facilities[key] ?? false;
+              final icon = facilityIcons[key] ?? Icons.check_circle_outline;
+
+              return InkWell(
+                onTap: () => setState(() => _facilities[key] = !isChecked),
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isChecked ? const Color(0xFF0096B4) : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isChecked ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                        size: 16,
+                        color: isChecked ? const Color(0xFF0096B4) : const Color(0xFF94A3B8),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(icon, size: 14, color: const Color(0xFF64748B)),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          key,
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Section C: Galeri Media & Foto Resmi (Point 4: Berfungsi Penuh)
+  // ---------------------------------------------------------------------------
+  Widget _buildSectionC() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0F7FA),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.photo_library_outlined,
+                    size: 18, color: Color(0xFF0096B4)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'Section C : Galeri Media &\nFoto Resmi',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                        height: 1.2,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Format JPG/PNG, rasio 16:9, foto pertama menjadi Cover Utama',
+                      style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFBAE6FD),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${_photoUrls.length}/10\nFoto',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0284C7),
+                    height: 1.1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Dashed border upload card (Bisa diklik untuk upload/tambah foto)
+          InkWell(
+            onTap: _showAddPhotoModal,
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0F9FF),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: const Color(0xFF7DD3FC),
+                  style: BorderStyle.solid,
+                  width: 1.2,
+                ),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFBAE6FD),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.cloud_upload_outlined,
+                        size: 24, color: Color(0xFF0284C7)),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Unggah Foto Hotel / Tambah Gambar',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Ketuk untuk pilih dari kamera, galeri HP, atau masukkan URL foto',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Dynamic Thumbnail Previews
+          if (_photoUrls.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                children: const [
+                  Icon(Icons.photo_library_outlined, size: 28, color: Color(0xFF94A3B8)),
+                  SizedBox(height: 6),
+                  Text(
+                    'Belum ada foto galeri yang diunggah.',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF475569)),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Gunakan tombol di atas atau di bawah untuk menambah foto hotel dari galeri HP atau URL.',
+                    style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            )
+          else
+            SizedBox(
+              height: 110,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _photoUrls.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 8),
+                itemBuilder: (context, idx) {
+                  final url = _photoUrls[idx];
+                  final isCover = idx == 0;
+                  return Stack(
+                    children: [
+                      Container(
+                        width: 140,
+                        height: 105,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isCover
+                                ? const Color(0xFF00758F)
+                                : const Color(0xFFE2E8F0),
+                            width: isCover ? 2 : 1,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: HotelImageUploadService.instance.buildSafeImage(
+                            url,
+                            width: 140,
+                            height: 105,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                      // Badge Cover
+                      Positioned(
+                        bottom: 6,
+                        left: 6,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isCover
+                                ? const Color(0xFF00758F).withValues(alpha: 0.9)
+                                : Colors.black54,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            isCover ? 'Cover Utama ⭐' : 'Foto ${idx + 1}',
+                            style: const TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Hapus tombol
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: InkWell(
+                          onTap: () {
+                            setState(() => _photoUrls.removeAt(idx));
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: const BoxDecoration(
+                              color: Colors.black54,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.close,
+                                size: 13, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          const SizedBox(height: 12),
+
+          // Tambah Foto Button
+          SizedBox(
+            width: double.infinity,
+            height: 38,
+            child: OutlinedButton.icon(
+              onPressed: _showAddPhotoModal,
+              icon: const Icon(Icons.add_photo_alternate_outlined,
+                  size: 16, color: Color(0xFF007A94)),
+              label: const Text(
+                '+ Tambah Foto / URL Galeri',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF007A94)),
+              ),
+              style: OutlinedButton.styleFrom(
+                backgroundColor: const Color(0xFFEEF2FE),
+                side: const BorderSide(color: Color(0xFFBAE6FD)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddPhotoModal() {
+    final urlCtrl = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          left: 18,
+          right: 18,
+          top: 18,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 18,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Tambah Foto Hotel',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // Opsi 1: Dari Kamera Fisik
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0F7FA),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.camera_alt_outlined,
+                    color: Color(0xFF007A94)),
+              ),
+              title: const Text('Ambil dari Kamera',
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+              subtitle: const Text('Gunakan kamera perangkat untuk mengambil foto',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+              onTap: () async {
+                Navigator.pop(ctx);
+                try {
+                  final picker = ImagePicker();
+                  final picked =
+                      await picker.pickImage(source: ImageSource.camera, imageQuality: 85);
+                  if (picked != null) {
+                    setState(() {
+                      _photoUrls.add(picked.path);
+                    });
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Foto kamera berhasil ditambahkan!'),
+                          backgroundColor: Color(0xFF16A34A),
+                        ),
+                      );
+                    }
+                  }
+                } catch (e) {
+                  debugPrint('Picker error: $e');
+                }
+              },
+            ),
+            const Divider(height: 1),
+
+            // Opsi 2: Dari Galeri Perangkat via ImagePicker
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0F7FA),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.photo_library_outlined,
+                    color: Color(0xFF007A94)),
+              ),
+              title: const Text('Pilih dari Galeri Perangkat',
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+              subtitle: const Text('Pilih file gambar langsung dari HP/Komputer',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+              onTap: () async {
+                Navigator.pop(ctx);
+                try {
+                  final picker = ImagePicker();
+                  final picked =
+                      await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+                  if (picked != null) {
+                    setState(() {
+                      _photoUrls.add(picked.path);
+                    });
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Foto galeri berhasil ditambahkan!'),
+                          backgroundColor: Color(0xFF16A34A),
+                        ),
+                      );
+                    }
+                  }
+                } catch (e) {
+                  debugPrint('Picker error: $e');
+                }
+              },
+            ),
+            const Divider(height: 1),
+
+            // Opsi 3: Input URL Foto
+            const SizedBox(height: 8),
+            const Text(
+              'Atau Masukkan URL Gambar (Direct Link):',
+              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: urlCtrl,
+              decoration: InputDecoration(
+                hintText: 'https://example.com/foto-hotel.jpg',
+                hintStyle: const TextStyle(fontSize: 11),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 40,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00758F),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: () {
+                  final url = urlCtrl.text.trim();
+                  if (url.isNotEmpty) {
+                    setState(() => _photoUrls.add(url));
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Foto URL berhasil ditambahkan!'),
+                        backgroundColor: Color(0xFF16A34A),
+                      ),
+                    );
+                  }
+                },
+                child: const Text('Tambahkan URL Foto',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Section D: Master Tipe Kamar (Bisa Tambah Banyak Tipe Kamar)
+  // ---------------------------------------------------------------------------
+  Widget _buildSectionD() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0F7FA),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.bed_rounded, size: 18, color: Color(0xFF0096B4)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'Section D: Master Tipe Kamar',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                        height: 1.2,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Setup tipe kamar, ranjang, dan skema tarif (dapat menambah lebih dari 1 tipe kamar)',
+                      style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFBAE6FD),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${_roomTypes.length} Tipe\nKamar',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0284C7),
+                    height: 1.1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Render list of room types
+          for (int i = 0; i < _roomTypes.length; i++) ...[
+            _buildRoomTypeCard(i),
+            if (i < _roomTypes.length - 1) const SizedBox(height: 14),
+          ],
+
+          const SizedBox(height: 14),
+
+          // Tombol Tambah Tipe Kamar Lain
+          SizedBox(
+            width: double.infinity,
+            height: 42,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                setState(() {
+                  _roomTypes.add(RoomTypeFormData());
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Tipe Kamar #${_roomTypes.length} berhasil ditambahkan!'),
+                    backgroundColor: const Color(0xFF00758F),
+                    duration: const Duration(seconds: 1),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.add_circle_outline, size: 18),
+              label: const Text(
+                '+ Tambah Tipe Kamar Lain',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE0F7FA),
+                foregroundColor: const Color(0xFF006678),
+                elevation: 0,
+                side: const BorderSide(color: Color(0xFF0096B4), width: 1.2),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRoomTypeCard(int i) {
+    final room = _roomTypes[i];
+    final roomNumberStr = (i + 1).toString().padLeft(2, '0');
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Card Kamar
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00758F),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'Tipe Kamar #$roomNumberStr',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (room.nameController.text.trim().isNotEmpty)
+                    Text(
+                      room.nameController.text.trim(),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                ],
+              ),
+              if (_roomTypes.length > 1)
+                InkWell(
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Hapus Tipe Kamar?'),
+                        content: Text('Apakah Anda yakin ingin menghapus Tipe Kamar #$roomNumberStr?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('Batal'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              setState(() {
+                                final removed = _roomTypes.removeAt(i);
+                                removed.dispose();
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Tipe kamar berhasil dihapus'),
+                                  backgroundColor: Color(0xFFEF4444),
+                                  duration: Duration(seconds: 1),
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+                            child: const Text('Hapus', style: TextStyle(color: Colors.white)),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFFCA5A5)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.delete_outline, size: 13, color: Color(0xFFDC2626)),
+                        SizedBox(width: 3),
+                        Text(
+                          'Hapus',
+                          style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: Color(0xFFDC2626)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Nama Tipe Kamar
+          const Text(
+            'Nama Tipe Kamar *',
+            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 4),
+          _buildInputBox(
+            controller: room.nameController,
+            hint: 'Contoh: Deluxe Ocean Panorama Suite',
+          ),
+          const SizedBox(height: 10),
+
+          // Luas Kamar & Tipe Ranjang
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Luas Kamar
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Luas Kamar', style: TextStyle(fontSize: 9.5, color: Color(0xFF64748B))),
+                    const SizedBox(height: 4),
+                    _buildInputBox(
+                      controller: room.sizeController,
+                      hint: '48',
+                      suffixText: 'm²',
+                      keyboardType: TextInputType.number,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // Tipe Ranjang Dropdown
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Tipe Ranjang (Pilih)', style: TextStyle(fontSize: 9.5, color: Color(0xFF64748B))),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _bedTypeOptions.contains(room.selectedBedType)
+                              ? room.selectedBedType
+                              : _bedTypeOptions.first,
+                          isExpanded: true,
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF64748B)),
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF0F172A),
+                          ),
+                          items: _bedTypeOptions.map((opt) {
+                            return DropdownMenuItem<String>(
+                              value: opt,
+                              child: Text(opt, overflow: TextOverflow.ellipsis),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() => room.selectedBedType = val);
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Kapasitas Tamu (+ / -)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Kapasitas Tamu (Dewasa / Anak)',
+                  style: TextStyle(fontSize: 9.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                ),
+                child: Row(
+                  children: [
+                    InkWell(
+                      onTap: () {
+                        if (room.guestCapacity > 1) {
+                          setState(() {
+                            room.guestCapacity--;
+                            room.capacityController.text = '${room.guestCapacity}';
+                          });
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.remove, size: 15, color: Color(0xFF00758F)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: room.capacityController,
+                        textAlign: TextAlign.center,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                        ),
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                          isDense: true,
+                          suffixText: 'Tamu',
+                          suffixStyle: TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
+                        ),
+                        onChanged: (val) {
+                          final parsed = int.tryParse(val.replaceAll(RegExp(r'[^0-9]'), ''));
+                          if (parsed != null && parsed > 0) {
+                            room.guestCapacity = parsed;
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          room.guestCapacity++;
+                          room.capacityController.text = '${room.guestCapacity}';
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.add, size: 15, color: Color(0xFF00758F)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Alokasi Kuota & Skema Tarif
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.payments_outlined, size: 14, color: Color(0xFF007A94)),
+                        SizedBox(width: 6),
+                        Text(
+                          'Alokasi Kuota & Skema Tarif',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(
+                      width: 85,
+                      child: _buildInputBox(
+                        controller: room.totalUnitController,
+                        hint: '10',
+                        suffixText: 'Unit',
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text('Harga Weekday (Sen–Kam) *',
+                    style: TextStyle(fontSize: 9.5, color: Color(0xFF64748B))),
+                const SizedBox(height: 4),
+                _buildPriceInputBox(controller: room.weekdayPriceController),
+                const SizedBox(height: 8),
+                const Text('Harga Weekend (Jum–Min) *',
+                    style: TextStyle(fontSize: 9.5, color: Color(0xFF64748B))),
+                const SizedBox(height: 4),
+                _buildPriceInputBox(controller: room.weekendPriceController),
+                const SizedBox(height: 8),
+                const Text('Biaya Tambahan Extra Bed',
+                    style: TextStyle(fontSize: 9.5, color: Color(0xFF64748B))),
+                const SizedBox(height: 4),
+                _buildPriceInputBox(controller: room.extraBedController),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Fasilitas Kamar Eksklusif
+          const Text(
+            'Fasilitas Kamar Eksklusif Terpasang',
+            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 6),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: room.roomAmenities.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 2.8,
+              crossAxisSpacing: 6,
+              mainAxisSpacing: 6,
+            ),
+            itemBuilder: (context, idx) {
+              final key = room.roomAmenities.keys.elementAt(idx);
+              final isChecked = room.roomAmenities[key] ?? false;
+              return InkWell(
+                onTap: () => setState(() => room.roomAmenities[key] = !isChecked),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isChecked ? const Color(0xFF0096B4) : const Color(0xFFCBD5E1),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isChecked ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                        size: 14,
+                        color: isChecked ? const Color(0xFF0096B4) : const Color(0xFF94A3B8),
+                      ),
+                      const SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          key,
+                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Section E: Kebijakan Check-In & Pembatalan (Point 8: showTimePicker Bulat)
+  // ---------------------------------------------------------------------------
+  Widget _buildSectionE() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0F7FA),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.verified_user_outlined,
+                    size: 18, color: Color(0xFF0096B4)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'Section E: Kebijakan Check-\nIn & Pembatalan',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                        height: 1.2,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Aturan kedatangan tamu dan ketentuan pengembalian dana',
+                      style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // 3 Columns: Waktu Check-in, Waktu Check-out, Deposit Jaminan
+          Row(
+            children: [
+              // Waktu Check-in (showTimePicker bulat)
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Waktu Check-in *',
+                        style: TextStyle(fontSize: 9.5, color: Color(0xFF64748B))),
+                    const SizedBox(height: 4),
+                    InkWell(
+                      onTap: () => showRoundTimePicker(
+                        context: context,
+                        controller: _checkInController,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      child: IgnorePointer(
+                        child: _buildInputBox(
+                          controller: _checkInController,
+                          suffixIcon: Icons.access_time_rounded,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // Waktu Check-out (showTimePicker bulat)
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Waktu Check-out *',
+                        style: TextStyle(fontSize: 9.5, color: Color(0xFF64748B))),
+                    const SizedBox(height: 4),
+                    InkWell(
+                      onTap: () => showRoundTimePicker(
+                        context: context,
+                        controller: _checkOutController,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      child: IgnorePointer(
+                        child: _buildInputBox(
+                          controller: _checkOutController,
+                          suffixIcon: Icons.access_time_rounded,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // Deposit Jaminan (Format titik)
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Deposit Jaminan',
+                        style: TextStyle(fontSize: 9.5, color: Color(0xFF64748B))),
+                    const SizedBox(height: 4),
+                    _buildPriceInputBox(controller: _depositController),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Kebijakan Pembatalan Pesanan Tamu
+          const Text(
+            'Kebijakan Pembatalan Pesanan Tamu',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 8),
+
+          // Option 1
+          InkWell(
+            onTap: () => setState(() => _cancellationPolicy = 0),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _cancellationPolicy == 0 ? const Color(0xFFF0FDF4) : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _cancellationPolicy == 0 ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    _cancellationPolicy == 0
+                        ? Icons.radio_button_checked_rounded
+                        : Icons.radio_button_off_rounded,
+                    size: 16,
+                    color: _cancellationPolicy == 0 ? const Color(0xFF007A94) : const Color(0xFF94A3B8),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'Bebas Pembatalan (H-3)',
+                          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Pengembalian dana 100% jika dibatalkan 3 hari sebelum jam check-in.',
+                          style: TextStyle(fontSize: 10, color: Color(0xFF64748B), height: 1.3),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Option 2
+          InkWell(
+            onTap: () => setState(() => _cancellationPolicy = 1),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _cancellationPolicy == 1 ? const Color(0xFFFEF2F2) : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _cancellationPolicy == 1 ? const Color(0xFFFCA5A5) : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    _cancellationPolicy == 1
+                        ? Icons.radio_button_checked_rounded
+                        : Icons.radio_button_off_rounded,
+                    size: 16,
+                    color: _cancellationPolicy == 1 ? const Color(0xFFDC2626) : const Color(0xFF94A3B8),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'Non-Refundable (Harga Promo)',
+                          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Tidak ada pengembalian uang setelah reservasi terkonfirmasi.',
+                          style: TextStyle(fontSize: 10, color: Color(0xFF64748B), height: 1.3),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Submit Form: Create or Update Hotel (Point 9)
+  // ---------------------------------------------------------------------------
+  Future<void> _submitForm() async {
+    final name = _hotelNameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nama hotel / properti wajib diisi!'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+
+    final address = _addressController.text.trim();
+    final city = _cityController.text.trim();
+    if (address.isEmpty || city.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Alamat dan kota wajib diisi!'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+
+    // Validasi kamar terisi di Section D
+    final validRooms = _roomTypes
+        .where((r) => r.nameController.text.trim().isNotEmpty)
+        .toList();
+    if (!_isEditMode && validRooms.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Mohon isi minimal 1 tipe kamar di Section D!'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final deposit =
+          ThousandsSeparatorInputFormatter.parse(_depositController.text);
+
+      String formatTime(String text, String fallback) {
+        final match = RegExp(r'\b(\d{1,2}):(\d{2})\b').firstMatch(text);
+        if (match != null) {
+          final h = match.group(1)!.padLeft(2, '0');
+          final m = match.group(2)!;
+          return '$h:$m:00';
+        }
+        return fallback;
+      }
+
+      final checkInTime = formatTime(_checkInController.text, '14:00:00');
+      final checkOutTime = formatTime(_checkOutController.text, '12:00:00');
+
+      final activeFacilities = _facilities.entries
+          .where((e) => e.value)
+          .map((e) => e.key)
+          .toList();
+
+      final lat = double.tryParse(_latitudeController.text.trim());
+      final long = double.tryParse(_longitudeController.text.trim());
+
+      // Unggah foto lokal perangkat ke Supabase Storage (bucket avatars) jika ada
+      final List<String> finalPhotoUrls = [];
+      for (final p in _photoUrls) {
+        if (_isLocalFile(p)) {
+          final file = File(p.replaceFirst('file://', ''));
+          if (file.existsSync()) {
+            final uploaded = await HotelImageUploadService.instance.uploadFile(
+              file,
+              prefix: 'hotel_galeri',
+            );
+            if (uploaded != null && uploaded.isNotEmpty) {
+              finalPhotoUrls.add(uploaded);
+              continue;
+            }
+          }
+        }
+        finalPhotoUrls.add(p);
+      }
+      final mainImage = finalPhotoUrls.isNotEmpty ? finalPhotoUrls.first : null;
+
+      // Siapkan payload seluruh tipe kamar di Section D
+      final List<Map<String, dynamic>> roomTypesPayload = [];
+      for (final room in validRooms) {
+        final rName = room.nameController.text.trim();
+        final wPrice =
+            ThousandsSeparatorInputFormatter.parse(room.weekdayPriceController.text);
+        final ePrice =
+            ThousandsSeparatorInputFormatter.parse(room.weekendPriceController.text);
+        final size = double.tryParse(
+                room.sizeController.text.replaceAll(RegExp(r'[^0-9.]'), '')) ??
+            30.0;
+        final totalU = int.tryParse(
+                room.totalUnitController.text.replaceAll(RegExp(r'[^0-9]'), '')) ??
+            10;
+        final activeRoomAmenities = room.roomAmenities.entries
+            .where((e) => e.value)
+            .map((e) => e.key)
+            .toList();
+
+        roomTypesPayload.add({
+          'name': rName,
+          'capacity': room.guestCapacity,
+          'sizeM2': size,
+          'bedType': room.selectedBedType,
+          'weekdayPrice': wPrice > 0 ? wPrice : 500000.0,
+          'weekendPrice':
+              ePrice > 0 ? ePrice : (wPrice > 0 ? wPrice * 1.2 : 600000.0),
+          'totalUnit': totalU > 0 ? totalU : 10,
+          'amenities': activeRoomAmenities,
+        });
+      }
+
+      if (_isEditMode) {
+        // MODE EDIT HOTEL
+        final hotelId = widget.hotelToEdit!.id;
+        final ok = await HotelService.instance.updateHotel(
+          hotelId: hotelId,
+          name: name,
+          city: city,
+          address: address,
+          phone: _phoneController.text.trim(),
+          whatsapp: _waController.text.trim(),
+          checkInTime: checkInTime,
+          checkOutTime: checkOutTime,
+          deposit: deposit,
+          cancellationPolicy: _cancellationPolicy == 0
+              ? 'Bebas Pembatalan (H-3)'
+              : 'Non-Refundable',
+          latitude: lat,
+          longitude: long,
+          mainImageUrl: mainImage,
+          imageUrls: finalPhotoUrls,
+          facilities: activeFacilities,
+          ptName: _ptNameController.text.trim(),
+          npwp: _npwpController.text.trim(),
+          nib: _nibController.text.trim(),
+        );
+
+        // Update/insert kamar baru jika diedit
+        final parsedHotelId = int.tryParse(hotelId) ?? 0;
+        if (parsedHotelId > 0 && roomTypesPayload.isNotEmpty) {
+          final svcKey = SupabaseConfig.supabaseServiceRoleKey.isNotEmpty
+              ? SupabaseConfig.supabaseServiceRoleKey
+              : SupabaseConfig.activeApiKey;
+          for (int i = 0; i < roomTypesPayload.length; i++) {
+            final r = roomTypesPayload[i];
+            final rName = r['name'] as String;
+            final uniqueRoomTypeId =
+                '${parsedHotelId}_${i + 1}_${DateTime.now().millisecondsSinceEpoch % 100000}';
+            final activeRoomAmenities =
+                (r['amenities'] as List<String>).join(', ');
+            try {
+              final uri = Uri.parse(
+                  '${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableTipeKamar}');
+              await http.post(uri, headers: {
+                'apikey': svcKey,
+                'Authorization': 'Bearer $svcKey',
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal',
+              }, body: jsonEncode({
+                'id_tipe_kamar': uniqueRoomTypeId,
+                'id_penginapan': parsedHotelId,
+                'nama_tipe': rName,
+                'kapasitas_tamu': r['capacity'],
+                'luas_m2': r['sizeM2'],
+                'tipe_bed': r['bedType'],
+                'harga_dasar': r['weekdayPrice'],
+                'harga_weekend': r['weekendPrice'],
+                'total_unit': r['totalUnit'],
+                'fasilitas_kamar': activeRoomAmenities,
+              }));
+            } catch (_) {}
+          }
+        }
+
+        if (!mounted) return;
+        setState(() => _isSubmitting = false);
+
+        if (ok) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Berhasil! Perubahan data hotel telah disimpan.'),
+              backgroundColor: Color(0xFF16A34A),
+            ),
+          );
+          Navigator.pop(context, true);
+        } else {
+          throw Exception('Gagal memperbarui data hotel di database.');
+        }
+      } else {
+        // MODE INPUT HOTEL BARU
+        final firstRoom =
+            roomTypesPayload.isNotEmpty ? roomTypesPayload.first : null;
+        await HotelService.instance.createHotel(
+          name: name,
+          address: address,
+          city: city,
+          ptName: _ptNameController.text.trim(),
+          nib: _nibController.text.trim(),
+          npwp: _npwpController.text.trim(),
+          phone: _phoneController.text.trim(),
+          whatsapp: _waController.text.trim(),
+          checkInTime: checkInTime,
+          checkOutTime: checkOutTime,
+          deposit: deposit,
+          cancellationPolicy: _cancellationPolicy == 0
+              ? 'Bebas Pembatalan (H-3)'
+              : 'Non-Refundable',
+          facilities: activeFacilities,
+          latitude: lat,
+          longitude: long,
+          mainImageUrl: mainImage,
+          imageUrls: finalPhotoUrls,
+          roomTypes: roomTypesPayload,
+          roomName: firstRoom != null ? firstRoom['name'] as String : null,
+          roomCapacity:
+              firstRoom != null ? firstRoom['capacity'] as int : null,
+          roomSizeM2:
+              firstRoom != null ? firstRoom['sizeM2'] as double : null,
+          bedType: firstRoom != null ? firstRoom['bedType'] as String : null,
+          weekdayPrice:
+              firstRoom != null ? firstRoom['weekdayPrice'] as double : null,
+          weekendPrice:
+              firstRoom != null ? firstRoom['weekendPrice'] as double : null,
+          roomAmenities:
+              firstRoom != null ? firstRoom['amenities'] as List<String> : null,
+        );
+
+        if (!mounted) return;
+        setState(() => _isSubmitting = false);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Berhasil! Mitra hotel baru dengan ${roomTypesPayload.length} tipe kamar berhasil disimpan ke database.'),
+            backgroundColor: const Color(0xFF00758F),
+          ),
+        );
+
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal menyimpan hotel: $e'),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
+      );
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bottom Action Bar
+  // ---------------------------------------------------------------------------
+  Widget _buildBottomActionBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+        ),
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        height: 46,
+        child: ElevatedButton.icon(
+          onPressed: _isSubmitting ? null : _submitForm,
+          icon: _isSubmitting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.cloud_done_rounded, size: 18, color: Colors.white),
+          label: Text(
+            _isSubmitting
+                ? 'Menyimpan ke Database...'
+                : (_isEditMode
+                    ? 'Simpan Perubahan Hotel ➔'
+                    : 'Lanjutkan & Daftarkan Hotel ➔'),
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF00758F),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            elevation: 0,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInputBox({
+    required TextEditingController controller,
+    String? hint,
+    IconData? prefixIcon,
+    IconData? suffixIcon,
+    String? suffixText,
+    TextInputType? keyboardType,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: TextField(
+        controller: controller,
+        keyboardType: keyboardType,
+        style: const TextStyle(
+            fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+          prefixIcon: prefixIcon != null
+              ? Icon(prefixIcon, size: 15, color: const Color(0xFF007A94))
+              : null,
+          suffixIcon: suffixIcon != null
+              ? Icon(suffixIcon, size: 16, color: const Color(0xFF64748B))
+              : (suffixText != null
+                  ? Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Text(
+                        suffixText,
+                        style: const TextStyle(
+                            fontSize: 11, color: Color(0xFF64748B)),
+                      ),
+                    )
+                  : null),
+          border: InputBorder.none,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          isDense: true,
+        ),
+      ),
+    );
+  }
+
+  /// Input box khusus nominal angka dengan otomatis titik ribuan (Point 7)
+  Widget _buildPriceInputBox({
+    required TextEditingController controller,
+    String? hint,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: TextField(
+        controller: controller,
+        keyboardType: TextInputType.number,
+        inputFormatters: [
+          ThousandsSeparatorInputFormatter(),
+        ],
+        style: const TextStyle(
+            fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+        decoration: InputDecoration(
+          prefixText: 'Rp ',
+          prefixStyle: const TextStyle(
+              fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF007A94)),
+          hintText: hint ?? '0',
+          hintStyle: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+          border: InputBorder.none,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          isDense: true,
+        ),
+      ),
+    );
+  }
+}

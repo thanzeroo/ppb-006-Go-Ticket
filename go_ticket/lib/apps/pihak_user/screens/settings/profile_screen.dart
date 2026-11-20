@@ -8,7 +8,7 @@ import 'package:go_ticket/core/services/supabase_service.dart';
 import 'package:go_ticket/core/utils/storage_helper.dart';
 import 'package:go_ticket/core/widgets/gt_ui.dart';
 import 'package:go_ticket/core/widgets/user_avatar.dart';
-import '../../../pihak_hotel/services/hotel_image_upload_service.dart';
+import 'package:go_ticket/core/services/hotel_image_upload_service.dart';
 
 /// Edit Profil Saya (Figma: "USER Page Profil Saya").
 class ProfileScreen extends StatefulWidget {

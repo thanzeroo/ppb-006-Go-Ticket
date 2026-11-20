@@ -1,0 +1,1858 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../../../../../core/services/promo_service.dart';
+import 'formatters.dart';
+
+/// Form Tambah/Edit Promo (6 Sections)
+/// Sesuai dengan desain visual pada Gambar 2 (Tambah Promo).
+class TambahPromoScreen extends StatefulWidget {
+  final Map<String, dynamic>? promoToEdit;
+
+  const TambahPromoScreen({super.key, this.promoToEdit});
+
+  @override
+  State<TambahPromoScreen> createState() => _TambahPromoScreenState();
+}
+
+class _TambahPromoScreenState extends State<TambahPromoScreen> {
+  bool get _isEditMode => widget.promoToEdit != null;
+  bool _isSubmitting = false;
+
+  // Section 1: Identitas & Kode Promo
+  final _promoNameController = TextEditingController();
+  final _promoCodeController = TextEditingController();
+  final _descController = TextEditingController();
+
+  // Section 2: Tipe & Skema Diskon
+  int _discountType = 0; // 0 = Persentase, 1 = Nominal Flat, 2 = Gratis Ekstra
+  final _discountValueController = TextEditingController();
+  final _maxDiscountController = TextEditingController();
+
+  // Section 3: Masa Berlaku
+  int _periodTab = 0; // 0 = Periode Booking, 1 = Periode Stay
+  DateTime? _selectedStartDate;
+  DateTime? _selectedEndDate;
+  final _startDateController = TextEditingController();
+  final _endDateController = TextEditingController();
+  int _applicableDays = 0; // 0 = All Days, 1 = Weekday, 2 = Weekend
+
+  // Section 4: Kuota & Batas Klaim
+  final _totalQuotaController = TextEditingController(text: '100');
+  final _limitPerAccountController = TextEditingController(text: '1x Klaim');
+  final _minTxController = TextEditingController();
+  final _minStayController = TextEditingController(text: 'Min. 1 Malam');
+
+  // Section 5: Cakupan Kamar
+  int _roomCoverage = 1; // 0 = Semua Kamar, 1 = Kamar Tertentu
+
+  // Section 6: Visibilitas & Pendanaan
+  bool _publicDiscovery = true;
+  bool _secretCode = false;
+  int _coFunding = 0; // 0 = 100% Hotel, 1 = 50:50
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isEditMode) {
+      final p = widget.promoToEdit!;
+      _promoNameController.text =
+          p['title']?.toString() ?? p['nama_kampanye']?.toString() ?? '';
+      _promoCodeController.text =
+          p['code']?.toString() ?? p['kode_promo']?.toString() ?? '';
+      _descController.text =
+          p['description']?.toString() ?? p['deskripsi_promo']?.toString() ?? '';
+
+      final dType = (p['discountType'] ?? p['tipe_diskon'] ?? 'Persen')
+          .toString()
+          .toLowerCase();
+      _discountType = dType.contains('nominal') ? 1 : 0;
+
+      final discVal = (p['discountPercent'] ?? p['besaran_diskon'] as num?)?.toInt() ?? 0;
+      _discountValueController.text = discVal > 0
+          ? ThousandsSeparatorInputFormatter.format(discVal)
+          : '';
+
+      final maxDisc = (p['maxDiscount'] ?? p['maks_plafon_diskon'] as num?)?.toInt() ?? 0;
+      _maxDiscountController.text = maxDisc > 0
+          ? ThousandsSeparatorInputFormatter.format(maxDisc)
+          : '';
+
+      final minTx = (p['minBookingAmount'] ?? p['min_transaksi'] as num?)?.toInt() ?? 0;
+      _minTxController.text = minTx > 0
+          ? ThousandsSeparatorInputFormatter.format(minTx)
+          : '';
+
+      final quota = p['totalQuota'] ?? p['total_kuota'] ?? 100;
+      _totalQuotaController.text = ThousandsSeparatorInputFormatter.format(
+          quota is num ? quota : int.tryParse(quota.toString()) ?? 100);
+
+      final sDateStr = p['startDate'] ?? p['tgl_mulai'];
+      if (sDateStr != null) {
+        _selectedStartDate =
+            DateTime.tryParse(sDateStr.toString()) ?? DateTime.now();
+      } else {
+        _selectedStartDate = DateTime.now();
+      }
+
+      final eDateStr = p['expiredDate'] ?? p['tgl_berakhir'];
+      if (eDateStr != null) {
+        _selectedEndDate = DateTime.tryParse(eDateStr.toString()) ??
+            DateTime.now().add(const Duration(days: 30));
+      } else {
+        _selectedEndDate = DateTime.now().add(const Duration(days: 30));
+      }
+    } else {
+      _selectedStartDate = DateTime.now();
+      _selectedEndDate = DateTime.now().add(const Duration(days: 30));
+    }
+
+    _startDateController.text =
+        '${_selectedStartDate!.day} ${_monthName(_selectedStartDate!.month)} ${_selectedStartDate!.year}';
+    _endDateController.text =
+        '${_selectedEndDate!.day} ${_monthName(_selectedEndDate!.month)} ${_selectedEndDate!.year}';
+  }
+
+  String _monthName(int month) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Agu',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des'
+    ];
+    if (month >= 1 && month <= 12) return months[month - 1];
+    return '';
+  }
+
+  Future<void> _submitPromo() async {
+    final name = _promoNameController.text.trim();
+    final code = _promoCodeController.text.trim();
+
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nama kampanye promo wajib diisi'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (code.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kode promo wajib diisi'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final discountVal = ThousandsSeparatorInputFormatter.parse(
+            _discountValueController.text)
+        .toDouble();
+    if (discountVal <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Besaran diskon harus lebih dari 0'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final maxDisc =
+          ThousandsSeparatorInputFormatter.parse(_maxDiscountController.text)
+              .toDouble();
+
+      final minTx =
+          ThousandsSeparatorInputFormatter.parse(_minTxController.text)
+              .toDouble();
+
+      final totalQuota =
+          ThousandsSeparatorInputFormatter.parse(_totalQuotaController.text)
+              .toInt();
+
+      final discountTypeStr = _discountType == 1 ? 'Nominal' : 'Persen';
+      final isPublic = _publicDiscovery && !_secretCode;
+
+      if (_isEditMode) {
+        final promoId = (widget.promoToEdit!['id'] ??
+                widget.promoToEdit!['promo_id'])
+            ?.toString() ??
+            '';
+        final ok = await PromoService.instance.updatePromo(
+          promoId: promoId,
+          name: name,
+          code: code,
+          discountValue: discountVal,
+          discountType: discountTypeStr,
+          maxDiscount: maxDisc > 0 ? maxDisc : null,
+          minTransaction: minTx > 0 ? minTx : null,
+          totalQuota: totalQuota > 0 ? totalQuota : 100,
+          startDate: _selectedStartDate,
+          endDate: _selectedEndDate,
+        );
+
+        if (mounted) {
+          if (ok) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Voucher Promo "$code" berhasil diperbarui!'),
+                backgroundColor: const Color(0xFF16A34A),
+              ),
+            );
+            Navigator.pop(context, true);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Gagal memperbarui voucher promo'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      } else {
+        final created = await PromoService.instance.createPromo(
+          code: code,
+          name: name,
+          discountValue: discountVal,
+          discountType: discountTypeStr,
+          maxDiscount: maxDisc > 0 ? maxDisc : null,
+          minTransaction: minTx > 0 ? minTx : null,
+          totalQuota: totalQuota > 0 ? totalQuota : 100,
+          seasonCategory: _applicableDays == 2 ? 'Weekend Escape' : 'Spesial',
+          startDate: _selectedStartDate ?? DateTime.now(),
+          endDate:
+              _selectedEndDate ?? DateTime.now().add(const Duration(days: 30)),
+          isPublic: isPublic,
+          status: 'Aktif',
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Voucher Promo "${created['kode_promo'] ?? code}" berhasil disimpan ke database!',
+              ),
+              backgroundColor: const Color(0xFF00758F),
+            ),
+          );
+          Navigator.pop(context, true);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal menyimpan voucher: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _promoNameController.dispose();
+    _promoCodeController.dispose();
+    _descController.dispose();
+    _discountValueController.dispose();
+    _maxDiscountController.dispose();
+    _startDateController.dispose();
+    _endDateController.dispose();
+    _totalQuotaController.dispose();
+    _limitPerAccountController.dispose();
+    _minTxController.dispose();
+    _minStayController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFD),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Top Bar
+            _buildTopAppBar(),
+
+            // Form Body
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                children: [
+                  // Title & Stepper Header
+                  _buildHeaderTitleAndSteps(),
+                  const SizedBox(height: 16),
+
+                  // Section 1: Identitas & Kode Promo
+                  _buildSection1(),
+                  const SizedBox(height: 16),
+
+                  // Section 2: Tipe & Skema Diskon
+                  _buildSection2(),
+                  const SizedBox(height: 16),
+
+                  // Section 3: Masa Berlaku & Periode
+                  _buildSection3(),
+                  const SizedBox(height: 16),
+
+                  // Section 4: Kuota & Batas Klaim
+                  _buildSection4(),
+                  const SizedBox(height: 16),
+
+                  // Section 5: Cakupan Tipe Kamar
+                  _buildSection5(),
+                  const SizedBox(height: 16),
+
+                  // Section 6: Visibilitas & Pendanaan
+                  _buildSection6(),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+
+            // Bottom Action Bar
+            _buildBottomActionBar(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Top App Bar
+  // ---------------------------------------------------------------------------
+  Widget _buildTopAppBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
+                onPressed: () => Navigator.pop(context),
+              ),
+              Container(
+                width: 32,
+                height: 32,
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0F7FA),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Image.asset(
+                  'assets/logo.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => const Icon(
+                    Icons.confirmation_number_rounded,
+                    color: Color(0xFF00B4D8),
+                    size: 18,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _isEditMode ? 'Edit Promo' : 'Tambah Promo',
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  const Text(
+                    'The Grand Amora Resort & Spa',
+                    style: TextStyle(fontSize: 9.5, color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              ElevatedButton.icon(
+                onPressed: _isSubmitting ? null : _submitPromo,
+                icon: _isSubmitting
+                    ? const SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Icon(Icons.check_rounded,
+                        size: 14, color: Colors.white),
+                label: Text(
+                  _isSubmitting ? 'Menyimpan...' : 'Simpan',
+                  style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00C2FF),
+                  disabledBackgroundColor: const Color(0xFF94A3B8),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  elevation: 0,
+                  minimumSize: Size.zero,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 32,
+                height: 32,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF006678),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.person_rounded,
+                  size: 18,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Header Title & Steps Indicator
+  // ---------------------------------------------------------------------------
+  Widget _buildHeaderTitleAndSteps() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE0F7FA),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF00B4D8),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  const Text(
+                    'FORM PROMO & DISKON HOTEL',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF007A94),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Text(
+              'Draft #VCH-2025-08',
+              style: TextStyle(fontSize: 9.5, color: Color(0xFF64748B)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Buat Kampanye Promo',
+          style: TextStyle(
+            fontSize: 19,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+        const SizedBox(height: 2),
+        const Text(
+          'The Grand Amora Resort & Spa • Promo Engine Yield v2.4',
+          style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 12),
+
+        // 3 Step Tabs
+        Row(
+          children: [
+            _buildStepTab(label: '1. Detail & Kupon', isActive: true),
+            const SizedBox(width: 8),
+            _buildStepTab(label: '2. Nilai Diskon', isActive: false),
+            const SizedBox(width: 8),
+            _buildStepTab(label: '3. Syarat & Kamar', isActive: false),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStepTab({required String label, required bool isActive}) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: isActive ? const Color(0xFF00C2FF) : const Color(0xFFE2E8F0),
+              width: 2,
+            ),
+          ),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+            color: isActive ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Section 1: Identitas & Kode Promo
+  // ---------------------------------------------------------------------------
+  Widget _buildSection1() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0F7FA),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.bookmark_outline_rounded,
+                    size: 18, color: Color(0xFF0096B4)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      '1. Identitas & Kode Promo',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    Text(
+                      'Penamaan publik dan kode kupon tamu',
+                      style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Nama Kampanye Promo
+          const Text(
+            'Nama Kampanye Promo *',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 6),
+          _buildInputBox(controller: _promoNameController),
+          const SizedBox(height: 12),
+
+          // Kode Promo / Kupon
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: const [
+              Text(
+                'Kode Promo / Kupon *',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+              ),
+              Text(
+                'Maks. 16 Karakter',
+                style: TextStyle(fontSize: 9.5, color: Color(0xFF007A94)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: TextField(
+                    controller: _promoCodeController,
+                    textCapitalization: TextCapitalization.characters,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF0F172A),
+                      letterSpacing: 1.2,
+                    ),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(vertical: 6),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _promoCodeController.text = 'AMORA${(10 + (DateTime.now().millisecond % 90))}PROMO';
+                  });
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCFFAFE),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: const [
+                      Icon(Icons.casino_outlined, size: 14, color: Color(0xFF0891B2)),
+                      SizedBox(width: 4),
+                      Text(
+                        'Acak',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF0891B2)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              IconButton(
+                icon: const Icon(Icons.copy_rounded, size: 18, color: Color(0xFF64748B)),
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: _promoCodeController.text));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Kode kupon berhasil disalin!')),
+                  );
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Deskripsi Singkat untuk Tamu
+          const Text(
+            'Deskripsi Singkat untuk Tamu',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: TextField(
+              controller: _descController,
+              maxLines: 2,
+              style: const TextStyle(fontSize: 11, color: Color(0xFF0F172A)),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              '104 / 200 karakter',
+              style: TextStyle(fontSize: 9.5, color: Color(0xFF94A3B8)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Section 2: Tipe & Skema Diskon
+  // ---------------------------------------------------------------------------
+  Widget _buildSection2() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0F7FA),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.percent_rounded, size: 18, color: Color(0xFF0096B4)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      '2. Tipe & Skema Diskon',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    Text(
+                      'Metode potongan dan simulasi live harga',
+                      style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // 3 Discount Type Cards
+          Row(
+            children: [
+              Expanded(
+                child: _buildDiscountTypeCard(
+                  icon: Icons.percent_rounded,
+                  title: 'Persentase',
+                  sub: '(%) Potongan',
+                  isSelected: _discountType == 0,
+                  onTap: () => setState(() => _discountType = 0),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _buildDiscountTypeCard(
+                  icon: Icons.payments_outlined,
+                  title: 'Nominal Flat',
+                  sub: '(Rp) Tetap',
+                  isSelected: _discountType == 1,
+                  onTap: () => setState(() => _discountType = 1),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _buildDiscountTypeCard(
+                  icon: Icons.card_giftcard_rounded,
+                  title: 'Gratis Ekstra',
+                  sub: 'Add-on Item',
+                  isSelected: _discountType == 2,
+                  onTap: () => setState(() => _discountType = 2),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Row 2 fields: Besaran Diskon & Maks. Plafon Diskon
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _discountType == 1
+                          ? 'Besaran Diskon (Rp) *'
+                          : 'Besaran Diskon (%) *',
+                      style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0F172A)),
+                    ),
+                    const SizedBox(height: 4),
+                    _buildInputBox(
+                      controller: _discountValueController,
+                      suffixText: _discountType == 1 ? null : '%',
+                      prefixText: _discountType == 1 ? 'Rp ' : null,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: _discountType == 1
+                          ? [ThousandsSeparatorInputFormatter()]
+                          : [FilteringTextInputFormatter.digitsOnly],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Maks. Plafon Diskon',
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF0F172A))),
+                    const SizedBox(height: 4),
+                    _buildInputBox(
+                      controller: _maxDiscountController,
+                      prefixText: 'Rp ',
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [ThousandsSeparatorInputFormatter()],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // SIMULASI NILAI RIIL Card
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFBFDBFE)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.calculate_outlined, size: 15, color: Color(0xFF2563EB)),
+                        SizedBox(width: 6),
+                        Text(
+                          'SIMULASI NILAI RIIL',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF1E40AF),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'Tipe: Grand Deluxe',
+                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFF1E40AF)),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: const [
+                    Text('Harga Dasar per Malam:', style: TextStyle(fontSize: 10.5, color: Color(0xFF475569))),
+                    Text('Rp 1.450.000', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: const [
+                    Text('Diskon 25% (Hemat):', style: TextStyle(fontSize: 10.5, color: Color(0xFF2563EB), fontWeight: FontWeight.w600)),
+                    Text('-Rp 362.500', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF2563EB))),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Divider(height: 1, color: Color(0xFFBFDBFE)),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: const [
+                    Text('Total Pembayaran Tamu:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                    Text('Rp 1.087.500', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFF00758F))),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Icon(Icons.info_outline_rounded, size: 12, color: Color(0xFF64748B)),
+                    SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        'Platform fee & revenue sharing hotel dihitung dari nilai bersih transaksi setelah potongan promo diterapkan.',
+                        style: TextStyle(fontSize: 9, color: Color(0xFF64748B), height: 1.3),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDiscountTypeCard({
+    required IconData icon,
+    required String title,
+    required String sub,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFE0F7FA) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF00B4D8) : const Color(0xFFE2E8F0),
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 18, color: isSelected ? const Color(0xFF007A94) : const Color(0xFF64748B)),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected ? const Color(0xFF007A94) : const Color(0xFF0F172A),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            Text(
+              sub,
+              style: TextStyle(
+                fontSize: 8.5,
+                color: isSelected ? const Color(0xFF007A94) : const Color(0xFF64748B),
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Section 3: Masa Berlaku & Periode
+  // ---------------------------------------------------------------------------
+  Widget _buildSection3() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0F7FA),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.calendar_month_outlined, size: 18, color: Color(0xFF0096B4)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      '3. Masa Berlaku & Periode',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    Text(
+                      'Jadwal reservasi dan batas check-in',
+                      style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Period Switcher Toggle
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _periodTab = 0),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _periodTab == 0 ? Colors.white : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: _periodTab == 0
+                            ? [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 4,
+                                ),
+                              ]
+                            : null,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Periode Booking',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: _periodTab == 0 ? FontWeight.w800 : FontWeight.w600,
+                          color: _periodTab == 0 ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _periodTab = 1),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _periodTab == 1 ? Colors.white : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Periode Stay / Menginap',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: _periodTab == 1 ? FontWeight.w800 : FontWeight.w600,
+                          color: _periodTab == 1 ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // 2 Date Fields: Mulai Promo & Berakhir Promo
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Mulai Promo',
+                        style: TextStyle(
+                            fontSize: 10, color: Color(0xFF64748B))),
+                    const SizedBox(height: 4),
+                    _buildInputBox(
+                      controller: _startDateController,
+                      suffixIcon: Icons.calendar_today_outlined,
+                      readOnly: true,
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _selectedStartDate ?? DateTime.now(),
+                          firstDate: DateTime(2024),
+                          lastDate: DateTime(2030),
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            _selectedStartDate = picked;
+                            _startDateController.text =
+                                '${picked.day} ${_monthName(picked.month)} ${picked.year}';
+                          });
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Berakhir Promo',
+                        style: TextStyle(
+                            fontSize: 10, color: Color(0xFF64748B))),
+                    const SizedBox(height: 4),
+                    _buildInputBox(
+                      controller: _endDateController,
+                      suffixIcon: Icons.calendar_today_outlined,
+                      readOnly: true,
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _selectedEndDate ??
+                              DateTime.now().add(const Duration(days: 30)),
+                          firstDate: DateTime(2024),
+                          lastDate: DateTime(2030),
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            _selectedEndDate = picked;
+                            _endDateController.text =
+                                '${picked.day} ${_monthName(picked.month)} ${picked.year}';
+                          });
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Ketentuan Hari Berlaku
+          const Text(
+            'Ketentuan Hari Berlaku',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 8),
+
+          _buildApplicableDayOption(
+            index: 0,
+            title: 'Berlaku Setiap Hari (All Days)',
+            sub: 'Dapat dipakai reservasi Weekday maupun Weekend',
+          ),
+          const SizedBox(height: 6),
+          _buildApplicableDayOption(
+            index: 1,
+            title: 'Hanya Weekday (Senin - Kamis)',
+            sub: 'Meningkatkan okupansi low-traffic weekday',
+          ),
+          const SizedBox(height: 6),
+          _buildApplicableDayOption(
+            index: 2,
+            title: 'Eksklusif Weekend (Jumat - Minggu)',
+            sub: 'Khusus reservasi paket akhir pekan',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildApplicableDayOption({
+    required int index,
+    required String title,
+    required String sub,
+  }) {
+    final isSelected = _applicableDays == index;
+    return InkWell(
+      onTap: () => setState(() => _applicableDays = index),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFF0FDF4) : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              isSelected ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+              size: 16,
+              color: isSelected ? const Color(0xFF007A94) : const Color(0xFF94A3B8),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                  ),
+                  Text(
+                    sub,
+                    style: const TextStyle(fontSize: 9.5, color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Section 4: Kuota & Batas Klaim
+  // ---------------------------------------------------------------------------
+  Widget _buildSection4() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0F7FA),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.tune_rounded, size: 18, color: Color(0xFF0096B4)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      '4. Kuota & Batas Klaim',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    Text(
+                      'Kontrol alokasi voucher platform',
+                      style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Row 1: Total Kuota & Batas per Akun
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: const [
+                        Text('Total Kuota', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                        Text('Uncapped', style: TextStyle(fontSize: 9.5, color: Color(0xFF007A94))),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    _buildInputBox(
+                      controller: _totalQuotaController,
+                      suffixText: 'Kupon',
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [ThousandsSeparatorInputFormatter()],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Batas per Akun', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                    const SizedBox(height: 4),
+                    _buildInputBox(controller: _limitPerAccountController),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Row 2: Min. Transaksi & Min. Menginap
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Min. Transaksi', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                    const SizedBox(height: 4),
+                    _buildInputBox(
+                      controller: _minTxController,
+                      prefixText: 'Rp ',
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [ThousandsSeparatorInputFormatter()],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Min. Menginap', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                    const SizedBox(height: 4),
+                    _buildInputBox(
+                      controller: _minStayController,
+                      suffixIcon: Icons.keyboard_arrow_down_rounded,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Section 5: Cakupan Tipe Kamar
+  // ---------------------------------------------------------------------------
+  Widget _buildSection5() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0F7FA),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.hotel_rounded, size: 18, color: Color(0xFF0096B4)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      '5. Cakupan Tipe Kamar',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    Text(
+                      'Tentukan suite yang berhak menerima promo',
+                      style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Radio 1: Berlaku untuk Semua Tipe Kamar
+          InkWell(
+            onTap: () => setState(() => _roomCoverage = 0),
+            child: Row(
+              children: [
+                Icon(
+                  _roomCoverage == 0 ? Icons.radio_button_checked : Icons.radio_button_off,
+                  size: 16,
+                  color: _roomCoverage == 0 ? const Color(0xFF007A94) : const Color(0xFF94A3B8),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Berlaku untuk Semua Tipe Kamar',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Radio 2: Hanya Tipe Kamar Tertentu
+          InkWell(
+            onTap: () => setState(() => _roomCoverage = 1),
+            child: Row(
+              children: [
+                Icon(
+                  _roomCoverage == 1 ? Icons.radio_button_checked : Icons.radio_button_off,
+                  size: 16,
+                  color: _roomCoverage == 1 ? const Color(0xFF007A94) : const Color(0xFF94A3B8),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Hanya Tipe Kamar Tertentu (Kustomisasi)',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Selected Room Chips
+          const Text(
+            'KAMAR TERPILIH (3 UNIT)',
+            style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: Color(0xFF64748B)),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _buildRoomChip('Executive Ocean Panorama', isChecked: true),
+              _buildRoomChip('Grand Deluxe Pool View', isChecked: true),
+              _buildRoomChip('Royal Garden Villa', isChecked: true),
+              _buildAddRoomChip('Standard Superior Room'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRoomChip(String label, {required bool isChecked}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFCFFAFE),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF67E8F9)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.check_circle_rounded, size: 13, color: Color(0xFF0891B2)),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF0891B2)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddRoomChip(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.add_rounded, size: 13, color: Color(0xFF64748B)),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Section 6: Visibilitas & Pendanaan
+  // ---------------------------------------------------------------------------
+  Widget _buildSection6() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0F7FA),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.visibility_outlined, size: 18, color: Color(0xFF0096B4)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      '6. Visibilitas & Pendanaan',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    Text(
+                      'Katalog publik dan subsidi beban biaya',
+                      style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Switch 1: Tayang Publik
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'Tayang Publik di Go Ticket Discovery',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                    ),
+                    Text(
+                      'Tampil di banner home app & katalog voucher tamu',
+                      style: TextStyle(fontSize: 9.5, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: _publicDiscovery,
+                activeThumbColor: Colors.white,
+                activeTrackColor: const Color(0xFF00C2FF),
+                onChanged: (val) => setState(() => _publicDiscovery = val),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Switch 2: Kode Rahasia
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'Kode Rahasia (Direct Concierge Only)',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                    ),
+                    Text(
+                      'Sembunyikan dari listing publik, hanya input manual',
+                      style: TextStyle(fontSize: 9.5, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: _secretCode,
+                activeThumbColor: Colors.white,
+                activeTrackColor: const Color(0xFF00C2FF),
+                onChanged: (val) => setState(() => _secretCode = val),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Beban Subsidi Diskon
+          const Text(
+            'Beban Subsidi Diskon (Co-Funding):',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 8),
+
+          // Co-funding Option 1
+          InkWell(
+            onTap: () => setState(() => _coFunding = 0),
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: _coFunding == 0 ? const Color(0xFFF0FDF4) : Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: _coFunding == 0 ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    _coFunding == 0 ? Icons.radio_button_checked : Icons.radio_button_off,
+                    size: 16,
+                    color: _coFunding == 0 ? const Color(0xFF007A94) : const Color(0xFF94A3B8),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          '100% Ditanggung Hotel (Internal Marketing)',
+                          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                        ),
+                        Text(
+                          'Alokasi penuh dari budget sales & marketing The Grand Amora',
+                          style: TextStyle(fontSize: 9.5, color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+
+          // Co-funding Option 2
+          InkWell(
+            onTap: () => setState(() => _coFunding = 1),
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: _coFunding == 1 ? const Color(0xFFF0FDF4) : Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: _coFunding == 1 ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    _coFunding == 1 ? Icons.radio_button_checked : Icons.radio_button_off,
+                    size: 16,
+                    color: _coFunding == 1 ? const Color(0xFF007A94) : const Color(0xFF94A3B8),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'Co-Sharing 50:50 dengan Promo Nasional Go Ticket',
+                          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                        ),
+                        Text(
+                          'Memerlukan persetujuan verifikasi regional HQ (1x24 jam)',
+                          style: TextStyle(fontSize: 9.5, color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bottom Action Bar
+  // ---------------------------------------------------------------------------
+  Widget _buildBottomActionBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+        ),
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        height: 46,
+        child: ElevatedButton(
+          onPressed: _isSubmitting ? null : _submitPromo,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF00758F),
+            disabledBackgroundColor: const Color(0xFF94A3B8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            elevation: 0,
+          ),
+          child: _isSubmitting
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2.5,
+                  ),
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _isEditMode
+                          ? 'Simpan Perubahan Promo'
+                          : 'Terbitkan Promo',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(Icons.arrow_forward_rounded,
+                        size: 16, color: Colors.white),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInputBox({
+    required TextEditingController controller,
+    String? hint,
+    IconData? suffixIcon,
+    String? suffixText,
+    String? prefixText,
+    VoidCallback? onTap,
+    bool readOnly = false,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: TextField(
+        controller: controller,
+        readOnly: readOnly,
+        onTap: onTap,
+        keyboardType: keyboardType,
+        inputFormatters: inputFormatters,
+        style: const TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0F172A)),
+        decoration: InputDecoration(
+          hintText: hint,
+          prefixText: prefixText,
+          prefixStyle: const TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0F172A)),
+          hintStyle: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+          suffixIcon: suffixIcon != null
+              ? Icon(suffixIcon, size: 16, color: const Color(0xFF64748B))
+              : (suffixText != null
+                  ? Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Text(
+                        suffixText,
+                        style: const TextStyle(
+                            fontSize: 11, color: Color(0xFF64748B)),
+                      ),
+                    )
+                  : null),
+          border: InputBorder.none,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          isDense: true,
+        ),
+      ),
+    );
+  }
+}

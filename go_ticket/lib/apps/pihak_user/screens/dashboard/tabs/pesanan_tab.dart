@@ -7,7 +7,7 @@ import 'package:go_ticket/core/services/auth_service.dart';
 import 'package:go_ticket/core/services/booking_service.dart';
 import 'package:go_ticket/core/utils/currency_formatter.dart';
 import 'package:go_ticket/core/widgets/user_avatar.dart';
-import '../../../../pihak_hotel/services/hotel_operations_store.dart';
+import 'package:go_ticket/core/services/hotel_operations_store.dart';
 import 'package:go_ticket/core/widgets/app_pagination_bar.dart';
 import '../../../router/customer_router.dart';
 import '../../../services/user_booking_storage.dart';

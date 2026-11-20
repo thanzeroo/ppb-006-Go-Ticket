@@ -8,7 +8,7 @@ import '../../../../../core/config/supabase_config.dart';
 import '../../../../../core/models/hotel_model.dart';
 import '../../../../../core/services/hotel_service.dart';
 import '../../../../../core/services/supabase_service.dart';
-import '../../../../pihak_hotel/services/hotel_image_upload_service.dart';
+import 'package:go_ticket/core/services/hotel_image_upload_service.dart';
 import 'formatters.dart';
 
 /// Data model form untuk tipe kamar di Section D
