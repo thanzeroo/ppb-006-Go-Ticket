@@ -7,11 +7,11 @@ import 'package:go_ticket/apps/pihak_go_ticket/screens/auth/admin_login_screen.d
 import 'package:go_ticket/apps/pihak_go_ticket/screens/splash/admin_splash_screen.dart';
 import 'package:go_ticket/apps/pihak_user/screens/auth/customer_login_screen.dart';
 import 'package:go_ticket/apps/pihak_user/screens/splash/customer_loading_screen.dart';
-import 'package:go_ticket/main.dart';
+import 'package:go_ticket/apps/pihak_user/main_pihak_user.dart';
 
 void main() {
-  testWidgets('Portal App should render', (WidgetTester tester) async {
-    await tester.pumpWidget(const GoTicketApp());
+  testWidgets('PihakUserApp should render', (WidgetTester tester) async {
+    await tester.pumpWidget(const PihakUserApp());
     expect(find.byType(MaterialApp), findsOneWidget);
     await tester.pumpAndSettle();
   });
@@ -102,7 +102,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Portal Administrator Hotel'), findsOneWidget);
-    expect(find.text('PIN Otorisasi Keuangan 6-Digit'), findsOneWidget);
+    expect(find.text('PIN / Token Otorisasi (6-Digit)'), findsOneWidget);
   });
 
   testWidgets('AdminLoginScreen should render', (WidgetTester tester) async {

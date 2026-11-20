@@ -1,275 +1,41 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import 'apps/pihak_go_ticket/screens/splash/admin_splash_screen.dart';
-import 'apps/pihak_hotel/screens/splash/hotel_splash_screen.dart';
-import 'apps/pihak_user/router/customer_router.dart';
-import 'apps/pihak_user/screens/splash/customer_loading_screen.dart';
-import 'core/services/auth_service.dart';
-import 'core/services/supabase_service.dart';
+import 'apps/pihak_go_ticket/main_pihak_go_ticket.dart';
+import 'apps/pihak_hotel/main_pihak_hotel.dart';
+import 'apps/pihak_user/main_pihak_user.dart';
+import 'core/services/app_initializer.dart';
 
+/// Entrypoint utama Go Ticket.
+/// Ketiga aplikasi (Pihak User, Pihak Hotel, Pihak Go Ticket) sudah dipisah mandiri
+/// tanpa menggunakan portal pemilihan perantara.
+///
+/// Cara menjalankan masing-masing aplikasi:
+/// 1. Pihak User / Tamu (Default):
+///    `flutter run` atau `flutter run -t lib/main_user.dart`
+///
+/// 2. Pihak Hotel (Mitra Penginapan):
+///    `flutter run -t lib/main_hotel.dart` atau `flutter run --dart-define=APP=hotel`
+///
+/// 3. Pihak Go Ticket (Super Admin Platform):
+///    `flutter run -t lib/main_go_ticket.dart` atau `flutter run --dart-define=APP=admin`
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  await AppInitializer.init();
 
-  // 1. Muat file .env sebelum inisialisasi Supabase
-  bool envLoaded = false;
-  try {
-    await dotenv.load(fileName: ".env");
-    envLoaded = true;
-  } catch (e) {
-    debugPrint('❌ [ENV ERROR] File .env tidak ditemukan atau gagal dimuat: $e');
-  }
+  const appTarget = String.fromEnvironment('APP', defaultValue: 'user');
 
-  // 2. Validasi keberadaan SUPABASE_URL dan SUPABASE_ANON_KEY
-  //    Jika .env gagal dimuat, gunakan nilai fallback hardcoded agar app tidak crash
-  String supabaseUrl = '';
-  String supabaseAnonKey = '';
-
-  if (envLoaded) {
-    supabaseUrl = dotenv.env['SUPABASE_URL']?.trim() ?? '';
-    supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY']?.trim() ?? '';
-  }
-
-  // Fallback jika env tidak terbaca
-  if (supabaseUrl.isEmpty) {
-    supabaseUrl = 'https://yujbnwaapualgliixsmm.supabase.co';
-    debugPrint('⚠️ [ENV] Menggunakan SUPABASE_URL fallback.');
-  }
-  if (supabaseAnonKey.isEmpty) {
-    supabaseAnonKey =
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1amJud2FhcHVhbGdsaWl4c21tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA3MTQyOTgsImV4cCI6MjEwNjI5MDI5OH0.1X577clY9bGzv0pvlcFEHu0nZa-f0BeGveOyBKk_UE8';
-    debugPrint('⚠️ [ENV] Menggunakan SUPABASE_ANON_KEY fallback.');
-  }
-
-  // 3. Log Project URL saat startup
-  debugPrint('🚀 [Startup] Menghubungkan ke Supabase Project URL: $supabaseUrl');
-
-  await SupabaseService.instance.initialize();
-  await AuthService.instance.loadSavedSession();
-  runApp(const GoTicketApp());
-}
-
-class GoTicketApp extends StatelessWidget {
-  const GoTicketApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Go Ticket',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        fontFamily: GoogleFonts.poppins().fontFamily,
-        textTheme: GoogleFonts.poppinsTextTheme(),
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00D1FF)),
-        useMaterial3: true,
-      ),
-      onGenerateRoute: CustomerRouter.onGenerateRoute,
-      home: const PortalSelectionScreen(),
-    );
-  }
-}
-
-/// Layar pemilihan portal — bersih, terpusat di tengah layar, dan minimalis.
-class PortalSelectionScreen extends StatelessWidget {
-  const PortalSelectionScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFD),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Logo Go Ticket dengan Box & Cyan Glow
-                  Center(child: _buildLogoHeader()),
-                  const SizedBox(height: 18),
-
-                  // Judul Sederhana & Bersih
-                  const Text(
-                    'Go Ticket',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0F172A),
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Pilih portal untuk melanjutkan',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF64748B),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-
-                  // 1. Portal User (Tamu)
-                  _buildPortalButton(
-                    context: context,
-                    label: 'User (Tamu)',
-                    subtitle: 'Cari & booking hotel',
-                    icon: Icons.person_outline_rounded,
-                    color: const Color(0xFF00B4D8),
-                    destination: const CustomerLoadingScreen(),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // 2. Portal Pihak Hotel
-                  _buildPortalButton(
-                    context: context,
-                    label: 'Pihak Hotel',
-                    subtitle: 'Kelola hotel mitra',
-                    icon: Icons.hotel_outlined,
-                    color: const Color(0xFF0D3B55),
-                    destination: const HotelSplashScreen(),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // 3. Portal Pihak Go Ticket
-                  _buildPortalButton(
-                    context: context,
-                    label: 'Pihak Go Ticket',
-                    subtitle: 'Panel administrasi platform',
-                    icon: Icons.admin_panel_settings_outlined,
-                    color: const Color(0xFF7C3AED),
-                    destination: const AdminSplashScreen(),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Logo Header dengan rounded card & glowing cyan shadow
-  Widget _buildLogoHeader() {
-    return Container(
-      width: 82,
-      height: 82,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF00C7F2).withValues(alpha: 0.35),
-            blurRadius: 28,
-            spreadRadius: 4,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Image.asset(
-        'assets/logo.png',
-        fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) => const Icon(
-          Icons.confirmation_number_outlined,
-          size: 48,
-          color: Color(0xFF00C2FF),
-        ),
-      ),
-    );
-  }
-
-  /// Tombol Portal yang bersih, rapi, dan responsif
-  Widget _buildPortalButton({
-    required BuildContext context,
-    required String label,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    required Widget destination,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => destination),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                // Icon Box
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: color,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 14),
-
-                // Label & Subtitle
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        label,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Arrow Icon
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: color.withValues(alpha: 0.6),
-                  size: 22,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+  switch (appTarget.toLowerCase()) {
+    case 'hotel':
+      runApp(const PihakHotelApp());
+      break;
+    case 'admin':
+    case 'go_ticket':
+    case 'pihak_go_ticket':
+      runApp(const PihakGoTicketApp());
+      break;
+    case 'user':
+    case 'customer':
+    default:
+      runApp(const PihakUserApp());
+      break;
   }
 }

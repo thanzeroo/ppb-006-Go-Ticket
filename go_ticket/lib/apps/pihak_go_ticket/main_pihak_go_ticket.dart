@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../core/services/app_initializer.dart';
 import 'screens/splash/admin_splash_screen.dart';
 
-/// Aplikasi root untuk Pihak Go Ticket.
-void main() {
+/// Aplikasi Mandiri untuk Pihak Go Ticket (Super Admin).
+/// Berjalan mandiri tanpa portal pemilihan.
+void main() async {
+  await AppInitializer.init();
   runApp(const PihakGoTicketApp());
 }
 
@@ -13,7 +16,7 @@ class PihakGoTicketApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'GoTicket — Pihak Go Ticket',
+      title: 'GoTicket — Super Admin Platform',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(

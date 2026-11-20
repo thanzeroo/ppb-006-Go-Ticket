@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../core/services/app_initializer.dart';
 import 'router/customer_router.dart';
 
-/// Aplikasi root untuk Pihak User / Customer Go Ticket.
-void main() {
+/// Aplikasi Mandiri untuk Pihak User / Tamu Go Ticket.
+/// Berjalan mandiri tanpa portal pemilihan.
+void main() async {
+  await AppInitializer.init();
   runApp(const PihakUserApp());
 }
 
@@ -13,7 +16,7 @@ class PihakUserApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'GoTicket — Pihak User',
+      title: 'GoTicket — User & Tamu',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
