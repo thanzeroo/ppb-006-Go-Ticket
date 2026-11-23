@@ -5,6 +5,11 @@ import 'core/services/app_initializer.dart';
 
 /// Entrypoint aplikasi go_ticket_hotel.
 void main() async {
-  await AppInitializer.init();
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await AppInitializer.init();
+  } catch (e) {
+    debugPrint('⚠️ [main] Inisialisasi mengalami kendala: $e');
+  }
   runApp(const PihakHotelApp());
 }

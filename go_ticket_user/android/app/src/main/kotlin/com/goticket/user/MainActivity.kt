@@ -1,4 +1,4 @@
-package com.goticket.go_ticket
+package com.goticket.user
 
 import io.flutter.embedding.android.FlutterActivity
 

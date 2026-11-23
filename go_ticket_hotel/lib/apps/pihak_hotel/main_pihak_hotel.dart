@@ -6,7 +6,12 @@ import 'screens/splash/hotel_splash_screen.dart';
 /// Aplikasi Mandiri untuk Pihak Hotel (Front Office, Maintenance, Admin Hotel).
 /// Berjalan mandiri tanpa portal pemilihan.
 void main() async {
-  await AppInitializer.init();
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await AppInitializer.init();
+  } catch (e) {
+    debugPrint('⚠️ [main] Inisialisasi mengalami kendala: $e');
+  }
   runApp(const PihakHotelApp());
 }
 

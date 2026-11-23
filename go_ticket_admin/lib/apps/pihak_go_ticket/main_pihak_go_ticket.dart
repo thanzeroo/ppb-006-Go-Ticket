@@ -6,7 +6,12 @@ import 'screens/splash/admin_splash_screen.dart';
 /// Aplikasi Mandiri untuk Pihak Go Ticket (Super Admin).
 /// Berjalan mandiri tanpa portal pemilihan.
 void main() async {
-  await AppInitializer.init();
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await AppInitializer.init();
+  } catch (e) {
+    debugPrint('⚠️ [main] Inisialisasi mengalami kendala: $e');
+  }
   runApp(const PihakGoTicketApp());
 }
 

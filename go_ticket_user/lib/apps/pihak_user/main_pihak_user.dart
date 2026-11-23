@@ -6,7 +6,12 @@ import 'router/customer_router.dart';
 /// Aplikasi Mandiri untuk Pihak User / Tamu Go Ticket.
 /// Berjalan mandiri tanpa portal pemilihan.
 void main() async {
-  await AppInitializer.init();
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await AppInitializer.init();
+  } catch (e) {
+    debugPrint('⚠️ [main] Inisialisasi mengalami kendala: $e');
+  }
   runApp(const PihakUserApp());
 }
 
