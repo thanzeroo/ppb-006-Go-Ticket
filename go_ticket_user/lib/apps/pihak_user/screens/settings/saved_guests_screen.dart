@@ -281,6 +281,9 @@ class _SavedGuestsScreenState extends State<SavedGuestsScreen> {
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
                   child: Column(
+                    // mainAxisSize min agar Column tidak mencoba expand
+                    // di dalam ScrollView yang sudah diberi minHeight constraint
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       GTButton(
@@ -321,12 +324,10 @@ class _SavedGuestsScreenState extends State<SavedGuestsScreen> {
                             ),
                           ),
                       ],
-                      // Jika data tamu kosong atau sedikit, dorong ke paling bawah
-                      if (_visible.isEmpty)
-                        const Spacer()
-                      else
-                        const SizedBox(height: 14),
-                      // Card Keamanan Data
+                      // Spacer diganti SizedBox — Spacer() CRASH di dalam
+                      // SingleChildScrollView karena butuh unconstrained height
+                      const SizedBox(height: 14),
+                      // Card Keamanan Data — selalu tampil di bawah daftar tamu
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(

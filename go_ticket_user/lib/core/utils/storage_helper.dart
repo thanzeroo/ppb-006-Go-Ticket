@@ -178,6 +178,13 @@ class StorageHelper {
     return prefs.getString('user_avatar_url');
   }
 
+  /// Hapus avatar URL dari SharedPreferences (saat foto profil dihapus)
+  static Future<void> clearAvatarUrl() async {
+    final prefs = await _getPrefs();
+    await prefs.remove('user_avatar_url');
+    debugPrint('[StorageHelper] Avatar URL cleared.');
+  }
+
   /// Menyimpan Hotel ID yang dikelola oleh staff (Hotel Partner app)
   static Future<void> saveManagedHotelId(String hotelId) async {
     final prefs = await _getPrefs();

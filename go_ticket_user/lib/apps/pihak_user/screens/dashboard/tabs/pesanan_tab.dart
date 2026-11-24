@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:go_ticket_user/core/models/booking_model.dart';
 import 'package:go_ticket_user/core/services/auth_service.dart';
 import 'package:go_ticket_user/core/services/booking_service.dart';
-import 'package:go_ticket_user/core/utils/currency_formatter.dart';
 import 'package:go_ticket_user/core/widgets/user_avatar.dart';
 import 'package:go_ticket_user/core/services/hotel_operations_store.dart';
 import 'package:go_ticket_user/core/widgets/app_pagination_bar.dart';
@@ -589,8 +588,6 @@ class _PesananTabState extends State<PesananTab>
 
     final dates =
         '${b.checkInDate.day} ${_monthShort(b.checkInDate.month)} – ${b.checkOutDate.day} ${_monthShort(b.checkOutDate.month)} ${b.checkOutDate.year}';
-    final priceStr = CurrencyFormatter.toRupiah(b.totalAmount);
-    final paymentMethodStr = b.paymentMethod ?? 'QRIS';
 
     String statusText = 'Menunggu Konfirmasi';
     Color headerBg = const Color(0xFFFFFBEB);
@@ -774,57 +771,6 @@ class _PesananTabState extends State<PesananTab>
                             ),
                           ],
                         ),
-                      ),
-                    ],
-                  ),
-                  const Divider(height: 20, color: Color(0xFFE5E7EB)),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Total Pembayaran',
-                        style: GoogleFonts.inter(
-                            fontSize: 12, color: const Color(0xFF6B7280)),
-                      ),
-                      Row(
-                        children: [
-                          Text(
-                            priceStr,
-                            style: GoogleFonts.inter(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: const Color(0xFF111827),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: isCancelled
-                                  ? const Color(0xFFFEE2E2)
-                                  : const Color(0xFFF0FDF4),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: isCancelled
-                                    ? const Color(0xFFFCA5A5)
-                                    : const Color(0xFF86EFAC),
-                              ),
-                            ),
-                            child: Text(
-                              isCancelled
-                                  ? 'Dibatalkan'
-                                  : '✓ Lunas ($paymentMethodStr)',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                color: isCancelled
-                                    ? const Color(0xFFEF4444)
-                                    : const Color(0xFF16A34A),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
                       ),
                     ],
                   ),

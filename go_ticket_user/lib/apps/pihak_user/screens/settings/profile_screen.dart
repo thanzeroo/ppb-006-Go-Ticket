@@ -75,6 +75,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 final d = DateTime.tryParse(res['tanggal_lahir'].toString());
                 if (d != null) _birth = d;
               }
+
+              // Sinkronisasi avatar: jika DB tidak menyimpan avatar_url
+              // atau nilainya null/kosong, hapus cache lokal agar foto
+              // lama tidak muncul lagi setelah dihapus dari database.
+              final dbAvatar = res['avatar_url']?.toString();
+              if (dbAvatar == null || dbAvatar.isEmpty) {
+                _avatarUrl = null;
+                StorageHelper.clearAvatarUrl(); // async tapi tidak perlu await
+              }
             });
           }
         }
@@ -82,10 +91,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         debugPrint('⚠️ Error fetching profile: $e');
       }
     }
-    // Muat avatar URL dari SharedPreferences (bukan dari DB — kolom tidak ada)
-    final savedAvatar = await StorageHelper.getAvatarUrl();
-    if (savedAvatar != null && savedAvatar.isNotEmpty && mounted) {
-      setState(() => _avatarUrl = savedAvatar);
+    // Muat avatar dari SharedPreferences HANYA jika belum di-clear oleh DB
+    if (_avatarUrl == null) {
+      final savedAvatar = await StorageHelper.getAvatarUrl();
+      if (savedAvatar != null && savedAvatar.isNotEmpty && mounted) {
+        setState(() => _avatarUrl = savedAvatar);
+      }
     }
   }
 
@@ -153,83 +164,93 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: GT.bg,
       appBar: const GTAppBar(title: 'Edit Profil'),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
-        children: [
-          GTCard(
+      // Center layout: konten dibatasi maxWidth 480 agar rapi di tablet & HP
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text(
-                  'Informasi Akun',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: GT.ink,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                _label('Nama Lengkap'),
-                _input(_name, Icons.badge_outlined,
-                    onChanged: (_) => setState(() {})),
-                const SizedBox(height: 14),
-                _label('Alamat Email'),
-                _static(Icons.mail_outline, _email),
-                const SizedBox(height: 14),
-                _label('Nomor Ponsel'),
-                _input(
-                  _phone,
-                  Icons.phone_outlined,
-                  type: TextInputType.phone,
-                ),
-                const SizedBox(height: 14),
-                _label('Tanggal Lahir'),
-                GestureDetector(
-                  onTap: _pickDate,
-                  child: _static(
-                      Icons.cake_outlined,
-                      _birth != null
-                          ? '${_birth!.day} ${_months[_birth!.month - 1]} ${_birth!.year}'
-                          : 'Pilih tanggal lahir (opsional)',
-                      trailing: const Icon(Icons.calendar_month_outlined,
-                          color: GT.teal)),
-                ),
-                const SizedBox(height: 14),
-                _label('Jenis Kelamin'),
-                Row(children: [
-                  _gender('Laki-laki', Icons.male, _male == true,
-                      () => setState(() => _male = true)),
-                  const SizedBox(width: 10),
-                  _gender('Perempuan', Icons.female, _male == false,
-                      () => setState(() => _male = false)),
-                ]),
-                const SizedBox(height: 14),
-                _label('Alamat Domisili'),
-                Container(
-                  decoration: BoxDecoration(
-                      color: GT.soft.withValues(alpha: 0.7),
-                      borderRadius: BorderRadius.circular(14)),
-                  child: TextField(
-                    controller: _address,
-                    maxLines: 3,
-                    decoration: const InputDecoration(
-                      hintText: 'Masukkan alamat domisili lengkap (opsional)',
-                      hintStyle: TextStyle(color: GT.muted, fontSize: 13),
-                      border: InputBorder.none,
-                      prefixIcon: Align(
-                        widthFactor: 1,
-                        heightFactor: 1,
-                        child: Icon(Icons.location_on_outlined,
-                            color: GT.teal),
+                GTCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Informasi Akun',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: GT.ink,
+                        ),
                       ),
-                      contentPadding: EdgeInsets.all(14),
-                    ),
+                      const SizedBox(height: 14),
+                      _label('Nama Lengkap'),
+                      _input(_name, Icons.badge_outlined,
+                          onChanged: (_) => setState(() {})),
+                      const SizedBox(height: 14),
+                      _label('Alamat Email'),
+                      _static(Icons.mail_outline, _email),
+                      const SizedBox(height: 14),
+                      _label('Nomor Ponsel'),
+                      _input(
+                        _phone,
+                        Icons.phone_outlined,
+                        type: TextInputType.phone,
+                      ),
+                      const SizedBox(height: 14),
+                      _label('Tanggal Lahir'),
+                      GestureDetector(
+                        onTap: _pickDate,
+                        child: _static(
+                            Icons.cake_outlined,
+                            _birth != null
+                                ? '${_birth!.day} ${_months[_birth!.month - 1]} ${_birth!.year}'
+                                : 'Pilih tanggal lahir (opsional)',
+                            trailing: const Icon(Icons.calendar_month_outlined,
+                                color: GT.teal)),
+                      ),
+                      const SizedBox(height: 14),
+                      _label('Jenis Kelamin'),
+                      Row(children: [
+                        _gender('Laki-laki', Icons.male, _male == true,
+                            () => setState(() => _male = true)),
+                        const SizedBox(width: 10),
+                        _gender('Perempuan', Icons.female, _male == false,
+                            () => setState(() => _male = false)),
+                      ]),
+                      const SizedBox(height: 14),
+                      _label('Alamat Domisili'),
+                      Container(
+                        decoration: BoxDecoration(
+                            color: GT.soft.withValues(alpha: 0.7),
+                            borderRadius: BorderRadius.circular(14)),
+                        child: TextField(
+                          controller: _address,
+                          maxLines: 3,
+                          decoration: const InputDecoration(
+                            hintText:
+                                'Masukkan alamat domisili lengkap (opsional)',
+                            hintStyle: TextStyle(color: GT.muted, fontSize: 13),
+                            border: InputBorder.none,
+                            prefixIcon: Align(
+                              widthFactor: 1,
+                              heightFactor: 1,
+                              child: Icon(Icons.location_on_outlined,
+                                  color: GT.teal),
+                            ),
+                            contentPadding: EdgeInsets.all(14),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
       bottomNavigationBar: GTBottomBar(
         child: Row(children: [
