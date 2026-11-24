@@ -40,30 +40,9 @@ class SavedHotelScreen extends StatefulWidget {
 }
 
 class _SavedHotelScreenState extends State<SavedHotelScreen> {
-  String _activeCategory = 'Semua';
-  String? _activeFolder;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   _SavedHotelFilters _filters = const _SavedHotelFilters();
-  final List<String> _categories = [
-    'Semua',
-    'Resor Bali',
-    'Villa Privat',
-    'Hotel Kota',
-  ];
-
-  final List<Map<String, dynamic>> _folders = [
-    {
-      'name': 'Liburan Akhir Tahun',
-      'icon': Icons.wb_sunny,
-      'color': Color(0xFF00B4D8),
-    },
-    {
-      'name': 'Staycation Romantis',
-      'icon': Icons.favorite,
-      'color': Color(0xFFEC4899),
-    },
-  ];
 
   List<Map<String, dynamic>> _hotels = [];
   bool _isLoading = true;
@@ -87,57 +66,13 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
 
   List<Map<String, dynamic>> get _filteredHotels {
     final query = _searchQuery.trim().toLowerCase();
-    final hotels = _hotels.where((hotel) {
-      final category = hotel['category']?.toString() ?? 'Semua';
-      final matchesCategory =
-          _activeCategory == 'Semua' || category == _activeCategory;
-
-      final folders = (hotel['folders'] as List?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          <String>[];
-      final matchesFolder =
-          _activeFolder == null || folders.contains(_activeFolder);
-
+    return _hotels.where((hotel) {
       final name = hotel['name']?.toString() ?? '';
       final location = hotel['location']?.toString() ?? '';
       final type = hotel['type']?.toString() ?? '';
       final searchableText = '$name $location $type'.toLowerCase();
-      final matchesSearch = query.isEmpty || searchableText.contains(query);
-
-      final priceVal = (hotel['priceValue'] as num?)?.toInt() ??
-          int.tryParse(hotel['priceValue']?.toString() ?? '0') ??
-          0;
-      final matchesPrice = priceVal <= _filters.maxPrice;
-      final matchesPromotion =
-          !_filters.promotionsOnly || hotel['discount'] != null;
-
-      return matchesCategory &&
-          matchesFolder &&
-          matchesSearch &&
-          matchesPrice &&
-          matchesPromotion;
+      return query.isEmpty || searchableText.contains(query);
     }).toList();
-
-    int parsePrice(Map<String, dynamic> h) =>
-        (h['priceValue'] as num?)?.toInt() ??
-        int.tryParse(h['priceValue']?.toString() ?? '0') ??
-        0;
-
-    double parseRating(Map<String, dynamic> h) =>
-        double.tryParse(h['rating']?.toString() ?? '0') ?? 0.0;
-
-    switch (_filters.sortOrder) {
-      case _HotelSortOrder.recommended:
-        break;
-      case _HotelSortOrder.priceLowToHigh:
-        hotels.sort((a, b) => parsePrice(a).compareTo(parsePrice(b)));
-      case _HotelSortOrder.priceHighToLow:
-        hotels.sort((a, b) => parsePrice(b).compareTo(parsePrice(a)));
-      case _HotelSortOrder.ratingHighToLow:
-        hotels.sort((a, b) => parseRating(b).compareTo(parseRating(a)));
-    }
-    return hotels;
   }
 
   String _formatPrice(Object? value) {
@@ -277,104 +212,110 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
         children: [
           _buildHeader(),
           _buildSearchAndFilter(),
-          _buildFolderSection(),
-          _buildCategoryTabs(),
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : filteredHotels.isEmpty
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 24, vertical: 36),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 68,
-                                height: 68,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFC8F0FA),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.favorite_border_rounded,
-                                  color: Color(0xFF0077B6),
-                                  size: 34,
-                                ),
+            child: RefreshIndicator(
+              color: const Color(0xFF00B4D8),
+              onRefresh: _loadHotels,
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : filteredHotels.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 24, vertical: 48),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 68,
+                                    height: 68,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFC8F0FA),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.favorite_border_rounded,
+                                      color: Color(0xFF0077B6),
+                                      size: 34,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Belum Ada Hotel Tersimpan',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: const Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Simpan hotel favorit Anda dengan menekan ikon hati di Beranda atau Cari untuk melihatnya di sini.',
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      color: const Color(0xFF64748B),
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      CustomerDashboardScreen.tabNotifier.value = 1;
+                                      if (widget.onSwitchToPemesanan == null &&
+                                          Navigator.canPop(context)) {
+                                        Navigator.pop(context);
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF00B4D8),
+                                      foregroundColor: Colors.white,
+                                      shape: const StadiumBorder(),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 22, vertical: 12),
+                                      elevation: 0,
+                                    ),
+                                    child: Text(
+                                      'Jelajahi Hotel Sekarang',
+                                      style: GoogleFonts.inter(
+                                          fontWeight: FontWeight.w700),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Belum Ada Hotel Tersimpan',
-                                style: GoogleFonts.inter(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                  color: const Color(0xFF0F172A),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                'Simpan hotel favorit Anda dengan menekan ikon hati di Beranda atau Cari untuk melihatnya di sini.',
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  color: const Color(0xFF64748B),
-                                  height: 1.4,
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              ElevatedButton(
-                                onPressed: () {
-                                  CustomerDashboardScreen.tabNotifier.value = 1;
-                                  if (widget.onSwitchToPemesanan == null &&
-                                      Navigator.canPop(context)) {
-                                    Navigator.pop(context);
-                                  }
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF00B4D8),
-                                  foregroundColor: Colors.white,
-                                  shape: const StadiumBorder(),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 22, vertical: 12),
-                                  elevation: 0,
-                                ),
-                                child: Text(
-                                  'Jelajahi Hotel Sekarang',
-                                  style: GoogleFonts.inter(
-                                      fontWeight: FontWeight.w700),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                    : Builder(
-                        builder: (ctx) {
-                          final total = filteredHotels.length;
-                          final maxPage = (total / 10).ceil();
-                          final safePage = _currentPage.clamp(1, maxPage > 0 ? maxPage : 1);
-                          final pagedHotels = paginateList(filteredHotels, safePage, pageSize: 10);
+                            ),
+                          ],
+                        )
+                      : Builder(
+                          builder: (ctx) {
+                            final total = filteredHotels.length;
+                            final maxPage = (total / 5).ceil();
+                            final safePage = _currentPage.clamp(1, maxPage > 0 ? maxPage : 1);
+                            final pagedHotels = paginateList(filteredHotels, safePage, pageSize: 5);
 
-                          return ListView.builder(
-                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                            itemCount: pagedHotels.length + (total > 0 ? 1 : 0),
-                            itemBuilder: (ctx, i) {
-                              if (i < pagedHotels.length) {
-                                return _buildHotelCard(pagedHotels[i]);
-                              }
-                              return AppPaginationBar(
-                                currentPage: safePage,
-                                totalItems: total,
-                                pageSize: 10,
-                                itemLabel: 'hotel tersimpan',
-                                primaryColor: const Color(0xFF00B4D8),
-                                onPageChanged: (p) => setState(() => _currentPage = p),
-                              );
-                            },
-                          );
-                        },
-                      ),
+                            return ListView.builder(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                              itemCount: pagedHotels.length + (total > 0 ? 1 : 0),
+                              itemBuilder: (ctx, i) {
+                                if (i < pagedHotels.length) {
+                                  return _buildHotelCard(pagedHotels[i]);
+                                }
+                                return AppPaginationBar(
+                                  currentPage: safePage,
+                                  totalItems: total,
+                                  pageSize: 5,
+                                  itemLabel: 'hotel tersimpan',
+                                  primaryColor: const Color(0xFF00B4D8),
+                                  onPageChanged: (p) => setState(() => _currentPage = p),
+                                );
+                              },
+                            );
+                          },
+                        ),
+            ),
           ),
         ],
       ),
@@ -587,150 +528,6 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
               size: 18,
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFolderSection() {
-    return Container(
-      color: Colors.white,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Divider(height: 1, color: Color(0xFFE5E7EB)),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'FOLDER KOLEKSI',
-                  style: GoogleFonts.inter(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF9CA3AF),
-                    letterSpacing: 0.8,
-                  ),
-                ),
-                Text(
-                  '${_hotels.length} Favorit Aktif',
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: const Color(0xFF00B4D8),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-            child: Row(
-              children: _folders.map((f) {
-                final folderName = f['name'] as String;
-                final folderColor = f['color'] as Color;
-                final isSelected = _activeFolder == folderName;
-                final count = _hotels
-                    .where(
-                      (hotel) => (hotel['folders'] as List<String>).contains(
-                        folderName,
-                      ),
-                    )
-                    .length;
-                return GestureDetector(
-                  onTap: () => setState(() {
-                    _activeFolder = isSelected ? null : folderName;
-                  }),
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 10),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? folderColor.withValues(alpha: 0.2)
-                          : folderColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: folderColor.withValues(alpha: 0.4),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          f['icon'] as IconData,
-                          color: folderColor,
-                          size: 15,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '$folderName ($count)',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: folderColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCategoryTabs() {
-    return Container(
-      color: Colors.white,
-      child: Column(
-        children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-            child: Row(
-              children: _categories.map((category) {
-                final count = category == 'Semua'
-                    ? _hotels.length
-                    : _hotels
-                          .where((hotel) => hotel['category'] == category)
-                          .length;
-                final isActive = _activeCategory == category;
-                return GestureDetector(
-                  onTap: () => setState(() => _activeCategory = category),
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 7,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isActive
-                          ? const Color(0xFF00B4D8)
-                          : const Color(0xFFF3F4F6),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '$category ($count)',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: isActive
-                            ? Colors.white
-                            : const Color(0xFF374151),
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          const Divider(height: 1, color: Color(0xFFE5E7EB)),
         ],
       ),
     );

@@ -125,7 +125,7 @@ class _TikoChatBubbleState extends State<TikoChatBubble>
               ],
             ),
             child: const Icon(
-              Icons.smart_toy_rounded,
+              Icons.support_agent_rounded,
               color: Colors.white,
               size: 28,
             ),

@@ -13,15 +13,13 @@ import '../customer_dashboard_screen.dart';
 class _CariFilters {
   const _CariFilters({
     this.promotionsOnly = false,
+    this.rating4Plus = false,
     this.rating45Plus = false,
-    this.poolOnly = false,
-    this.maxPrice = 5000000,
   });
 
   final bool promotionsOnly;
+  final bool rating4Plus;
   final bool rating45Plus;
-  final bool poolOnly;
-  final double maxPrice;
 }
 
 /// Tab Cari: Halaman hasil pencarian hotel seperti screenshot
@@ -101,18 +99,11 @@ class _CariTabState extends State<CariTab> {
           ? null
           : CurrencyFormatter.parseToInt(hotel['originalPrice'] as String);
       final rating = double.tryParse(hotel['rating'] as String) ?? 0;
-      final amenities = [
-        ...(hotel['features'] as List<String>),
-        ...((hotel['extras'] as List<String>?) ?? const <String>[]),
-      ].join(' ').toLowerCase();
       return (query.isEmpty || searchableText.contains(query)) &&
-          price <= _filters.maxPrice &&
           (!_filters.promotionsOnly ||
               (originalPrice != null && originalPrice > price)) &&
-          (!_filters.rating45Plus || rating >= 4.5) &&
-          (!_filters.poolOnly ||
-              amenities.contains('kolam') ||
-              amenities.contains('pool'));
+          (!_filters.rating4Plus || rating >= 4.0) &&
+          (!_filters.rating45Plus || rating >= 4.5);
     }).toList();
 
     switch (_sort) {
@@ -245,12 +236,15 @@ class _CariTabState extends State<CariTab> {
 
   Future<void> _showFilter() async {
     var promotionsOnly = _filters.promotionsOnly;
+    var rating4Plus = _filters.rating4Plus;
     var rating45Plus = _filters.rating45Plus;
-    var poolOnly = _filters.poolOnly;
-    var maxPrice = _filters.maxPrice;
+
     final result = await showModalBottomSheet<_CariFilters>(
       context: context,
       isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setSheetState) => SafeArea(
           child: Padding(
@@ -272,52 +266,42 @@ class _CariTabState extends State<CariTab> {
                     TextButton(
                       onPressed: () => setSheetState(() {
                         promotionsOnly = false;
+                        rating4Plus = false;
                         rating45Plus = false;
-                        poolOnly = false;
-                        maxPrice = 5000000;
                       }),
                       child: const Text('Reset'),
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Promo saja'),
+                  title: const Text('Promo'),
+                  subtitle: const Text('Tampilkan penginapan berdiskon'),
                   value: promotionsOnly,
-                  activeThumbColor: const Color(0xFF00B4D8),
+                  activeColor: const Color(0xFF00B4D8),
                   onChanged: (value) =>
                       setSheetState(() => promotionsOnly = value),
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Rating 4.5 ke atas'),
-                  value: rating45Plus,
-                  activeThumbColor: const Color(0xFF00B4D8),
+                  title: const Text('Rating 4 ke atas'),
+                  subtitle: const Text('Skor ulasan minimal 4.0 ⭐'),
+                  value: rating4Plus,
+                  activeColor: const Color(0xFF00B4D8),
                   onChanged: (value) =>
-                      setSheetState(() => rating45Plus = value),
+                      setSheetState(() => rating4Plus = value),
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Ada kolam renang'),
-                  value: poolOnly,
-                  activeThumbColor: const Color(0xFF00B4D8),
-                  onChanged: (value) => setSheetState(() => poolOnly = value),
-                ),
-                Text(
-                  'Harga maksimum ${CurrencyFormatter.toRupiah(maxPrice.round())}',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                ),
-                Slider(
-                  value: maxPrice,
-                  min: 100000,
-                  max: 5000000,
-                  divisions: 49,
-                  label: CurrencyFormatter.toRupiah(maxPrice.round()),
+                  title: const Text('Rating 4.5 ke atas'),
+                  subtitle: const Text('Skor ulasan istimewa minimal 4.5 ⭐'),
+                  value: rating45Plus,
                   activeColor: const Color(0xFF00B4D8),
                   onChanged: (value) =>
-                      setSheetState(() => maxPrice = value),
+                      setSheetState(() => rating45Plus = value),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -325,16 +309,22 @@ class _CariTabState extends State<CariTab> {
                       sheetContext,
                       _CariFilters(
                         promotionsOnly: promotionsOnly,
+                        rating4Plus: rating4Plus,
                         rating45Plus: rating45Plus,
-                        poolOnly: poolOnly,
-                        maxPrice: maxPrice,
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF00B4D8),
                       foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    child: const Text('Terapkan Filter'),
+                    child: const Text(
+                      'Terapkan Filter',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
                   ),
                 ),
               ],
@@ -344,7 +334,10 @@ class _CariTabState extends State<CariTab> {
       ),
     );
     if (result != null && mounted) {
-      setState(() => _filters = result);
+      setState(() {
+        _filters = result;
+        _currentPage = 1;
+      });
     }
   }
 
@@ -352,9 +345,9 @@ class _CariTabState extends State<CariTab> {
   Widget build(BuildContext context) {
     final visibleHotels = _visibleHotels;
     final total = visibleHotels.length;
-    final maxPage = (total / 10).ceil();
+    final maxPage = (total / 5).ceil();
     final safePage = _currentPage.clamp(1, maxPage > 0 ? maxPage : 1);
-    final displayedHotels = paginateList(visibleHotels, safePage, pageSize: 10);
+    final displayedHotels = paginateList(visibleHotels, safePage, pageSize: 5);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
@@ -364,46 +357,59 @@ class _CariTabState extends State<CariTab> {
             children: [
               _buildSearchHeader(),
               Expanded(
-                child: _isLoading && _hotels.isEmpty
-                    ? const Center(child: CircularProgressIndicator())
-                    : visibleHotels.isEmpty
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Text(
-                                'Penginapan tidak ditemukan. Ubah kata pencarian atau filter.',
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.inter(
-                                  color: const Color(0xFF6B7280),
+                child: RefreshIndicator(
+                  color: const Color(0xFF00B4D8),
+                  onRefresh: _fetchHotels,
+                  child: _isLoading && _hotels.isEmpty
+                      ? const Center(child: CircularProgressIndicator())
+                      : visibleHotels.isEmpty
+                          ? ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              children: [
+                                SizedBox(
+                                  height: MediaQuery.of(context).size.height * 0.4,
+                                  child: Center(
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(24),
+                                      child: Text(
+                                        'Penginapan tidak ditemukan. Ubah kata pencarian atau filter.',
+                                        textAlign: TextAlign.center,
+                                        style: GoogleFonts.inter(
+                                          color: const Color(0xFF6B7280),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              ],
+                            )
+                          : ListView.builder(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              controller: _scrollController,
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                              itemCount: displayedHotels.length + (total > 0 ? 1 : 0),
+                              itemBuilder: (context, index) {
+                                if (index < displayedHotels.length) {
+                                  return _buildHotelCard(displayedHotels[index]);
+                                }
+                                return AppPaginationBar(
+                                  currentPage: safePage,
+                                  totalItems: total,
+                                  pageSize: 5,
+                                  itemLabel: 'penginapan',
+                                  primaryColor: const Color(0xFF00B4D8),
+                                  onPageChanged: (newPage) {
+                                    setState(() => _currentPage = newPage);
+                                    _scrollController.animateTo(
+                                      0,
+                                      duration: const Duration(milliseconds: 300),
+                                      curve: Curves.easeOut,
+                                    );
+                                  },
+                                );
+                              },
                             ),
-                          )
-                        : ListView.builder(
-                            controller: _scrollController,
-                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                            itemCount: displayedHotels.length + (total > 0 ? 1 : 0),
-                            itemBuilder: (context, index) {
-                              if (index < displayedHotels.length) {
-                                return _buildHotelCard(displayedHotels[index]);
-                              }
-                              return AppPaginationBar(
-                                currentPage: safePage,
-                                totalItems: total,
-                                pageSize: 10,
-                                itemLabel: 'penginapan',
-                                primaryColor: const Color(0xFF00B4D8),
-                                onPageChanged: (newPage) {
-                                  setState(() => _currentPage = newPage);
-                                  _scrollController.animateTo(
-                                    0,
-                                    duration: const Duration(milliseconds: 300),
-                                    curve: Curves.easeOut,
-                                  );
-                                },
-                              );
-                            },
-                          ),
+                ),
               ),
             ],
           ),
@@ -853,9 +859,8 @@ class _CariTabState extends State<CariTab> {
 
   Widget _buildBottomButtons() {
     final activeFiltersCount = (_filters.promotionsOnly ? 1 : 0) +
-        (_filters.rating45Plus ? 1 : 0) +
-        (_filters.poolOnly ? 1 : 0) +
-        (_filters.maxPrice < 5000000 ? 1 : 0);
+        (_filters.rating4Plus ? 1 : 0) +
+        (_filters.rating45Plus ? 1 : 0);
 
     return Container(
       decoration: BoxDecoration(

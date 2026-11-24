@@ -267,98 +267,114 @@ class _SavedGuestsScreenState extends State<SavedGuestsScreen> {
     return Scaffold(
       backgroundColor: GT.bg,
       appBar: const GTAppBar(title: 'Saved Guests'),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-                color: GT.soft, borderRadius: BorderRadius.circular(20)),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const CircleAvatar(
-                  radius: 20,
-                  backgroundColor: GT.sky,
-                  child: Icon(Icons.bolt, color: GT.teal)),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Booking Instan & Praktis',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w800, color: GT.teal)),
-                    SizedBox(height: 2),
-                    Text(
-                        'Simpan data tamu untuk proses reservasi hotel 3× lebih cepat tanpa perlu ketik ulang setiap checkout.',
-                        style: TextStyle(
-                            fontSize: 12, height: 1.4, color: GT.body)),
-                  ],
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return RefreshIndicator(
+            color: GT.teal,
+            onRefresh: _loadGuests,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      GTButton(
+                        label: '+ Tambah Tamu Baru',
+                        leading: Icons.person_add_alt_1_outlined,
+                        height: 52,
+                        onTap: () => _edit(),
+                      ),
+                      const SizedBox(height: 14),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _filterChip('Semua Tamu', _guests.length, 0),
+                            const SizedBox(width: 8),
+                            _filterChip('Dewasa', _adults, 1),
+                            const SizedBox(width: 8),
+                            _filterChip('Anak-anak', _kids, 2),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      if (_isLoading)
+                        const Padding(
+                          padding: EdgeInsets.all(32),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else ...[
+                        for (final g in _visible) _card(g),
+                        if (_visible.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 48),
+                            child: Center(
+                              child: Text(
+                                'Belum ada data tamu',
+                                style: TextStyle(color: GT.muted),
+                              ),
+                            ),
+                          ),
+                      ],
+                      // Jika data tamu kosong atau sedikit, dorong ke paling bawah
+                      if (_visible.isEmpty)
+                        const Spacer()
+                      else
+                        const SizedBox(height: 14),
+                      // Card Keamanan Data
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: GT.soft,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            CircleAvatar(
+                              radius: 18,
+                              backgroundColor: GT.sky,
+                              child: Icon(Icons.lock, size: 18, color: GT.teal),
+                            ),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Keamanan Data Terjamin',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      color: GT.ink,
+                                    ),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Data identitas diri Anda terenkripsi dan hanya digunakan untuk validasi reservasi legal hotel mitra Go Ticket.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      height: 1.4,
+                                      color: GT.body,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ]),
-          ),
-          const SizedBox(height: 14),
-          GTButton(
-            label: '+ Tambah Tamu Baru',
-            leading: Icons.person_add_alt_1_outlined,
-            height: 56,
-            onTap: () => _edit(),
-          ),
-          const SizedBox(height: 14),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(children: [
-              _filterChip('Semua Tamu', _guests.length, 0),
-              const SizedBox(width: 8),
-              _filterChip('Dewasa', _adults, 1),
-              const SizedBox(width: 8),
-              _filterChip('Anak-anak', _kids, 2),
-            ]),
-          ),
-          const SizedBox(height: 14),
-          if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.all(32),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else ...[
-            for (final g in _visible) _card(g),
-            if (_visible.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(32),
-                child: Center(
-                    child: Text('Belum ada data tamu',
-                        style: TextStyle(color: GT.muted))),
-              ),
-          ],
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-                color: GT.soft, borderRadius: BorderRadius.circular(20)),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: const [
-              CircleAvatar(
-                  radius: 18,
-                  backgroundColor: GT.sky,
-                  child: Icon(Icons.lock, size: 18, color: GT.teal)),
-              SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Keamanan Data Terjamin',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w800, color: GT.ink)),
-                    SizedBox(height: 2),
-                    Text(
-                        'Data KTP & identitas diri Anda dienkripsi AES-256 dan hanya digunakan untuk validasi legal check-in resepsionis hotel mitra Go Ticket.',
-                        style: TextStyle(
-                            fontSize: 12, height: 1.4, color: GT.body)),
-                  ],
-                ),
-              ),
-            ]),
-          ),
-        ],
+            ),
+          );
+        },
       ),
     );
   }

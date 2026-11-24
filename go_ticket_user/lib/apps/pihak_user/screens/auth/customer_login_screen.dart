@@ -110,7 +110,10 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
   }
 
   Future<void> _submitRegister() async {
-    // 1. Persetujuan Syarat & Ketentuan: tampilkan TermsScreen bila belum disetujui
+    // 1. Validasi form registrasi terlebih dahulu
+    if (!(_registerFormKey.currentState?.validate() ?? false)) return;
+
+    // 2. Persetujuan Syarat & Ketentuan: jika belum dicentang, wajib munculkan TermsScreen
     if (!_agreeTerms) {
       final agreed = await Navigator.of(context).push<bool>(
         MaterialPageRoute(builder: (_) => const TermsScreen()),
@@ -122,16 +125,9 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         return;
       }
       if (mounted) {
-        setState(() {
-          _agreeTerms = true;
-          _tabIndex = 0;
-        });
+        setState(() => _agreeTerms = true);
       }
-      return;
     }
-
-    // 2. Validasi form registrasi
-    if (!(_registerFormKey.currentState?.validate() ?? false)) return;
 
     // 3. Panggil registerCustomer ke Supabase
     setState(() => _isLoading = true);
@@ -234,12 +230,9 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
   String? _vRequired(String? v, String label) =>
       (v == null || v.trim().isEmpty) ? '$label tidak boleh kosong' : null;
 
-  String? _vEmailOrPhone(String? v) {
+  String? _vEmailOrUsername(String? v) {
     final t = (v ?? '').trim();
-    if (t.isEmpty) return 'Email / nomor WhatsApp tidak boleh kosong';
-    if (!_emailRe.hasMatch(t) && !_phoneRe.hasMatch(t)) {
-      return 'Format email atau nomor WhatsApp tidak valid';
-    }
+    if (t.isEmpty) return 'Email tidak boleh kosong';
     return null;
   }
 
@@ -337,10 +330,6 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
 
                       // Form sesuai tab yang dipilih
                       _tabIndex == 0 ? _buildLoginForm() : _buildRegisterForm(),
-                      const SizedBox(height: 24),
-
-                      // Badge Keamanan Enkripsi
-                      _buildSecurityBadge(),
                     ],
                   ),
                 ),
@@ -445,13 +434,13 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
       child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildInputLabel('Email / Nomor WhatsApp'),
+        _buildInputLabel('Email'),
         _buildTextField(
           controller: _emailLoginController,
-          hintText: 'nama@gmail.com / 0812xxxx',
+          hintText: 'Masukkan Username',
           prefixIcon: Icons.alternate_email_rounded,
           keyboardType: TextInputType.emailAddress,
-          validator: _vEmailOrPhone,
+          validator: _vEmailOrUsername,
         ),
         const SizedBox(height: 16),
 
@@ -513,7 +502,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         _buildInputLabel('Nama Lengkap'),
         _buildTextField(
           controller: _nameController,
-          hintText: 'Masukkan nama lengkap anda',
+          hintText: 'Masukkan nama lengkap',
           prefixIcon: Icons.person_outline_rounded,
           validator: (v) => _vRequired(v, 'Nama lengkap'),
         ),
@@ -522,7 +511,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         _buildInputLabel('Email'),
         _buildTextField(
           controller: _emailRegisterController,
-          hintText: 'nama@gmail.com',
+          hintText: 'Masukkan email',
           prefixIcon: Icons.alternate_email_rounded,
           keyboardType: TextInputType.emailAddress,
           validator: _vEmail,
@@ -532,7 +521,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         _buildInputLabel('Nomor Telepon'),
         _buildTextField(
           controller: _phoneController,
-          hintText: 'Contoh: 08123456789',
+          hintText: 'Masukkan nomor',
           prefixIcon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
           validator: _vPhone,
@@ -542,7 +531,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         _buildInputLabel('Kata Sandi'),
         _buildTextField(
           controller: _passwordRegisterController,
-          hintText: 'Minimal 8 karakter',
+          hintText: 'Masukkan kata sandi',
           prefixIcon: Icons.lock_outline_rounded,
           obscureText: _obscureRegisterPassword,
           validator: _vPassword,
@@ -563,7 +552,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         _buildInputLabel('Konfirmasi Kata Sandi'),
         _buildTextField(
           controller: _confirmPasswordController,
-          hintText: 'Ulangi kata sandi',
+          hintText: 'Masukkan konfirmasi kata sandi',
           prefixIcon: Icons.lock_outline_rounded,
           obscureText: _obscureConfirmPassword,
           validator: _vConfirm,
@@ -764,25 +753,6 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                 ],
               ),
       ),
-    );
-  }
-
-  Widget _buildSecurityBadge() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: const [
-        Icon(Icons.verified_user_rounded, color: Color(0xFF0284C7), size: 14),
-        SizedBox(width: 6),
-        Text(
-          'TERPROTEKSI ENKRIPSI 256-BIT KELAS PERBANKAN',
-          style: TextStyle(
-            fontSize: 9,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF64748B),
-            letterSpacing: 0.5,
-          ),
-        ),
-      ],
     );
   }
 }

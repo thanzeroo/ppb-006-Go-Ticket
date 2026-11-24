@@ -69,10 +69,10 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
   @override
   Widget build(BuildContext context) {
     final messages = TikoChatService.instance.history;
-    final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
 
     return Scaffold(
       backgroundColor: _bgColor,
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: _tikoPrimary,
         foregroundColor: Colors.white,
@@ -91,7 +91,7 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
                 shape: BoxShape.circle,
               ),
               child: const Icon(
-                Icons.smart_toy_rounded,
+                Icons.support_agent_rounded,
                 color: Colors.white,
                 size: 20,
               ),
@@ -178,18 +178,16 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
 
           // Input area
           Container(
-            padding: EdgeInsets.only(
-              left: 16,
-              right: 8,
-              top: 10,
-              bottom: 10 + bottomPadding,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 8,
             ),
             decoration: BoxDecoration(
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 8,
                   offset: const Offset(0, -2),
                 ),
               ],
@@ -200,7 +198,7 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
                 children: [
                   Expanded(
                     child: Container(
-                      constraints: const BoxConstraints(maxHeight: 120),
+                      constraints: const BoxConstraints(maxHeight: 100),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(24),
@@ -227,8 +225,10 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 8),
                   Container(
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
                       color: _isLoading
                           ? const Color(0xFF94A3B8)
@@ -236,10 +236,11 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
                       shape: BoxShape.circle,
                     ),
                     child: IconButton(
+                      padding: EdgeInsets.zero,
                       icon: _isLoading
                           ? const SizedBox(
-                              width: 20,
-                              height: 20,
+                              width: 18,
+                              height: 18,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
                                 color: Colors.white,
@@ -265,25 +266,25 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
   /// Empty state saat belum ada pesan
   Widget _buildEmptyState() {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 80,
-              height: 80,
+              width: 72,
+              height: 72,
               decoration: BoxDecoration(
-                color: _tikoPrimary.withOpacity(0.1),
+                color: _tikoPrimary.withOpacity(0.12),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
-                Icons.smart_toy_rounded,
-                size: 40,
+                Icons.support_agent_rounded,
+                size: 38,
                 color: _tikoPrimary,
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             const Text(
               'Halo! Aku Tiko 👋',
               style: TextStyle(
@@ -292,27 +293,30 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
                 color: Color(0xFF0F172A),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             const Text(
-              'Asisten AI Go Ticket siap membantu kamu.\nTanya apa saja seputar Go Ticket!',
+              'Asisten AI Go Ticket siap membantu reservasi penginapanmu.\nPilih topik cepat atau ketik pertanyaanmu di bawah:',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,
                 color: Color(0xFF64748B),
-                height: 1.5,
+                height: 1.45,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
-            // Quick suggestions
+            // 6 Shortcut Pertanyaan Relevan & Terpopuler
             Wrap(
               spacing: 8,
               runSpacing: 8,
               alignment: WrapAlignment.center,
               children: [
-                _buildSuggestionChip('Cara booking hotel?'),
-                _buildSuggestionChip('Apa itu Go Ticket?'),
-                _buildSuggestionChip('Alur check-in'),
+                _buildSuggestionChip('Bagaimana cara booking hotel?'),
+                _buildSuggestionChip('Metode pembayaran apa saja?'),
+                _buildSuggestionChip('Cara melihat & cek e-tiket?'),
+                _buildSuggestionChip('Alur check-in dan check-out?'),
+                _buildSuggestionChip('Bagaimana cara pakai promo?'),
+                _buildSuggestionChip('Kebijakan pembatalan pesanan?'),
               ],
             ),
           ],
@@ -362,7 +366,7 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
                 shape: BoxShape.circle,
               ),
               child: const Icon(
-                Icons.smart_toy_rounded,
+                Icons.support_agent_rounded,
                 color: Colors.white,
                 size: 16,
               ),
@@ -424,7 +428,7 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
               shape: BoxShape.circle,
             ),
             child: const Icon(
-              Icons.smart_toy_rounded,
+              Icons.support_agent_rounded,
               color: Colors.white,
               size: 16,
             ),

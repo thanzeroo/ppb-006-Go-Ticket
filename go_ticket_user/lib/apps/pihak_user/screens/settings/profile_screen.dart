@@ -1,14 +1,10 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 import 'package:go_ticket_user/core/config/supabase_config.dart';
 import 'package:go_ticket_user/core/services/auth_service.dart';
 import 'package:go_ticket_user/core/services/supabase_service.dart';
 import 'package:go_ticket_user/core/utils/storage_helper.dart';
 import 'package:go_ticket_user/core/widgets/gt_ui.dart';
-import 'package:go_ticket_user/core/widgets/user_avatar.dart';
-import 'package:go_ticket_user/core/services/hotel_image_upload_service.dart';
 
 /// Edit Profil Saya (Figma: "USER Page Profil Saya").
 class ProfileScreen extends StatefulWidget {
@@ -27,9 +23,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   DateTime? _birth;
   bool? _male;
-  bool _notif = true;
-  bool _phoneEditable = false;
-  String _currency = 'IDR - Indonesian Rupiah (Rp)';
 
   @override
   void initState() {
@@ -129,137 +122,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (d != null) setState(() => _birth = d);
   }
 
-  Future<void> _pickAvatar() async {
-    final picker = ImagePicker();
-    final source = await showModalBottomSheet<ImageSource>(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Pilih Sumber Foto Profil',
-                style: TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w800, color: GT.ink),
-              ),
-              const SizedBox(height: 14),
-              ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: GT.sky,
-                  child: Icon(Icons.photo_camera, color: GT.teal),
-                ),
-                title: const Text('Ambil Foto Kamera',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: const Text('Gunakan kamera perangkat langsung',
-                    style: TextStyle(fontSize: 12, color: GT.muted)),
-                onTap: () => Navigator.pop(ctx, ImageSource.camera),
-              ),
-              ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: GT.soft,
-                  child: Icon(Icons.photo_library, color: GT.teal),
-                ),
-                title: const Text('Pilih dari Galeri HP',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: const Text('Upload gambar dari penyimpanan perangkat',
-                    style: TextStyle(fontSize: 12, color: GT.muted)),
-                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    if (source == null) return;
-
-    try {
-      final XFile? picked = await picker.pickImage(
-        source: source,
-        imageQuality: 85,
-        maxWidth: 1024,
-        maxHeight: 1024,
-      );
-
-      if (picked != null) {
-        final localFile = File(picked.path);
-        setState(() {
-          _avatarUrl = picked.path;
-        });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Row(
-                children: [
-                  SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white),
-                  ),
-                  SizedBox(width: 12),
-                  Text('Menyimpan foto profil...'),
-                ],
-              ),
-              duration: Duration(seconds: 1),
-            ),
-          );
-        }
-
-        // Upload ke Supabase Storage (bucket avatars) jika memungkinkan
-        String finalUrl = picked.path;
-        try {
-          final uploaded = await HotelImageUploadService.instance.uploadFile(
-            localFile,
-            prefix: 'user_${AuthService.instance.currentUser?.id ?? 'profile'}',
-            bucket: 'avatars',
-          );
-          if (uploaded != null && uploaded.isNotEmpty) {
-            finalUrl = uploaded;
-          }
-        } catch (e) {
-          debugPrint('⚠️ Storage upload error: $e');
-        }
-
-        if (mounted) {
-          setState(() {
-            _avatarUrl = finalUrl;
-          });
-        }
-
-        // Simpan ke AuthService (lokal session & database)
-        await AuthService.instance.updateProfile(
-          avatarUrl: finalUrl,
-        );
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Foto profil berhasil diperbarui!'),
-              backgroundColor: GT.green,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Gagal memilih foto: $e'),
-              backgroundColor: GT.red),
-        );
-      }
-    }
-  }
-
   Future<void> _save() async {
     if (_name.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -286,136 +148,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _choose(String title, List<String> options, String current,
-      ValueChanged<String> onPick) async {
-    final v = await showModalBottomSheet<String>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(title,
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w800)),
-          ),
-          for (final o in options)
-            ListTile(
-              title: Text(o),
-              trailing: o == current
-                  ? const Icon(Icons.check, color: GT.primary)
-                  : null,
-              onTap: () => Navigator.pop(ctx, o),
-            ),
-        ]),
-      ),
-    );
-    if (v != null) onPick(v);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: GT.bg,
-      appBar: const GTAppBar(title: 'Profile'),
+      appBar: const GTAppBar(title: 'Edit Profil'),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
         children: [
           GTCard(
-            child: Row(children: [
-              Stack(
-                children: [
-                  UserAvatar(
-                    imageUrl: _avatarUrl,
-                    name: _name.text,
-                    radius: 36,
-                    showVerifiedBadge:
-                        AuthService.instance.currentUser?.isVerified ?? false,
-                  ),
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: GestureDetector(
-                      onTap: _pickAvatar,
-                      child: const CircleAvatar(
-                          radius: 14,
-                          backgroundColor: GT.teal,
-                          child: Icon(Icons.photo_camera,
-                              size: 14, color: Colors.white)),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      Flexible(
-                        child: Text(_name.text,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                                color: GT.ink)),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.verified, color: GT.teal, size: 18),
-                    ]),
-                    const SizedBox(height: 4),
-                    const GTChip('Go Ticket Gold Member',
-                        icon: Icons.workspace_premium, bg: GT.sky),
-                    const SizedBox(height: 6),
-                    Row(children: const [
-                      Text('Saldo Poin: ',
-                          style: TextStyle(fontSize: 12, color: GT.muted)),
-                      GTChip('2.450 Poin', bg: GT.soft, fg: GT.teal),
-                    ]),
-                  ],
-                ),
-              ),
-            ]),
-          ),
-          GTCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(children: const [
-                  Expanded(
-                    child: Text('Informasi Akun',
-                        style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: GT.ink)),
+                const Text(
+                  'Informasi Akun',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: GT.ink,
                   ),
-                  Text('WAJIB DIISI',
-                      style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: GT.teal)),
-                ]),
+                ),
                 const SizedBox(height: 14),
                 _label('Nama Lengkap'),
                 _input(_name, Icons.badge_outlined,
                     onChanged: (_) => setState(() {})),
                 const SizedBox(height: 14),
-                Row(children: [
-                  Expanded(child: _label('Alamat Email')),
-                  const GTChip('Terverifikasi',
-                      icon: Icons.check_circle, bg: GT.sky),
-                ]),
+                _label('Alamat Email'),
                 _static(Icons.mail_outline, _email),
                 const SizedBox(height: 14),
                 _label('Nomor Ponsel'),
-                _input(_phone, Icons.phone_outlined,
-                    readOnly: !_phoneEditable,
-                    type: TextInputType.phone,
-                    trailing: GestureDetector(
-                      onTap: () =>
-                          setState(() => _phoneEditable = !_phoneEditable),
-                      child: GTChip(_phoneEditable ? 'Selesai' : 'Ubah',
-                          bg: GT.sky),
-                    )),
+                _input(
+                  _phone,
+                  Icons.phone_outlined,
+                  type: TextInputType.phone,
+                ),
                 const SizedBox(height: 14),
                 _label('Tanggal Lahir'),
                 GestureDetector(
@@ -460,51 +226,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 ),
-              ],
-            ),
-          ),
-          GTCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Preferensi & Keamanan',
-                    style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: GT.ink)),
-                const SizedBox(height: 12),
-                _prefRow(Icons.payments_outlined, 'Mata Uang Pilihan',
-                    _currency,
-                    onTap: () => _choose(
-                        'Pilih Mata Uang',
-                        ['IDR - Indonesian Rupiah (Rp)', 'USD - US Dollar (\$)'],
-                        _currency,
-                        (v) => setState(() => _currency = v))),
-                Row(children: [
-                  const CircleAvatar(
-                      radius: 20,
-                      backgroundColor: GT.soft,
-                      child: Icon(Icons.campaign_outlined, color: GT.teal)),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Notifikasi Booking & Promo',
-                            style: TextStyle(
-                                fontWeight: FontWeight.w800, color: GT.ink)),
-                        Text('Update tiket penerbangan & voucher',
-                            style: TextStyle(fontSize: 11, color: GT.muted)),
-                      ],
-                    ),
-                  ),
-                  Switch(
-                    value: _notif,
-                    activeColor: Colors.white,
-                    activeTrackColor: GT.teal,
-                    onChanged: (v) => setState(() => _notif = v),
-                  ),
-                ]),
               ],
             ),
           ),
@@ -607,38 +328,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     fontWeight: FontWeight.w700, color: GT.ink)),
           ]),
         ),
-      ),
-    );
-  }
-
-  Widget _prefRow(IconData i, String t, String s, {required VoidCallback onTap}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: onTap,
-        child: Row(children: [
-          CircleAvatar(
-              radius: 20,
-              backgroundColor: GT.soft,
-              child: Icon(i, color: GT.teal)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(t,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w800, color: GT.ink)),
-                Text(s,
-                    style: const TextStyle(fontSize: 11, color: GT.muted)),
-              ],
-            ),
-          ),
-          const CircleAvatar(
-              radius: 16,
-              backgroundColor: GT.soft,
-              child: Icon(Icons.chevron_right, color: GT.ink, size: 20)),
-        ]),
       ),
     );
   }

@@ -17,7 +17,6 @@ class _SecurityScreenState extends State<SecurityScreen> {
   final _new = TextEditingController();
   final _confirm = TextEditingController();
   bool _hideOld = true, _hideNew = true, _hideConfirm = true;
-  bool _passwordUpdated = false;
 
   @override
   void dispose() {
@@ -27,28 +26,14 @@ class _SecurityScreenState extends State<SecurityScreen> {
     super.dispose();
   }
 
-  bool get _okLen => _new.text.length >= 8;
-  bool get _okCase =>
-      RegExp(r'[a-z]').hasMatch(_new.text) &&
-      RegExp(r'[A-Z]').hasMatch(_new.text);
-  bool get _okSym =>
-      RegExp(r'[0-9]').hasMatch(_new.text) &&
-      RegExp(r'[^A-Za-z0-9]').hasMatch(_new.text);
-
-  double get _score {
-    var s = 0.8;
-    if (_passwordUpdated) s += 0.15;
-    return s.clamp(0.0, 1.0);
-  }
-
   void _snack(String m) => ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(m)));
 
   Future<void> _updatePassword() async {
     if (_old.text.isEmpty) return _snack('Masukkan kata sandi saat ini');
-    if (!(_okLen && _okCase && _okSym)) {
-      return _snack('Kata sandi baru belum memenuhi kriteria keamanan');
+    if (_new.text.length < 8) {
+      return _snack('Kata sandi baru minimal 8 karakter');
     }
     if (_new.text != _confirm.text) {
       return _snack('Konfirmasi kata sandi tidak sama');
@@ -63,12 +48,11 @@ class _SecurityScreenState extends State<SecurityScreen> {
       }
       if (!mounted) return;
       setState(() {
-        _passwordUpdated = true;
         _old.clear();
         _new.clear();
         _confirm.clear();
       });
-      _snack('Kata sandi berhasil diperbarui di Supabase');
+      _snack('Kata sandi berhasil diperbarui');
     } catch (e) {
       if (!mounted) return;
       _snack('Gagal memperbarui kata sandi: $e');
@@ -97,178 +81,122 @@ class _SecurityScreenState extends State<SecurityScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final pct = (_score * 100).round();
     return Scaffold(
       backgroundColor: GT.bg,
-      appBar: const GTAppBar(title: 'Security'),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
-        children: [
-          GTCard(
-            child: Column(children: [
-              Row(children: [
-                Expanded(
+      appBar: const GTAppBar(title: 'Keamanan Akun'),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                GTCard(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      const GTChip('PROTEKSI TINGKAT TINGGI',
-                          icon: Icons.shield, bg: GT.sky),
-                      const SizedBox(height: 8),
-                      const Text('Skor Keamanan Akun',
-                          style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                              color: GT.ink)),
-                      Text('$pct% • ${pct >= 80 ? 'Sangat Baik' : 'Cukup'}',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w700, color: GT.teal)),
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: GT.sky,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.lock_reset_rounded,
+                          color: GT.teal,
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Ubah Kata Sandi',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: GT.ink,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      _pw('Kata Sandi Saat Ini', 'Masukkan kata sandi lama', _old,
+                          _hideOld, () => setState(() => _hideOld = !_hideOld)),
+                      const SizedBox(height: 12),
+                      _pw('Kata Sandi Baru', 'Buat kata sandi baru (min. 8 karakter)', _new, _hideNew,
+                          () => setState(() => _hideNew = !_hideNew),
+                          onChanged: (_) => setState(() {})),
+                      const SizedBox(height: 12),
+                      _pw('Konfirmasi Kata Sandi Baru', 'Ulangi kata sandi baru',
+                          _confirm, _hideConfirm,
+                          () => setState(() => _hideConfirm = !_hideConfirm)),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        child: GTButton(
+                          label: 'Perbarui Kata Sandi',
+                          leading: Icons.vpn_key_outlined,
+                          onTap: _updatePassword,
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                SizedBox(
-                  width: 64,
-                  height: 64,
-                  child: Stack(alignment: Alignment.center, children: [
-                    SizedBox(
-                      width: 64,
-                      height: 64,
-                      child: CircularProgressIndicator(
-                        value: _score,
-                        strokeWidth: 7,
-                        backgroundColor: GT.soft,
-                        color: GT.primary,
-                      ),
-                    ),
-                    Text('$pct%',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w800, color: GT.ink)),
-                  ]),
-                ),
-              ]),
-              const Divider(height: 22),
-              Row(children: const [
-                Icon(Icons.lightbulb_outline, color: GT.teal, size: 18),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                      'Perbarui kata sandi berkala untuk meraih perlindungan optimal 100%.',
-                      style: TextStyle(fontSize: 12, color: GT.body)),
-                ),
-              ]),
-            ]),
-          ),
-          GTCard(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              _header(Icons.lock_reset, 'Ubah Kata Sandi',
-                  'Kelola kombinasi sandi akun Anda'),
-              _pw('Kata Sandi Saat Ini', 'Masukkan kata sandi lama', _old,
-                  _hideOld, () => setState(() => _hideOld = !_hideOld)),
-              const SizedBox(height: 12),
-              _pw('Kata Sandi Baru', 'Buat kata sandi baru', _new, _hideNew,
-                  () => setState(() => _hideNew = !_hideNew),
-                  onChanged: (_) => setState(() {})),
-              const SizedBox(height: 12),
-              _pw('Konfirmasi Kata Sandi Baru', 'Ulangi kata sandi baru',
-                  _confirm, _hideConfirm,
-                  () => setState(() => _hideConfirm = !_hideConfirm)),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                    color: GT.soft.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(14)),
-                child: Column(
+                const SizedBox(height: 14),
+                GTCard(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('KRITERIA KEAMANAN:',
-                          style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: GT.ink)),
+                      Row(
+                        children: const [
+                          Icon(Icons.warning_amber_rounded, color: GT.red),
+                          SizedBox(width: 8),
+                          Text('Zona Berisiko',
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: GT.red)),
+                        ],
+                      ),
                       const SizedBox(height: 6),
-                      _crit('Minimal 8 karakter', _okLen),
-                      _crit('Kombinasi huruf besar & kecil', _okCase),
-                      _crit('Mengandung angka & simbol khusus', _okSym),
-                    ]),
-              ),
-              const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                child: GTButton(
-                    label: 'Perbarui Kata Sandi',
-                    leading: Icons.vpn_key_outlined,
-                    onTap: _updatePassword),
-              ),
-            ]),
-          ),
-          GTCard(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: const [
-                Icon(Icons.warning_amber_rounded, color: GT.red),
-                SizedBox(width: 8),
-                Text('Zona Berisiko',
-                    style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: GT.red)),
-              ]),
-              const SizedBox(height: 8),
-              const Text(
-                  'Menghapus akun akan membatalkan semua e-tiket mendatang, poin loyalitas, dan riwayat pesanan secara permanen.',
-                  style: TextStyle(fontSize: 12, height: 1.4, color: GT.body)),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _confirm2(
-                      'Hapus Akun Permanen?',
-                      'Tindakan ini tidak dapat dibatalkan. Semua e-tiket, poin, dan riwayat pesanan akan hilang.',
-                      'Hapus Akun',
-                      () => _snack('Permintaan hapus akun dikirim')),
-                  icon: const Icon(Icons.delete_forever_outlined,
-                      color: GT.red, size: 18),
-                  label: const Text('Hapus Akun Permanen',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w700, color: GT.red)),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: const BorderSide(color: Color(0xFFFCA5A5)),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24)),
+                      const Text(
+                        'Menghapus akun akan membatalkan semua e-tiket dan riwayat pesanan secara permanen.',
+                        style: TextStyle(fontSize: 12, height: 1.4, color: GT.body),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _confirm2(
+                            'Hapus Akun Permanen?',
+                            'Tindakan ini tidak dapat dibatalkan. Semua e-tiket dan riwayat pesanan akan hilang.',
+                            'Hapus Akun',
+                            () => _snack('Permintaan hapus akun dikirim'),
+                          ),
+                          icon: const Icon(Icons.delete_forever_outlined,
+                              color: GT.red, size: 18),
+                          label: const Text('Hapus Akun Permanen',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700, color: GT.red)),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            side: const BorderSide(color: Color(0xFFFCA5A5)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ]),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _header(IconData i, String t, String s) => Padding(
-        padding: const EdgeInsets.only(bottom: 14),
-        child: Row(children: [
-          CircleAvatar(
-              radius: 20,
-              backgroundColor: GT.soft,
-              child: Icon(i, color: GT.teal, size: 20)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(t,
-                    style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: GT.ink)),
-                Text(s,
-                    style: const TextStyle(fontSize: 11, color: GT.muted)),
               ],
             ),
           ),
-        ]),
-      );
+        ),
+      ),
+    );
+  }
 
   Widget _pw(String label, String hint, TextEditingController c, bool hide,
       VoidCallback toggle,
@@ -302,15 +230,4 @@ class _SecurityScreenState extends State<SecurityScreen> {
       ),
     ]);
   }
-
-  Widget _crit(String t, bool ok) => Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: Row(children: [
-          Icon(ok ? Icons.check_circle : Icons.check_circle_outline,
-              size: 16, color: ok ? GT.green : GT.muted),
-          const SizedBox(width: 6),
-          Text(t, style: const TextStyle(fontSize: 12, color: GT.body)),
-        ]),
-      );
-
 }

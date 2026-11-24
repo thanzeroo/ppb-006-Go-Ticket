@@ -26,7 +26,6 @@ class _PengaturanTabState extends State<PengaturanTab> {
   int _savedHotelsCount = 0;
   int _voucherCount = 0;
   int _points = 0;
-  String _tier = 'MEMBER BRONZE GO TICKET';
 
   @override
   void initState() {
@@ -38,14 +37,12 @@ class _PengaturanTabState extends State<PengaturanTab> {
     final guests = await CustomerDataService.instance.getSavedGuests();
     final hotels = await CustomerDataService.instance.getSavedHotels();
     final points = await CustomerDataService.instance.getRewardPoints();
-    final tier = await CustomerDataService.instance.getMembershipTier();
     final promos = await PromoService.instance.getPromos(activeOnly: true);
     if (mounted) {
       setState(() {
         _savedGuestsCount = guests.length;
         _savedHotelsCount = hotels.length;
         _points = points;
-        _tier = tier;
         _voucherCount = promos.length;
       });
     }
@@ -234,21 +231,24 @@ class _PengaturanTabState extends State<PengaturanTab> {
         (user?.email?.isNotEmpty == true) ? user!.email! : '';
     final isVerified = user?.isVerified ?? true;
     final points = _points;
-    final tier = _tier;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildTopBar(user),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildProfileCard(user, fullName, email, isVerified, tier),
+      body: RefreshIndicator(
+        color: const Color(0xFF00B4D8),
+        onRefresh: _loadDynamicCounts,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildTopBar(user),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildProfileCard(user, fullName, email, isVerified),
                   const SizedBox(height: 12),
                   _buildSaldoCard(points),
                   const SizedBox(height: 24),
@@ -326,8 +326,9 @@ class _PengaturanTabState extends State<PengaturanTab> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   // ---------------------------------------------------------------------------
   // TOP BAR
@@ -385,14 +386,13 @@ class _PengaturanTabState extends State<PengaturanTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // PROFILE CARD (Sesuai Gambar 3)
+  // PROFILE CARD
   // ---------------------------------------------------------------------------
   Widget _buildProfileCard(
     dynamic user,
     String fullName,
     String email,
     bool isVerified,
-    String tier,
   ) {
     return Container(
       decoration: BoxDecoration(
@@ -479,33 +479,6 @@ class _PengaturanTabState extends State<PengaturanTab> {
                     color: const Color(0xFF64748B),
                   ),
                   overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                // Tier Badge
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFC8F0FA),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.workspace_premium,
-                          color: Color(0xFF0077B6), size: 13),
-                      const SizedBox(width: 4),
-                      Text(
-                        tier,
-                        style: GoogleFonts.inter(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF0077B6),
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ],
             ),

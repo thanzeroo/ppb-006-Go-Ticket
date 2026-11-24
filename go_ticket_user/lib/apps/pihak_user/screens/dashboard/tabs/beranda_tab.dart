@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'package:go_ticket_user/core/widgets/app_pagination_bar.dart';
 import 'package:go_ticket_user/core/models/booking_args.dart';
 import 'package:go_ticket_user/core/models/hotel_model.dart';
 import 'package:go_ticket_user/core/services/auth_service.dart';
@@ -23,7 +22,6 @@ class BerandaTab extends StatefulWidget {
 
 class _BerandaTabState extends State<BerandaTab> {
   final Set<String> _savedHotelIds = {};
-  int _rekomendasiPage = 1;
   late Future<List<Map<String, dynamic>>> _promosFuture;
   late Future<List<HotelModel>> _featuredHotelsFuture;
 
@@ -65,6 +63,18 @@ class _BerandaTabState extends State<BerandaTab> {
     }
   }
 
+  Future<void> _refreshData() async {
+    setState(() {
+      _promosFuture = PromoService.instance.getPromos();
+      _featuredHotelsFuture = HotelService.instance.getFeaturedHotels();
+    });
+    await Future.wait([
+      _promosFuture,
+      _featuredHotelsFuture,
+      _loadSavedHotels(),
+    ]);
+  }
+
   Future<void> _toggleSave(Map<String, dynamic> hotel) async {
     final id = hotel['id']?.toString() ?? hotel['name']?.toString() ?? '';
     final isSaved = await CustomerDataService.instance.toggleSavedHotel(hotel);
@@ -97,25 +107,30 @@ class _BerandaTabState extends State<BerandaTab> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(user, firstName),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildPromoCard(),
-                  const SizedBox(height: 24),
-                  _buildRekomendasiSection(),
-                  const SizedBox(height: 24),
-                  _buildWhyGoTicket(),
-                ],
+      body: RefreshIndicator(
+        color: const Color(0xFF00B4D8),
+        onRefresh: _refreshData,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(user, firstName),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildPromoCard(),
+                    const SizedBox(height: 24),
+                    _buildRekomendasiSection(),
+                    const SizedBox(height: 24),
+                    _buildWhyGoTicket(),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -189,39 +204,7 @@ class _BerandaTabState extends State<BerandaTab> {
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
-              // Badge Pill: Eksplorasi Staycation Pilihan
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE0E7FF),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF4F46E5),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Eksplorasi Staycation Pilihan',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF4338CA),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 14),
               // Greeting Title
               Text(
                 'Halo, $firstName!',
@@ -419,19 +402,36 @@ class _BerandaTabState extends State<BerandaTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // REKOMENDASI TERPOPULER (Dari Database / Supabase)
+  // HOTEL TERBARU (Maksimal 3 Hotel Kemunculan Terbaru)
   // ---------------------------------------------------------------------------
   Widget _buildRekomendasiSection() {
     return FutureBuilder<List<HotelModel>>(
       future: _featuredHotelsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SizedBox.shrink();
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: CircularProgressIndicator(),
+            ),
+          );
         }
         final list = snapshot.data ?? [];
         if (list.isEmpty) {
           return const SizedBox.shrink();
         }
+
+        // Urutkan berdasarkan kemunculan terbaru (registeredAt/approvedAt desc atau ID desc)
+        final sortedHotels = List<HotelModel>.from(list);
+        sortedHotels.sort((a, b) {
+          final dtA = a.registeredAt ?? a.approvedAt;
+          final dtB = b.registeredAt ?? b.approvedAt;
+          if (dtA != null && dtB != null) return dtB.compareTo(dtA);
+          return (int.tryParse(b.id) ?? 0).compareTo(int.tryParse(a.id) ?? 0);
+        });
+
+        // Batasi hanya 3 hotel terbaru
+        final latestHotels = sortedHotels.take(3).toList();
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -439,26 +439,29 @@ class _BerandaTabState extends State<BerandaTab> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Rekomendasi Terpopuler',
-                      style: GoogleFonts.inter(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF0F172A),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Hotel Terbaru',
+                        style: GoogleFonts.inter(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF0F172A),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Dipilih khusus dengan skor ulasan tertinggi',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: const Color(0xFF64748B),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Pilihan akomodasi terbaru yang siap dipesan',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: const Color(0xFF64748B),
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 TextButton(
                   onPressed: () =>
@@ -475,28 +478,8 @@ class _BerandaTabState extends State<BerandaTab> {
               ],
             ),
             const SizedBox(height: 12),
-            Builder(
-              builder: (ctx) {
-                final total = list.length;
-                final maxPage = (total / 10).ceil();
-                final safePage = _rekomendasiPage.clamp(1, maxPage > 0 ? maxPage : 1);
-                final pagedHotels = paginateList(list, safePage, pageSize: 10);
-
-                return Column(
-                  children: [
-                    ...pagedHotels.map((h) => _buildHotelCard(h)),
-                    if (total > 10)
-                      AppPaginationBar(
-                        currentPage: safePage,
-                        totalItems: total,
-                        pageSize: 10,
-                        itemLabel: 'hotel rekomendasi',
-                        primaryColor: const Color(0xFF0077B6),
-                        onPageChanged: (p) => setState(() => _rekomendasiPage = p),
-                      ),
-                  ],
-                );
-              },
+            Column(
+              children: latestHotels.map((h) => _buildHotelCard(h)).toList(),
             ),
           ],
         );

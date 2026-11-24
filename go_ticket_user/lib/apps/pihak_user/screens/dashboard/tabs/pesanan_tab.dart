@@ -242,15 +242,21 @@ class _PesananTabState extends State<PesananTab>
               Expanded(
                 child: snapshot.connectionState == ConnectionState.waiting
                     ? const Center(child: CircularProgressIndicator())
-                    : TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildOrderList(allBookings, filterStatus: 'all'),
-                          _buildOrderList(allBookings, filterStatus: 'pending'),
-                          _buildOrderList(allBookings, filterStatus: 'confirmed'),
-                          _buildOrderList(allBookings, filterStatus: 'selesai'),
-                          _buildOrderList(allBookings, filterStatus: 'dibatalkan'),
-                        ],
+                    : RefreshIndicator(
+                        color: const Color(0xFF00B4D8),
+                        onRefresh: () async {
+                          setState(() {});
+                        },
+                        child: TabBarView(
+                          controller: _tabController,
+                          children: [
+                            _buildOrderList(allBookings, filterStatus: 'all'),
+                            _buildOrderList(allBookings, filterStatus: 'pending'),
+                            _buildOrderList(allBookings, filterStatus: 'confirmed'),
+                            _buildOrderList(allBookings, filterStatus: 'selesai'),
+                            _buildOrderList(allBookings, filterStatus: 'dibatalkan'),
+                          ],
+                        ),
                       ),
               ),
             ],
@@ -531,11 +537,12 @@ class _PesananTabState extends State<PesananTab>
 
     final total = filtered.length;
     final curPage = _tabPages[filterStatus] ?? 1;
-    final maxPage = (total / 10).ceil();
+    final maxPage = (total / 5).ceil();
     final safePage = curPage.clamp(1, maxPage > 0 ? maxPage : 1);
-    final pagedBookings = paginateList(filtered, safePage, pageSize: 10);
+    final pagedBookings = paginateList(filtered, safePage, pageSize: 5);
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       itemCount: pagedBookings.length + (total > 0 ? 1 : 0) + 1, // items + pagination bar + bantuan card
       itemBuilder: (context, index) {
@@ -549,7 +556,7 @@ class _PesananTabState extends State<PesananTab>
           return AppPaginationBar(
             currentPage: safePage,
             totalItems: total,
-            pageSize: 10,
+            pageSize: 5,
             itemLabel: 'pesanan',
             primaryColor: const Color(0xFF00B4D8),
             onPageChanged: (newPage) {
