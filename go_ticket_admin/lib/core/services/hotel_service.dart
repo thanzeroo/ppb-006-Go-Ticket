@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -593,7 +594,102 @@ class HotelService {
       }
     }
 
+    // 4. Generate akun Administrator hotel secara otomatis
+    String? genAdminEmail;
+    String? genAdminPassword;
+    String? genAdminStaffId;
+
+    if (newHotelId > 0) {
+      genAdminEmail = 'administrator$newHotelId@gmail.com';
+      // Password acak 8 karakter (huruf besar, kecil, angka)
+      const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      final rand = Random.secure();
+      genAdminPassword = List.generate(8, (_) => chars[rand.nextInt(chars.length)]).join();
+      genAdminStaffId = 'ADM-${newHotelId.toString().padLeft(3, '0')}';
+
+      final svcKeyAdmin = SupabaseConfig.supabaseServiceRoleKey.isNotEmpty
+          ? SupabaseConfig.supabaseServiceRoleKey
+          : SupabaseConfig.activeApiKey;
+
+      // a. Daftarkan akun ke Supabase Auth via Admin REST API (Service Role Key)
+      try {
+        final authUrl = Uri.parse('${SupabaseConfig.supabaseUrl}/auth/v1/admin/users');
+        await http.post(
+          authUrl,
+          headers: {
+            'apikey': svcKeyAdmin,
+            'Authorization': 'Bearer $svcKeyAdmin',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'email': genAdminEmail,
+            'password': genAdminPassword,
+            'email_confirm': true,
+            'user_metadata': {
+              'full_name': 'Administrator $name',
+              'id_staf': genAdminStaffId,
+              'role': 'administrator',
+              'id_penginapan': newHotelId,
+            },
+          }),
+        );
+      } catch (authErr) {
+        debugPrint('⚠️ [createHotel] Gagal registrasi Supabase Auth admin: $authErr');
+      }
+
+      // b. Simpan data staf administrator ke tabel staf_hotel
+      try {
+        final staffPayload = {
+          'id_staf': genAdminStaffId,
+          'id_penginapan': newHotelId,
+          'nama_staf': 'Administrator $name',
+          'email': genAdminEmail,
+          'password': genAdminPassword,
+          'no_telepon': phone?.trim().isNotEmpty == true ? phone!.trim() : null,
+          'role_jabatan': 'administrator',
+          'status_karyawan': 'Aktif',
+          'status_duty': 'Off',
+        };
+        final staffUri = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableStafHotel}');
+        await http.post(
+          staffUri,
+          headers: {
+            'apikey': svcKeyAdmin,
+            'Authorization': 'Bearer $svcKeyAdmin',
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal',
+          },
+          body: jsonEncode(staffPayload),
+        );
+      } catch (stafErr) {
+        debugPrint('⚠️ [createHotel] Gagal insert staf_hotel admin: $stafErr');
+      }
+
+      // c. Simpan ke tabel users (jika ada)
+      try {
+        final userUri = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableUsers}');
+        await http.post(
+          userUri,
+          headers: {
+            'apikey': svcKeyAdmin,
+            'Authorization': 'Bearer $svcKeyAdmin',
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal',
+          },
+          body: jsonEncode({
+            'email': genAdminEmail,
+            'nama_lengkap': 'Administrator $name',
+            'role': 'Admin Hotel',
+            'id_penginapan': newHotelId,
+          }),
+        );
+      } catch (_) {}
+    }
+
     final resMap = Map<String, dynamic>.from(insertedHotel);
+    resMap['generated_admin_email'] = genAdminEmail;
+    resMap['generated_admin_password'] = genAdminPassword;
+    resMap['generated_admin_staff_id'] = genAdminStaffId;
     if (mainImageUrl != null && mainImageUrl.isNotEmpty) {
       resMap['main_image_url'] = mainImageUrl;
       resMap['foto_utama'] = mainImageUrl;

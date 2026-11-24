@@ -153,6 +153,11 @@ class HotelModel {
   final String? _checkOutTime;
   final String? _cancellationPolicy;
 
+  /// Kredensial akun Administrator otomatis saat hotel baru didaftarkan
+  final String? generatedAdminEmail;
+  final String? generatedAdminPassword;
+  final String? generatedAdminStaffId;
+
   const HotelModel({
     required this.id,
     required this.name,
@@ -186,6 +191,9 @@ class HotelModel {
     String? checkInTime,
     String? checkOutTime,
     String? cancellationPolicy,
+    this.generatedAdminEmail,
+    this.generatedAdminPassword,
+    this.generatedAdminStaffId,
     this.totalRooms,
     this.registeredAt,
     this.approvedAt,
@@ -426,6 +434,9 @@ class HotelModel {
           json['check_out_time']?.toString(),
       cancellationPolicy: json['kebijakan_batal']?.toString() ??
           json['cancellation_policy']?.toString(),
+      generatedAdminEmail: json['generated_admin_email']?.toString(),
+      generatedAdminPassword: json['generated_admin_password']?.toString(),
+      generatedAdminStaffId: json['generated_admin_staff_id']?.toString(),
       registeredAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'])
           : null,
@@ -439,6 +450,9 @@ class HotelModel {
     return {
       'id': id,
       'name': name,
+      'generated_admin_email': generatedAdminEmail,
+      'generated_admin_password': generatedAdminPassword,
+      'generated_admin_staff_id': generatedAdminStaffId,
       'address': address,
       'city': city,
       'province': province,

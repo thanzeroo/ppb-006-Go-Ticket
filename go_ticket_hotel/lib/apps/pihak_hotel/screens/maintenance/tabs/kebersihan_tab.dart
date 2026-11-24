@@ -23,8 +23,6 @@ class _KebersihanTabState extends State<KebersihanTab> {
   int _selectedFloorIndex = 0; // 0: Semua Lantai, 1: Lantai 1, 2: Lantai 2, 3: Lantai 3
   int _selectedStatusFilter = 0; // 0: Semua, 1: Antrean (Perlu Bersih), 2: Proses, 3: Selesai Siap Huni
 
-  List<MaintenanceTicketModel> _tickets = [];
-  bool _isLoading = false;
   int _currentPage = 1;
 
   @override
@@ -45,20 +43,11 @@ class _KebersihanTabState extends State<KebersihanTab> {
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
     try {
-      final data = await MaintenanceService.instance.getTickets(
+      await MaintenanceService.instance.getTickets(
         category: TicketCategory.cleaning,
       );
-      if (mounted) {
-        setState(() {
-          _tickets = data;
-          _isLoading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    } catch (_) {}
   }
 
   void _showActionSnackbar(String message) {

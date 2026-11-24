@@ -93,20 +93,6 @@ class _FoCheckInTabState extends State<FoCheckInTab> {
     }
   }
 
-  /// Eksekusi Check-in dari pencarian
-  Future<void> _executeCheckIn(BookingModel b) async {
-    try {
-      final ok = await BookingService.instance.checkInGuest(b.id);
-      if (ok) {
-        HotelOperationsStore.instance.verifyETicket(b.id);
-        _showActionSnackbar('Tamu ${b.customerName} berhasil Check-In! Kunci RFID aktif.');
-        _loadData();
-      }
-    } catch (e) {
-      _showActionSnackbar('Gagal Check-in: $e', isSuccess: false);
-    }
-  }
-
   /// -------------------------------------------------------------------------
   /// 1. MODAL ATUR PERPANJANGAN HOTEL DENGAN BIAYA TAMBAHAN
   /// -------------------------------------------------------------------------
@@ -116,7 +102,6 @@ class _FoCheckInTabState extends State<FoCheckInTab> {
         ? (booking.totalAmount / booking.totalNights).round()
         : 500000;
     String paymentMethod = 'Tunai di Resepsionis';
-    final notesController = TextEditingController();
 
     showModalBottomSheet(
       context: context,
@@ -601,9 +586,9 @@ class _FoCheckInTabState extends State<FoCheckInTab> {
   /// -------------------------------------------------------------------------
   void _showForcedExpulsionModal(BookingModel booking) {
     String selectedViolation = 'Merokok di kamar ber-AC bebas asap rokok';
-    final notesController = TextEditingController();
     final penaltyController = TextEditingController(text: '500000');
 
+    final notesController = TextEditingController();
     final violationPresets = [
       'Merokok di kamar ber-AC bebas asap rokok',
       'Kebisingan ekstrem / mengganggu ketenangan tamu lain',

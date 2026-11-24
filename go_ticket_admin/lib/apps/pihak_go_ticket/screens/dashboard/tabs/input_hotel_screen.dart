@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -92,9 +93,10 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
   late final TextEditingController _waController;
   late final TextEditingController _emailController;
 
-  // Koordinat Latitude & Longitude (Editable)
+  // Koordinat Latitude & Longitude serta Link Google Maps
   late final TextEditingController _latitudeController;
   late final TextEditingController _longitudeController;
+  late final TextEditingController _mapsUrlController;
 
   // Kategori: 0 = Resor, 1 = Hotel, 2 = Vila
   int _selectedCategory = 0;
@@ -155,6 +157,13 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
     );
     _longitudeController = TextEditingController(
       text: h?.longitude != null ? h!.longitude.toString() : '',
+    );
+    final double? initLat = h?.latitude;
+    final double? initLng = h?.longitude;
+    _mapsUrlController = TextEditingController(
+      text: (initLat != null && initLng != null)
+          ? 'https://www.google.com/maps?q=$initLat,$initLng'
+          : '',
     );
 
     // Kategori: Resor (0), Hotel (1), Vila (2)
@@ -324,6 +333,7 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
     _phoneController.dispose();
     _waController.dispose();
     _emailController.dispose();
+    _mapsUrlController.dispose();
     _latitudeController.dispose();
     _longitudeController.dispose();
     for (final room in _roomTypes) {
@@ -602,71 +612,8 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
           ),
           const SizedBox(height: 12),
 
-          // Koordinat Latitude & Longitude (Point 3: Bisa diedit dan disambung Google Maps)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: const [
-                  Icon(Icons.location_on_outlined, size: 14, color: Color(0xFF007A94)),
-                  SizedBox(width: 4),
-                  Text(
-                    'Koordinat GPS (Google Maps)',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF0F172A),
-                    ),
-                  ),
-                ],
-              ),
-              InkWell(
-                onTap: _showCoordinatesHelperDialog,
-                borderRadius: BorderRadius.circular(6),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE0F2FE),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFFBAE6FD)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.content_paste_rounded, size: 12, color: Color(0xFF0284C7)),
-                      SizedBox(width: 4),
-                      Text(
-                        'Tempel dari Maps',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF0284C7)),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Expanded(
-                child: _buildInputBox(
-                  controller: _latitudeController,
-                  hint: 'Latitude (mis. -8.691200)',
-                  prefixIcon: Icons.my_location_rounded,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildInputBox(
-                  controller: _longitudeController,
-                  hint: 'Longitude (mis. 115.168333)',
-                  prefixIcon: Icons.explore_outlined,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                ),
-              ),
-            ],
-          ),
+          // Koordinat & Google Maps (Mendukung link Maps, input manual, dan titik pokok populer)
+          _buildCoordinatesSubcard(),
           const SizedBox(height: 14),
 
           // Kontak Operasional & Concierge
@@ -701,6 +648,243 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
     );
   }
 
+  /// Subcard Koordinat GPS & Google Maps
+  /// Menyediakan hal-hal pokok dari Google Maps langsung:
+  /// 1. Input/Tempel Link Google Maps langsung
+  /// 2. Input manual Latitude & Longitude
+  /// 3. Tombol pemilihan cepat titik lokasi pokok destinasi wisata hotel di Indonesia
+  /// 4. Indikator status koordinat terhubung
+  Widget _buildCoordinatesSubcard() {
+    final hasCoords = _latitudeController.text.trim().isNotEmpty &&
+        _longitudeController.text.trim().isNotEmpty;
+
+    // Titik lokasi pokok Google Maps untuk destinasi hotel terpopuler di Indonesia
+    final quickLocations = [
+      {'label': '🏝️ Bali (Seminyak)', 'lat': '-8.691200', 'lng': '115.168333'},
+      {'label': '🏖️ Bali (Kuta)', 'lat': '-8.721800', 'lng': '115.169500'},
+      {'label': '🌿 Bali (Ubud)', 'lat': '-8.506900', 'lng': '115.262500'},
+      {'label': '🏢 Jakarta', 'lat': '-6.175400', 'lng': '106.827200'},
+      {'label': '☕ Bandung', 'lat': '-6.917500', 'lng': '107.619100'},
+      {'label': '🏛️ Yogyakarta', 'lat': '-7.795600', 'lng': '110.369500'},
+      {'label': '🏝️ Lombok', 'lat': '-8.583300', 'lng': '116.333300'},
+      {'label': '🏙️ Surabaya', 'lat': '-7.257500', 'lng': '112.752100'},
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: const [
+                  Icon(Icons.location_on_rounded, size: 15, color: Color(0xFF007A94)),
+                  SizedBox(width: 6),
+                  Text(
+                    'Koordinat GPS & Google Maps',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+              InkWell(
+                onTap: _showCoordinatesHelperDialog,
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0F2FE),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFFBAE6FD)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.content_paste_rounded, size: 12, color: Color(0xFF0284C7)),
+                      SizedBox(width: 4),
+                      Text(
+                        'Tempel dari Maps',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF0284C7)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Tempel tautan Google Maps atau pilih titik pokok destinasi di bawah',
+            style: TextStyle(fontSize: 9.5, color: Color(0xFF64748B)),
+          ),
+          const SizedBox(height: 10),
+
+          // 1. Input Langsung Link / URL Google Maps
+          TextField(
+            controller: _mapsUrlController,
+            onChanged: (val) {
+              if (val.trim().isNotEmpty) {
+                _parseAndSetCoordinates(val.trim(), isSilent: true);
+              }
+            },
+            style: const TextStyle(fontSize: 11, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+            decoration: InputDecoration(
+              hintText: 'Tempel link Google Maps (misal: https://maps.app.goo.gl/...)',
+              hintStyle: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8)),
+              prefixIcon: const Icon(Icons.link_rounded, size: 16, color: Color(0xFF007A94)),
+              suffixIcon: _mapsUrlController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear_rounded, size: 14, color: Color(0xFF94A3B8)),
+                      onPressed: () {
+                        setState(() {
+                          _mapsUrlController.clear();
+                        });
+                      },
+                    )
+                  : null,
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFF0096B4), width: 1.5),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // 2. Row Input Manual Latitude & Longitude
+          Row(
+            children: [
+              Expanded(
+                child: _buildInputBox(
+                  controller: _latitudeController,
+                  hint: 'Latitude (mis. -8.691200)',
+                  prefixIcon: Icons.my_location_rounded,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildInputBox(
+                  controller: _longitudeController,
+                  hint: 'Longitude (mis. 115.168333)',
+                  prefixIcon: Icons.explore_outlined,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // 3. Pilihan Cepat Titik Lokasi Pokok Google Maps (Mudah saat buat hotel baru)
+          const Text(
+            'Titik Lokasi Pokok dari Maps (Pilih Cepat):',
+            style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFF475569)),
+          ),
+          const SizedBox(height: 6),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: quickLocations.map((loc) {
+                final isCurrent = _latitudeController.text.trim() == loc['lat'] &&
+                    _longitudeController.text.trim() == loc['lng'];
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: InkWell(
+                    onTap: () {
+                      setState(() {
+                        _latitudeController.text = loc['lat']!;
+                        _longitudeController.text = loc['lng']!;
+                        _mapsUrlController.text =
+                            'https://www.google.com/maps?q=${loc['lat']},${loc['lng']}';
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Titik Maps ${loc['label']} berhasil diterapkan!'),
+                          duration: const Duration(seconds: 2),
+                          backgroundColor: const Color(0xFF00758F),
+                        ),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isCurrent ? const Color(0xFF00758F) : Colors.white,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: isCurrent ? const Color(0xFF00758F) : const Color(0xFFCBD5E1),
+                        ),
+                      ),
+                      child: Text(
+                        loc['label']!,
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
+                          color: isCurrent ? Colors.white : const Color(0xFF334155),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+
+          // 4. Indikator Titik Koordinat Aktif
+          if (hasCoords) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFF86EFAC)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, size: 13, color: Color(0xFF16A34A)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Titik Maps: ${_latitudeController.text.trim()}, ${_longitudeController.text.trim()} (Tersambung)',
+                      style: const TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF15803D),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Dialog modal bantuan untuk menempel koordinat atau link Google Maps
   void _showCoordinatesHelperDialog() {
     final pasteCtrl = TextEditingController();
     showDialog(
@@ -757,49 +941,91 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
     );
   }
 
-  void _parseAndSetCoordinates(String raw) {
-    if (raw.isEmpty) return;
+  /// Parser cerdas untuk mengekstrak koordinat dari link / teks Google Maps apapun
+  void _parseAndSetCoordinates(String raw, {bool isSilent = false}) {
+    if (raw.trim().isEmpty) return;
+    final text = raw.trim();
 
-    // Cek format "-8.123, 115.123"
-    final directMatch =
-        RegExp(r'(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)').firstMatch(raw);
-    if (directMatch != null) {
+    String? lat;
+    String? lng;
+
+    // 1. Cek format @lat,long
+    final m1 = RegExp(r'@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)').firstMatch(text);
+    if (m1 != null) {
+      lat = m1.group(1);
+      lng = m1.group(2);
+    }
+
+    // 2. Cek query q=lat,long atau query=lat,long
+    if (lat == null) {
+      final m2 = RegExp(r'[?&](?:q|query)=(-?\d{1,3}\.\d+)[,+](-?\d{1,3}\.\d+)').firstMatch(text);
+      if (m2 != null) {
+        lat = m2.group(1);
+        lng = m2.group(2);
+      }
+    }
+
+    // 3. Cek format Google Maps embed !3dlat!4dlong atau !2dlong!3dlat
+    if (lat == null) {
+      final m3 = RegExp(r'!3d(-?\d{1,3}\.\d+).*?!4d(-?\d{1,3}\.\d+)').firstMatch(text);
+      if (m3 != null) {
+        lat = m3.group(1);
+        lng = m3.group(2);
+      }
+    }
+    if (lat == null) {
+      final m3b = RegExp(r'!2d(-?\d{1,3}\.\d+).*?!3d(-?\d{1,3}\.\d+)').firstMatch(text);
+      if (m3b != null) {
+        lat = m3b.group(2);
+        lng = m3b.group(1);
+      }
+    }
+
+    // 4. Cek parameter ll=lat,long
+    if (lat == null) {
+      final m4 = RegExp(r'[?&]ll=(-?\d{1,3}\.\d+)[,+](-?\d{1,3}\.\d+)').firstMatch(text);
+      if (m4 != null) {
+        lat = m4.group(1);
+        lng = m4.group(2);
+      }
+    }
+
+    // 5. Cek pasangan angka desimal latitude & longitude langsung dalam teks
+    if (lat == null) {
+      final m5 = RegExp(r'(-?\d{1,3}\.\d+)[^\d\-]+(-?\d{1,3}\.\d+)').firstMatch(text);
+      if (m5 != null) {
+        lat = m5.group(1);
+        lng = m5.group(2);
+      }
+    }
+
+    if (lat != null && lng != null) {
       setState(() {
-        _latitudeController.text = directMatch.group(1)!;
-        _longitudeController.text = directMatch.group(2)!;
+        _latitudeController.text = lat!;
+        _longitudeController.text = lng!;
+        if (_mapsUrlController.text != text && (text.startsWith('http://') || text.startsWith('https://'))) {
+          _mapsUrlController.text = text;
+        }
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Koordinat berhasil diterapkan!'),
-          backgroundColor: Color(0xFF16A34A),
-        ),
-      );
+      if (!isSilent && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Koordinat dari Maps ($lat, $lng) berhasil diterapkan!'),
+            backgroundColor: const Color(0xFF16A34A),
+          ),
+        );
+      }
       return;
     }
 
-    // Cek format link Google Maps @-8.123,115.123
-    final linkMatch =
-        RegExp(r'@(-?\d+\.\d+),(-?\d+\.\d+)').firstMatch(raw);
-    if (linkMatch != null) {
-      setState(() {
-        _latitudeController.text = linkMatch.group(1)!;
-        _longitudeController.text = linkMatch.group(2)!;
-      });
+    if (!isSilent && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Koordinat dari link Google Maps berhasil diserap!'),
-          backgroundColor: Color(0xFF16A34A),
+          content: Text('Format link/koordinat Maps tidak dikenali. Contoh: -8.691200, 115.168333 atau link Google Maps'),
+          backgroundColor: Colors.orange,
         ),
       );
-      return;
     }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Format koordinat tidak dikenali. Masukkan contoh: -8.691200, 115.168333'),
-        backgroundColor: Colors.orange,
-      ),
-    );
   }
 
   /// Section A: Pilihan Kategori Hotel (Resor, Hotel, Vila)
@@ -2507,7 +2733,7 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
         // MODE INPUT HOTEL BARU
         final firstRoom =
             roomTypesPayload.isNotEmpty ? roomTypesPayload.first : null;
-        await HotelService.instance.createHotel(
+        final createdHotel = await HotelService.instance.createHotel(
           name: name,
           address: address,
           city: city,
@@ -2545,13 +2771,96 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
         if (!mounted) return;
         setState(() => _isSubmitting = false);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                'Berhasil! Mitra hotel baru dengan ${roomTypesPayload.length} tipe kamar berhasil disimpan ke database.'),
-            backgroundColor: const Color(0xFF00758F),
-          ),
-        );
+        // Jika akun administrator hotel berhasil digenerate otomatis, tampilkan kredensialnya
+        if (createdHotel.generatedAdminEmail != null &&
+            createdHotel.generatedAdminPassword != null) {
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: const [
+                  Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 24),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Hotel & Akun Admin Berhasil Dibuat',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Akun administrator hotel telah dibuat secara otomatis untuk portal pihak hotel:',
+                    style: TextStyle(fontSize: 11, color: Color(0xFF475569)),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFBBF7D0)),
+                    ),
+                    child: Column(
+                      children: [
+                        _buildAdminCredentialItem('Email Admin', createdHotel.generatedAdminEmail!),
+                        const Divider(height: 14, color: Color(0xFFDCFCE7)),
+                        _buildAdminCredentialItem('Password', createdHotel.generatedAdminPassword!),
+                        const Divider(height: 14, color: Color(0xFFDCFCE7)),
+                        _buildAdminCredentialItem('ID Petugas', createdHotel.generatedAdminStaffId ?? '-'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Simpan atau salin kredensial di atas untuk diserahkan kepada pihak mitra hotel.',
+                    style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+              actions: [
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.copy_rounded, size: 14, color: Colors.white),
+                  label: const Text('Salin Kredensial',
+                      style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00758F),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () {
+                    final cText = 'Email: ${createdHotel.generatedAdminEmail}\nPassword: ${createdHotel.generatedAdminPassword}\nID Petugas: ${createdHotel.generatedAdminStaffId}';
+                    Clipboard.setData(ClipboardData(text: cText));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Kredensial akun admin berhasil disalin ke clipboard!'),
+                        backgroundColor: Color(0xFF16A34A),
+                      ),
+                    );
+                  },
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Selesai',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00758F))),
+                ),
+              ],
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  'Berhasil! Mitra hotel baru dengan ${roomTypesPayload.length} tipe kamar berhasil disimpan ke database.'),
+              backgroundColor: const Color(0xFF00758F),
+            ),
+          );
+        }
 
         Navigator.pop(context, true);
       }
@@ -2565,6 +2874,22 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
         ),
       );
     }
+  }
+
+  Widget _buildAdminCredentialItem(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+        ),
+        SelectableText(
+          value,
+          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+        ),
+      ],
+    );
   }
 
   // ---------------------------------------------------------------------------

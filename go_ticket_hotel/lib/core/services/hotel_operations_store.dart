@@ -1,7 +1,5 @@
 import 'package:flutter/foundation.dart';
-import '../models/booking_model.dart';
 import '../models/maintenance_ticket_model.dart';
-import '../models/room_model.dart';
 
 /// Tipe proses check-out tamu
 enum CheckoutType {

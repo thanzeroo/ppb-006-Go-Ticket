@@ -221,8 +221,28 @@ class _FoCheckOutTabState extends State<FoCheckOutTab> {
                       style: TextStyle(fontSize: 11, color: Color(0xFFB45309)),
                     ),
                     const SizedBox(height: 10),
-                    Column(
-                      children: dueTodayGuests.map((g) {
+                    if (_isLoading)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFB45309)),
+                          ),
+                        ),
+                      )
+                    else if (dueTodayGuests.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'Tidak ada tamu yang habis masa menginap hari ini.',
+                          style: TextStyle(fontSize: 11, color: Color(0xFF78350F), fontStyle: FontStyle.italic),
+                        ),
+                      )
+                    else
+                      Column(
+                        children: dueTodayGuests.map((g) {
                         return Container(
                           margin: const EdgeInsets.only(bottom: 6),
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),

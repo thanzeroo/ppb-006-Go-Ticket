@@ -50,17 +50,6 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
     }
   }
 
-  void _showActionSnackbar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: const Color(0xFF00758F),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
   void _showRoomStatusDialog() {
     showDialog(
       context: context,

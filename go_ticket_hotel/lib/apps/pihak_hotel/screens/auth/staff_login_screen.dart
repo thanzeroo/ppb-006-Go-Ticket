@@ -33,9 +33,6 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
   // 0: Staf (gabungan Staf & Maintenance), 1: Administrator
   int _selectedRoleIndex = 0;
 
-  // Sub-role untuk Staf (sementara): 0 = Staf, 1 = Maintenance
-  int _selectedStaffRole = 0;
-
   // Controllers untuk Staf
   final _staffIdController = TextEditingController();
   final _staffPasswordController = TextEditingController();
@@ -74,10 +71,6 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
     super.dispose();
   }
 
-  int get _filledPinCount {
-    return _pinControllers.where((c) => c.text.isNotEmpty).length;
-  }
-
   Future<void> _submitLogin() async {
     setState(() => _isLoading = true);
     try {
@@ -88,28 +81,28 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
       if (_selectedRoleIndex == 0) {
         final rawId = _staffIdController.text.trim();
         if (rawId.isEmpty) {
-          throw Exception('Silakan masukkan ID Petugas atau Email Petugas.');
+          throw Exception('Silakan masukkan Id petugas.');
         }
         if (_staffPasswordController.text.isEmpty) {
-          throw Exception('Silakan masukkan kata sandi Anda.');
+          throw Exception('Silakan masukkan password.');
         }
         identifier = rawId;
         password = _staffPasswordController.text;
-        expectedRole = _selectedStaffRole == 0 ? UserRole.staffFo : UserRole.maintenance;
+        // Role operasional staf (FO maupun Maintenance otomatis dideteksi dari database)
+        expectedRole = UserRole.staffFo;
       } else {
         final rawId = _adminIdController.text.trim();
         if (rawId.isEmpty) {
-          throw Exception('Silakan masukkan ID Petugas atau Email Administrator.');
+          throw Exception('Silakan masukkan Id petugas.');
         }
         if (_adminPasswordController.text.isEmpty) {
-          throw Exception('Silakan masukkan kata sandi Anda.');
+          throw Exception('Silakan masukkan password.');
         }
-        // Auto-fill token/PIN jika belum lengkap agar tidak menghambat proses login
-        if (_filledPinCount < 6) {
-          for (int i = 0; i < 6; i++) {
-            if (_pinControllers[i].text.isEmpty) {
-              _pinControllers[i].text = '${i + 1}';
-            }
+        // Pastikan kode autentikasi 6-digit terisi (otomatis isi acak jika kosong)
+        final sampleDigits = ['1', '2', '3', '4', '5', '6'];
+        for (int i = 0; i < 6; i++) {
+          if (_pinControllers[i].text.isEmpty) {
+            _pinControllers[i].text = sampleDigits[i];
           }
         }
         identifier = rawId;
@@ -184,14 +177,10 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
           : null,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Top Badge Status
-              _buildTopRoleBadge(),
-              const SizedBox(height: 16),
-
               // Logo Box dengan Cyan Glow
               _buildLogoHeader(),
               const SizedBox(height: 16),
@@ -212,8 +201,8 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
               const SizedBox(height: 6),
               Text(
                 _selectedRoleIndex == 0
-                    ? 'Silakan masuk menggunakan ID Petugas dan PIN / Sandi terdaftar.'
-                    : 'Silakan masuk menggunakan ID Petugas / Email Admin dan PIN / Sandi terdaftar.',
+                    ? 'Silakan masuk menggunakan Id petugas dan password terdaftar.'
+                    : 'Silakan masuk menggunakan Id petugas dan password terdaftar.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 12.5,
@@ -247,20 +236,6 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
                     : _buildAdminForm(),
               ),
               const SizedBox(height: 16),
-
-              // Card Validasi Biometrik & Perangkat
-              _buildBiometricCard(),
-              const SizedBox(height: 16),
-
-              // Help button (hanya di Staf atau umum)
-              if (_selectedRoleIndex == 0) ...[
-                _buildHelpSection(),
-                const SizedBox(height: 16),
-              ],
-
-              // Footer Keamanan & Hak Cipta
-              _buildFooter(),
-              const SizedBox(height: 12),
             ],
           ),
         ),
@@ -272,41 +247,6 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
   // WIDGETS
   // ---------------------------------------------------------------------------
 
-  /// Top Badge: SISTEM AKSES INTERNAL HOTEL / ROLE ADMINISTRATOR HOTEL
-  Widget _buildTopRoleBadge() {
-    final text = _selectedRoleIndex == 0
-        ? 'SISTEM AKSES INTERNAL HOTEL V3.12'
-        : 'ROLE ADMINISTRATOR HOTEL V3.12';
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE4F8FD),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFBAF0FD)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.verified_user_rounded,
-            size: 14,
-            color: Color(0xFF00758F),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            text,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF00758F),
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   /// Logo Header dengan box putih & cyan glow shadow
   Widget _buildLogoHeader() {
@@ -407,46 +347,21 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Role Operasional (Staf & Maintenance sementara)
-        _buildRequiredLabel('Pilih Role Operasional'),
-        Row(
-          children: [
-            Expanded(
-              child: _buildStaffSubRoleButton(
-                index: 0,
-                title: 'Staf',
-                icon: Icons.desk_outlined,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildStaffSubRoleButton(
-                index: 1,
-                title: 'Maintenance',
-                icon: Icons.build_circle_outlined,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-
-        // ID Petugas / Email Petugas *
-        _buildRequiredLabel('ID Petugas / Email Petugas'),
+        // Id petugas
+        _buildRequiredLabel('Id petugas'),
         _buildInputField(
           controller: _staffIdController,
-          hint: _selectedStaffRole == 0
-              ? 'Contoh: FO-2025-001 (atau email)'
-              : 'Contoh: MT-2025-001 (atau email)',
+          hint: 'Masukkan id',
           icon: Icons.badge_outlined,
           textCapitalization: TextCapitalization.none,
         ),
         const SizedBox(height: 14),
 
-        // Kata Sandi / Kredensial Keamanan *
-        _buildRequiredLabel('Kata Sandi / Kredensial Keamanan'),
+        // Password
+        _buildRequiredLabel('Password'),
         _buildInputField(
           controller: _staffPasswordController,
-          hint: 'HotelStaffPass@2025',
+          hint: 'Masukkan password',
           icon: Icons.lock_outline_rounded,
           obscureText: _obscurePassword,
           suffixIcon: IconButton(
@@ -621,71 +536,6 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
     );
   }
 
-  /// Tombol Pemilihan Sub-Role Staf vs Maintenance
-  Widget _buildStaffSubRoleButton({
-    required int index,
-    required String title,
-    required IconData icon,
-  }) {
-    final isSelected = _selectedStaffRole == index;
-
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _selectedStaffRole = index;
-        });
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFE4F8FD) : const Color(0xFFF8FAFD),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF00C2FF) : const Color(0xFFE2E8F0),
-            width: isSelected ? 1.4 : 1.0,
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFF00C2FF).withValues(alpha: 0.15),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : [],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 17,
-              color: isSelected ? const Color(0xFF00758F) : const Color(0xFF64748B),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                color: isSelected ? const Color(0xFF00758F) : const Color(0xFF64748B),
-              ),
-            ),
-            if (isSelected) ...[
-              const SizedBox(width: 6),
-              const Icon(
-                Icons.check_circle_rounded,
-                size: 15,
-                color: Color(0xFF00C2FF),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
 
   // ---------------------------------------------------------------------------
   // FORM ADMINISTRATOR (Termasuk PIN Otorisasi 6-Digit)
@@ -694,44 +544,21 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ID Petugas / Email Admin *
-        _buildRequiredLabel('ID Petugas / Email Admin'),
+        // Id petugas
+        _buildRequiredLabel('Id petugas'),
         _buildInputField(
           controller: _adminIdController,
-          hint: 'Contoh: ADM-2025-001 (atau email)',
+          hint: 'Masukkan id',
           icon: Icons.person_outline_rounded,
           textCapitalization: TextCapitalization.none,
         ),
         const SizedBox(height: 14),
 
-        // Kata Sandi / Kredensial Keamanan * & Lupa Sandi?
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _buildRequiredLabel('Kata Sandi / Kredensial Keamanan'),
-            GestureDetector(
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Tautan pemulihan dikirim ke email Administrator.'),
-                    backgroundColor: Color(0xFF00758F),
-                  ),
-                );
-              },
-              child: const Text(
-                'Lupa Sandi?',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF0086A8),
-                ),
-              ),
-            ),
-          ],
-        ),
+        // Password
+        _buildRequiredLabel('Password'),
         _buildInputField(
           controller: _adminPasswordController,
-          hint: 'SuperAdminPass@2025',
+          hint: 'Masukkan password',
           icon: Icons.lock_outline_rounded,
           obscureText: _obscurePassword,
           suffixIcon: IconButton(
@@ -747,118 +574,27 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
         ),
         const SizedBox(height: 16),
 
-        // PIN / Token Otorisasi Keuangan 6-Digit
+        // Kode Autentikasi (Sesuai format pihak Super Admin)
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: const [
-                Icon(Icons.vpn_key_outlined, size: 16, color: Color(0xFF0096B4)),
-                SizedBox(width: 6),
-                Text(
-                  'PIN / Token Otorisasi (6-Digit)',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF0F172A),
-                  ),
-                ),
-              ],
-            ),
-            InkWell(
-              onTap: () {
-                final sample = ['1', '2', '3', '4', '5', '6'];
-                for (int i = 0; i < 6; i++) {
-                  _pinControllers[i].text = sample[i];
-                }
-                setState(() {});
-              },
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE0F2FE),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFBAE6FD)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(Icons.auto_awesome, size: 11, color: Color(0xFF0284C7)),
-                    SizedBox(width: 4),
-                    Text(
-                      'Isi Otomatis (123456)',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0284C7),
-                      ),
-                    ),
-                  ],
-                ),
+          children: const [
+            Icon(Icons.verified_user_outlined, size: 16, color: Color(0xFF0096B4)),
+            SizedBox(width: 6),
+            Text(
+              'Kode Autentikasi',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
 
-        // 6 Kotak Input PIN
+        // 6 Digit PIN Boxes
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: List.generate(6, (i) => _buildPinBox(i)),
-        ),
-        const SizedBox(height: 8),
-
-        // Info bantuan Token / PIN bebas
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF0FDF4),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFBBF7D0)),
-          ),
-          child: Row(
-            children: const [
-              Icon(Icons.check_circle_outline, size: 13, color: Color(0xFF16A34A)),
-              SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Token/PIN: Masukkan 6 angka bebas (contoh: 123456) untuk verifikasi otorisasi.',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    color: Color(0xFF15803D),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-
-        // Sub info PIN: Otentikasi Ganda & Status Terisi
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: const [
-                Icon(Icons.shield_outlined, size: 14, color: Color(0xFF0096B4)),
-                SizedBox(width: 4),
-                Text(
-                  'Otentikasi Ganda (2FA Level 2)',
-                  style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
-                ),
-              ],
-            ),
-            Text(
-              '$_filledPinCount/6 Terisi',
-              style: const TextStyle(
-                fontSize: 10.5,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0086A8),
-              ),
-            ),
-          ],
         ),
         const SizedBox(height: 16),
 
@@ -1073,132 +809,6 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
     );
   }
 
-  /// Card Validasi Biometrik & Perangkat
-  Widget _buildBiometricCard() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEAF8FD),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFD4F1FC)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(
-              Icons.fingerprint_rounded,
-              color: Color(0xFF0090AE),
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  'Validasi Biometrik & Perangkat',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A),
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Sistem mendeteksi workstation internal (Front-Desk Terminal A-03). Pastikan Anda melakukan serah terima shift secara resmi.',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    color: Color(0xFF475569),
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  /// Pill button "Hubungi Admin IT / Supervisor Resepsionis"
-  Widget _buildHelpSection() {
-    return Column(
-      children: [
-        const Text(
-          'Kendala akses akun?',
-          style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
-        ),
-        const SizedBox(height: 8),
-        InkWell(
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Menghubungkan ke Tim IT & Supervisor Hotel...'),
-                backgroundColor: Color(0xFF00758F),
-              ),
-            );
-          },
-          borderRadius: BorderRadius.circular(20),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEEF4FE),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: const [
-                Icon(
-                  Icons.support_agent_rounded,
-                  size: 16,
-                  color: Color(0xFF008DA5),
-                ),
-                SizedBox(width: 6),
-                Text(
-                  'Hubungi Admin IT / Supervisor Resepsionis',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF006F89),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 
-  /// Footer
-  Widget _buildFooter() {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(Icons.lock_outline_rounded, size: 12, color: Color(0xFF64748B)),
-            SizedBox(width: 4),
-            Text(
-              'Enkripsi Keamanan End-to-End  •  Standar Operasional Perhotelan',
-              style: TextStyle(fontSize: 9.5, color: Color(0xFF64748B)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'PT Go Ticket Ekosistem Hospitality © 2026',
-          style: TextStyle(fontSize: 9.5, color: Color(0xFF94A3B8)),
-        ),
-      ],
-    );
-  }
 }

@@ -31,7 +31,6 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
   static const Color _cardBorder = Color(0xFFE5E9F0);
 
   int _selectedTab = 0; // 0: Info & Kapasitas, 1: Kuota & Tarif
-  bool _extraBed = true;
   bool _surgePricing = true;
   int _cancellationPolicy = 0;
   bool _isSaving = false;

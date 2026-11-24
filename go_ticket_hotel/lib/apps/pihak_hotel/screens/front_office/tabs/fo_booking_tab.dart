@@ -103,14 +103,6 @@ class _FoBookingTabState extends State<FoBookingTab> {
     }
   }
 
-  Future<void> _reject(String id, String code) async {
-    final ok = await BookingService.instance.cancelBooking(id);
-    if (ok) {
-      _showActionSnackbar('Booking $code telah dibatalkan.');
-      _loadBookings();
-    }
-  }
-
   List<BookingModel> get _filteredBookings {
     final q = _searchQuery.trim().toLowerCase();
     final store = HotelOperationsStore.instance;
