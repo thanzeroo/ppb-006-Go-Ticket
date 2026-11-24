@@ -345,34 +345,37 @@ class _RejectReasonScreenState extends State<RejectReasonScreen> {
         for (final opt in _reasonOptions) ...[
           Container(
             margin: const EdgeInsets.only(bottom: 8),
-            decoration: BoxDecoration(
+            child: Material(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: _selectedReasons.contains(opt)
-                    ? GT.teal
-                    : const Color(0xFFE2E8F0),
-                width: _selectedReasons.contains(opt) ? 1.5 : 1,
-              ),
-            ),
-            child: CheckboxListTile(
-              value: _selectedReasons.contains(opt),
-              onChanged: (_) => _toggleReason(opt),
-              title: Text(
-                opt,
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: _selectedReasons.contains(opt)
-                      ? FontWeight.w700
-                      : FontWeight.w500,
-                  color: _selectedReasons.contains(opt) ? GT.ink : const Color(0xFF475569),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(
+                  color: _selectedReasons.contains(opt)
+                      ? GT.teal
+                      : const Color(0xFFE2E8F0),
+                  width: _selectedReasons.contains(opt) ? 1.5 : 1,
                 ),
               ),
-              activeColor: GT.teal,
-              controlAffinity: ListTileControlAffinity.leading,
-              dense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              clipBehavior: Clip.antiAlias,
+              child: CheckboxListTile(
+                value: _selectedReasons.contains(opt),
+                onChanged: (_) => _toggleReason(opt),
+                title: Text(
+                  opt,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: _selectedReasons.contains(opt)
+                        ? FontWeight.w700
+                        : FontWeight.w500,
+                    color: _selectedReasons.contains(opt) ? GT.ink : const Color(0xFF475569),
+                  ),
+                ),
+                activeColor: GT.teal,
+                controlAffinity: ListTileControlAffinity.leading,
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
             ),
           ),
         ],

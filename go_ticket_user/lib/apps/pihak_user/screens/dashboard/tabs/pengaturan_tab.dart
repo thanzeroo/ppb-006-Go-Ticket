@@ -598,18 +598,24 @@ class _PengaturanTabState extends State<PengaturanTab> {
   Widget _buildMenuCard(List<Widget> children) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withOpacity(0.03),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Column(children: children),
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(children: children),
+      ),
     );
   }
 
@@ -621,55 +627,58 @@ class _PengaturanTabState extends State<PengaturanTab> {
     Color? badgeColor,
     required VoidCallback onTap,
   }) {
-    return ListTile(
-      onTap: onTap,
-      leading: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(10),
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        onTap: onTap,
+        leading: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: const Color(0xFF0077B6), size: 20),
         ),
-        child: Icon(icon, color: const Color(0xFF0077B6), size: 20),
-      ),
-      title: Text(
-        title,
-        style: GoogleFonts.inter(
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-          color: const Color(0xFF0F172A),
+        title: Text(
+          title,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: const Color(0xFF0F172A),
+          ),
         ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: GoogleFonts.inter(
-          fontSize: 11,
-          color: const Color(0xFF64748B),
+        subtitle: Text(
+          subtitle,
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            color: const Color(0xFF64748B),
+          ),
         ),
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (badge != null) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: (badgeColor ?? const Color(0xFF00B4D8)).withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                badge,
-                style: GoogleFonts.inter(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: badgeColor ?? const Color(0xFF0077B6),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (badge != null) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: (badgeColor ?? const Color(0xFF00B4D8)).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  badge,
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: badgeColor ?? const Color(0xFF0077B6),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 6),
+              const SizedBox(width: 6),
+            ],
+            const Icon(Icons.chevron_right, size: 18, color: Color(0xFF94A3B8)),
           ],
-          const Icon(Icons.chevron_right, size: 18, color: Color(0xFF94A3B8)),
-        ],
+        ),
       ),
     );
   }
