@@ -293,49 +293,25 @@ class _KelolaHotelTabState extends State<KelolaHotelTab> {
       child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [
-          // 1. Title & Super Admin Badge
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'Kelola Hotel & Kamar',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF0F172A),
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Manajemen inventaris, tarif dinamis, serta kelola mitra hotel',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
+          // 1. Title & Subtitle (Konsisten tanpa badge Super Admin)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text(
+                'Kelola Hotel & Kamar',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF0F172A),
+                  letterSpacing: -0.3,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFCFFAFE),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Text(
-                  'Super\nAdmin',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0891B2),
-                    height: 1.15,
-                  ),
+              SizedBox(height: 4),
+              Text(
+                'Manajemen inventaris, tarif dinamis, serta kelola mitra hotel',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: Color(0xFF64748B),
                 ),
               ),
             ],

@@ -42,12 +42,45 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   }
 
   Future<void> _submitLogin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final pin = _pinControllers.map((c) => c.text.trim()).join();
+
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Masukkan email'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+
+    if (password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Masukkan password'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+
+    if (pin.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kode autentikasi wajib diisi 6 digit (angka acak/bebas)'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
-      final pin = _pinControllers.map((c) => c.text).join();
       await AuthService.instance.loginSuperAdmin(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
+        email: email,
+        password: password,
         pin2FA: pin,
       );
 
@@ -97,68 +130,61 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
             )
           : null,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Logo Box dengan Cyan Glow
+                _buildLogoHeader(),
+                const SizedBox(height: 18),
 
-              // Logo Box dengan Cyan Glow
-              _buildLogoHeader(),
-              const SizedBox(height: 18),
-
-              // Judul Utama
-              const Text(
-                'LOGIN ADMIN',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF0F172A),
-                  letterSpacing: 0.5,
+                // Judul Utama
+                const Text(
+                  'LOGIN ADMIN',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: 0.5,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
+                const SizedBox(height: 8),
 
-              // Subtitle
-              const Text(
-                'Otorisasi panel kendali manajemen penginapan, kontrol staf, pengguna, dan analitik finansial Go Ticket.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: Color(0xFF475569),
-                  height: 1.4,
+                // Subtitle
+                const Text(
+                  'Otorisasi panel kendali manajemen penginapan, kontrol staf, pengguna, dan analitik finansial Go Ticket.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: Color(0xFF475569),
+                    height: 1.4,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 22),
+                const SizedBox(height: 22),
 
-              // Main Card Form Container
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+                // Main Card Form Container
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.03),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: _buildForm(),
                 ),
-                child: _buildForm(),
-              ),
-              const SizedBox(height: 18),
-
-              // Card Audit Trail Keamanan Aktif
-              _buildAuditTrailCard(),
-              const SizedBox(height: 16),
-
-              // Pill Button Hubungi Tim Teknis & Keamanan Server
-              _buildSupportButton(),
-              const SizedBox(height: 12),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -204,13 +230,13 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 1. Email / ID Super Admin
+        // 1. Email
         Row(
           children: const [
-            Icon(Icons.badge_outlined, size: 16, color: Color(0xFF0096B4)),
+            Icon(Icons.email_outlined, size: 16, color: Color(0xFF0096B4)),
             SizedBox(width: 6),
             Text(
-              'Email / ID Super Admin',
+              'Email',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
@@ -222,45 +248,22 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         const SizedBox(height: 6),
         _buildInputField(
           controller: _emailController,
-          hint: 'superadmin@gmail.com',
-          icon: Icons.shield_outlined,
+          hint: 'Masukkan email',
+          icon: Icons.alternate_email_rounded,
         ),
         const SizedBox(height: 16),
 
-        // 2. Master Security Key / Password
+        // 2. Password
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: const [
-                Icon(Icons.vpn_key_outlined, size: 16, color: Color(0xFF0096B4)),
-                SizedBox(width: 6),
-                Text(
-                  'Master Security Key / Password',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF0F172A),
-                  ),
-                ),
-              ],
-            ),
-            GestureDetector(
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Akses Kunci Vault Utama diverifikasi ke HSM Server.'),
-                    backgroundColor: Color(0xFF006D84),
-                  ),
-                );
-              },
-              child: const Text(
-                'Kunci Vault Utama',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF0284C7),
-                ),
+          children: const [
+            Icon(Icons.lock_outline_rounded, size: 16, color: Color(0xFF0096B4)),
+            SizedBox(width: 6),
+            Text(
+              'Password',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
               ),
             ),
           ],
@@ -268,7 +271,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         const SizedBox(height: 6),
         _buildInputField(
           controller: _passwordController,
-          hint: '12345678',
+          hint: 'Masukkan password',
           icon: Icons.lock_outline_rounded,
           obscureText: _obscurePassword,
           suffixIcon: IconButton(
@@ -284,40 +287,18 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         ),
         const SizedBox(height: 16),
 
-        // 3. Kode Autentikasi 2FA / Token
+        // 3. Kode Autentikasi
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: const [
-                Icon(Icons.verified_user_outlined, size: 16, color: Color(0xFF0096B4)),
-                SizedBox(width: 6),
-                Text(
-                  'Kode Autentikasi 2FA /\nToken',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF0F172A),
-                    height: 1.2,
-                  ),
-                ),
-              ],
-            ),
-            Row(
-              children: const [
-                Icon(Icons.lock_outline, size: 14, color: Color(0xFF00809A)),
-                SizedBox(width: 4),
-                Text(
-                  'Hardware Token /\nTOTP',
-                  textAlign: TextAlign.right,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF00809A),
-                    height: 1.2,
-                  ),
-                ),
-              ],
+          children: const [
+            Icon(Icons.verified_user_outlined, size: 16, color: Color(0xFF0096B4)),
+            SizedBox(width: 6),
+            Text(
+              'Kode Autentikasi',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
+              ),
             ),
           ],
         ),
@@ -532,94 +513,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                   ),
                 ],
               ),
-      ),
-    );
-  }
-
-  /// Card: AUDIT TRAIL KEAMANAN AKTIF
-  Widget _buildAuditTrailCard() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEEF2FD),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(
-            Icons.shield_rounded,
-            color: Color(0xFF0284C7),
-            size: 24,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  'AUDIT TRAIL KEAMANAN AKTIF',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                SizedBox(height: 3),
-                Text(
-                  'Dilindungi Enkripsi AES-256 & Audit Trail Transaksi Realtime. Setiap aktivitas login dan modifikasi data admin dicatat secara permanen ke server log.',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    color: Color(0xFF475569),
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Support Button: Hubungi Tim Teknis & Keamanan Server
-  Widget _buildSupportButton() {
-    return InkWell(
-      onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Menghubungkan ke NOC & Tim Keamanan Server...'),
-            backgroundColor: Color(0xFF0F172A),
-          ),
-        );
-      },
-      borderRadius: BorderRadius.circular(24),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
-        decoration: BoxDecoration(
-          color: const Color(0xFFEEF2FD),
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: const [
-            Icon(
-              Icons.headset_mic_outlined,
-              size: 17,
-              color: Color(0xFFDC2626),
-            ),
-            SizedBox(width: 8),
-            Text(
-              'Hubungi Tim Teknis & Keamanan Server',
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF0F172A),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

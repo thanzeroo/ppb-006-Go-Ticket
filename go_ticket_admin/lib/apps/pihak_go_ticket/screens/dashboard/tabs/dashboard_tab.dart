@@ -17,16 +17,18 @@ class DashboardTab extends StatefulWidget {
 }
 
 class _DashboardTabState extends State<DashboardTab> {
-  int _selectedPeriodIndex = 2; // Default: 'Bulan Ini (MTD)'
+  // Filter: 0 = Hari Ini, 1 = Minggu Ini, 2 = Bulan Ini, 3 = Tahun Ini, 4 = Custom
+  int _selectedPeriodIndex = 2; // Default: Bulan Ini
   final List<String> _periodOptions = [
     'Hari Ini',
-    '7 Hari Terakhir',
-    'Bulan Ini (MTD)',
-    'Tahun Ini (YTD)',
+    'Minggu Ini',
+    'Bulan Ini',
   ];
+  int _selectedYear = DateTime.now().year;
+  DateTimeRange? _customDateRange;
+
   Map<String, dynamic> _stats = {};
   List<HotelModel> _hotels = [];
-  bool _isLoading = true;
 
   @override
   void initState() {
@@ -35,7 +37,6 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 
   Future<void> _loadDashboardData() async {
-    setState(() => _isLoading = true);
     try {
       final s = await SuperAdminService.instance.getPlatformStats();
       final h = await HotelService.instance.getHotels();
@@ -43,7 +44,6 @@ class _DashboardTabState extends State<DashboardTab> {
         setState(() {
           _stats = s;
           _hotels = h;
-          _isLoading = false;
         });
       }
     } catch (_) {
@@ -51,9 +51,139 @@ class _DashboardTabState extends State<DashboardTab> {
         setState(() {
           _stats = {};
           _hotels = [];
-          _isLoading = false;
         });
       }
+    }
+  }
+
+  List<Map<String, dynamic>> get _rawBookings {
+    return (_stats['bookingsList'] as List<Map<String, dynamic>>?) ?? [];
+  }
+
+  /// Memfilter booking sesuai filter yang dipilih
+  List<Map<String, dynamic>> get _filteredBookings {
+    final now = DateTime.now();
+    return _rawBookings.where((b) {
+      final dateStr = (b['tgl_booking'] ?? b['created_at'])?.toString();
+      if (dateStr == null || dateStr.isEmpty) return true;
+      final d = DateTime.tryParse(dateStr);
+      if (d == null) return true;
+
+      if (_selectedPeriodIndex == 0) {
+        // Hari Ini
+        return d.year == now.year && d.month == now.month && d.day == now.day;
+      } else if (_selectedPeriodIndex == 1) {
+        // Minggu Ini (7 hari terakhir)
+        return now.difference(d).inDays <= 7 && now.difference(d).inDays >= 0;
+      } else if (_selectedPeriodIndex == 2) {
+        // Bulan Ini
+        return d.year == now.year && d.month == now.month;
+      } else if (_selectedPeriodIndex == 3) {
+        // Tahun Ini (Per Tahun)
+        return d.year == _selectedYear;
+      } else if (_selectedPeriodIndex == 4 && _customDateRange != null) {
+        // Custom Range
+        return d.isAfter(_customDateRange!.start.subtract(const Duration(seconds: 1))) &&
+            d.isBefore(_customDateRange!.end.add(const Duration(days: 1)));
+      }
+      return true;
+    }).toList();
+  }
+
+  double get _filteredRevenue {
+    double rev = 0;
+    for (final b in _filteredBookings) {
+      if (b['status_booking'] == 'confirmed' || b['status_booking'] == 'completed') {
+        rev += (b['total_harga'] as num?)?.toDouble() ?? 0;
+      }
+    }
+    return rev;
+  }
+
+  /// Data 7 bar hari untuk Tren Booking (nyata dari database jika ada)
+  List<int> get _weeklyBookingCounts {
+    final now = DateTime.now();
+    final counts = List.filled(7, 0);
+    for (final b in _rawBookings) {
+      final dateStr = (b['tgl_booking'] ?? b['created_at'])?.toString();
+      if (dateStr == null || dateStr.isEmpty) continue;
+      final d = DateTime.tryParse(dateStr);
+      if (d == null) continue;
+      final diff = now.difference(d).inDays;
+      if (diff >= 0 && diff < 7) {
+        // 0 = 6 hari lalu, 6 = hari ini
+        final index = 6 - diff;
+        counts[index]++;
+      }
+    }
+    return counts;
+  }
+
+  Future<void> _pickCustomDateRange() async {
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+      initialDateRange: _customDateRange ??
+          DateTimeRange(
+            start: DateTime.now().subtract(const Duration(days: 7)),
+            end: DateTime.now(),
+          ),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF007A94),
+              onPrimary: Colors.white,
+              onSurface: Color(0xFF0F172A),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        _customDateRange = picked;
+        _selectedPeriodIndex = 4;
+      });
+    }
+  }
+
+  Future<void> _pickYearFilter() async {
+    final currentYear = DateTime.now().year;
+    final years = List.generate(10, (i) => currentYear - i);
+    final chosen = await showDialog<int>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text(
+          'Pilih Tahun',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        children: years.map((y) {
+          return SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, y),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('$y', style: const TextStyle(fontSize: 14)),
+                  if (y == _selectedYear && _selectedPeriodIndex == 3)
+                    const Icon(Icons.check, size: 18, color: Color(0xFF007A94)),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+
+    if (chosen != null) {
+      setState(() {
+        _selectedYear = chosen;
+        _selectedPeriodIndex = 3;
+      });
     }
   }
 
@@ -62,11 +192,7 @@ class _DashboardTabState extends State<DashboardTab> {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       children: [
-        // 1. Live Server Status Pill & Timestamp
-        _buildLiveStatusRow(),
-        const SizedBox(height: 12),
-
-        // 2. Title & Subtitle
+        // 1. Title & Subtitle
         const Text(
           'HQ Command Center',
           style: TextStyle(
@@ -86,239 +212,166 @@ class _DashboardTabState extends State<DashboardTab> {
         ),
         const SizedBox(height: 14),
 
-        // 3. Time Filter Chips (Horizontal)
+        // 2. Time Filter Chips (Horizontal)
         _buildPeriodFilters(),
-        const SizedBox(height: 12),
-
-        // 4. Alert Banner Card ("PERHATIAN KEUANGAN")
-        _buildFinancialAlertCard(),
         const SizedBox(height: 14),
 
-        // 5. Key Metrics Grid (2x2)
+        // 3. Key Metrics Grid (Pendapatan Kotor, Komisi, Mitra Hotel, Tamu)
         _buildMetricsGrid(),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
 
-        // 6. National Booking Volume Trend Card (Interactive/Painter)
+        // 4. National Booking Volume Trend Card (Data Nyata dari Database)
         _buildBookingTrendCard(),
-        const SizedBox(height: 20),
-
-        // 7. Sebaran Hotel Populer
-        _buildPopularHotelsSection(),
-        const SizedBox(height: 20),
-
-        // 8. Aksi Cepat Super Admin
-        _buildQuickActionsSection(),
         const SizedBox(height: 24),
       ],
     );
   }
 
   // ---------------------------------------------------------------------------
-  // 1. Live Status Row
-  // ---------------------------------------------------------------------------
-  Widget _buildLiveStatusRow() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE0F7FA),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFBAE6FD)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 7,
-                height: 7,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF00B4D8),
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 6),
-              const Text(
-                'Live Server: Normal 99.98%',
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF0284C7),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const Text(
-          'Sinkronisasi: 14:02 WIB',
-          style: TextStyle(
-            fontSize: 10.5,
-            color: Color(0xFF64748B),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // 2. Period Filter Chips
+  // 2. Period Filter Chips + Filter Per Tahun & Custom
   // ---------------------------------------------------------------------------
   Widget _buildPeriodFilters() {
+    String currentLabel = '';
+    if (_selectedPeriodIndex < _periodOptions.length) {
+      currentLabel = _periodOptions[_selectedPeriodIndex];
+    } else if (_selectedPeriodIndex == 3) {
+      currentLabel = 'Tahun $_selectedYear';
+    } else if (_selectedPeriodIndex == 4) {
+      if (_customDateRange != null) {
+        currentLabel =
+            '${_customDateRange!.start.day}/${_customDateRange!.start.month} - ${_customDateRange!.end.day}/${_customDateRange!.end.month}';
+      } else {
+        currentLabel = 'Kustom';
+      }
+    }
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        children: List.generate(_periodOptions.length, (index) {
-          final isSelected = _selectedPeriodIndex == index;
-          return Padding(
+        children: [
+          // 3 filter utama: Hari Ini, Minggu Ini, Bulan Ini
+          ...List.generate(_periodOptions.length, (index) {
+            final isSelected = _selectedPeriodIndex == index;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: InkWell(
+                onTap: () => setState(() => _selectedPeriodIndex = index),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: isSelected ? const Color(0xFFCFFAFE) : Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected
+                          ? const Color(0xFF67E8F9)
+                          : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: Text(
+                    _periodOptions[index],
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                      color: isSelected
+                          ? const Color(0xFF0891B2)
+                          : const Color(0xFF475569),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+
+          // Tombol Filter Per Tahun
+          Padding(
             padding: const EdgeInsets.only(right: 8),
             child: InkWell(
-              onTap: () => setState(() => _selectedPeriodIndex = index),
+              onTap: _pickYearFilter,
               borderRadius: BorderRadius.circular(20),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                 decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFFCFFAFE) : Colors.white,
+                  color: _selectedPeriodIndex == 3 ? const Color(0xFFCFFAFE) : Colors.white,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: isSelected
+                    color: _selectedPeriodIndex == 3
                         ? const Color(0xFF67E8F9)
                         : const Color(0xFFE2E8F0),
                   ),
                 ),
-                child: Text(
-                  _periodOptions[index],
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-                    color: isSelected
-                        ? const Color(0xFF0891B2)
-                        : const Color(0xFF475569),
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.calendar_today_rounded,
+                      size: 13,
+                      color: _selectedPeriodIndex == 3
+                          ? const Color(0xFF0891B2)
+                          : const Color(0xFF64748B),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      _selectedPeriodIndex == 3 ? 'Tahun $_selectedYear' : 'Per Tahun',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: _selectedPeriodIndex == 3 ? FontWeight.w800 : FontWeight.w500,
+                        color: _selectedPeriodIndex == 3
+                            ? const Color(0xFF0891B2)
+                            : const Color(0xFF475569),
+                      ),
+                    ),
+                    const SizedBox(width: 3),
+                    Icon(
+                      Icons.arrow_drop_down,
+                      size: 16,
+                      color: _selectedPeriodIndex == 3
+                          ? const Color(0xFF0891B2)
+                          : const Color(0xFF64748B),
+                    ),
+                  ],
                 ),
               ),
             ),
-          );
-        }),
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // 3. Financial Alert Banner
-  // ---------------------------------------------------------------------------
-  Widget _buildFinancialAlertCard() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFFBEB),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFFDE68A)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFEF3C7),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.notifications_active_outlined,
-                  color: Color(0xFFD97706),
-                  size: 19,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Text(
-                          'PERHATIAN KEUANGAN',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF92400E),
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFDE68A),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text(
-                            'Segera',
-                            style: TextStyle(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF92400E),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      '18 Antrean Payout Mitra (Rp 1.450.000.000) jatuh tempo verifikasi hari ini.',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: Color(0xFF78350F),
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ),
-          const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.centerRight,
-            child: InkWell(
-              onTap: () {
-                // Switch to Keuangan Tab
-                widget.onNavigateTab?.call(1);
-              },
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFDE047),
-                  borderRadius: BorderRadius.circular(16),
+
+          // Tombol Filter Kustom
+          InkWell(
+            onTap: _pickCustomDateRange,
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: _selectedPeriodIndex == 4 ? const Color(0xFFCFFAFE) : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: _selectedPeriodIndex == 4
+                      ? const Color(0xFF67E8F9)
+                      : const Color(0xFFE2E8F0),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Text(
-                      'Buka Antrean',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF78350F),
-                      ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.tune_rounded,
+                    size: 13,
+                    color: _selectedPeriodIndex == 4
+                        ? const Color(0xFF0891B2)
+                        : const Color(0xFF64748B),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    _selectedPeriodIndex == 4 ? currentLabel : 'Kustom',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: _selectedPeriodIndex == 4 ? FontWeight.w800 : FontWeight.w500,
+                      color: _selectedPeriodIndex == 4
+                          ? const Color(0xFF0891B2)
+                          : const Color(0xFF475569),
                     ),
-                    SizedBox(width: 4),
-                    Icon(
-                      Icons.arrow_forward_rounded,
-                      size: 13,
-                      color: Color(0xFF78350F),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -328,23 +381,24 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // 4. Key Metrics 2x2 Grid (100% Dinamis dari Database)
+  // 3. Key Metrics 2x2 Grid (Pendapatan Kotor, Komisi, Mitra Hotel, Tamu)
   // ---------------------------------------------------------------------------
   Widget _buildMetricsGrid() {
-    final baseRev = (_stats['totalRevenue'] as num?)?.toDouble() ?? 0;
-    // Multiplier berdasarkan filter periode yang dipilih
-    final periodMultiplier = _selectedPeriodIndex == 0
-        ? 0.1
-        : (_selectedPeriodIndex == 1
-            ? 0.35
-            : (_selectedPeriodIndex == 2 ? 1.0 : 4.2));
-    final adjustedRev = baseRev * periodMultiplier;
-
+    final filteredRev = _filteredRevenue;
     final totalHotelsCount = _hotels.length;
     final totalUsers = (_stats['totalUsers'] as num?)?.toInt() ?? 0;
 
-    final gmvStr = CurrencyFormatter.toRupiah(adjustedRev.round());
-    final komisiStr = CurrencyFormatter.toRupiah((adjustedRev * 0.1).round());
+    final gmvStr = CurrencyFormatter.toRupiah(filteredRev.round());
+    final komisiStr = CurrencyFormatter.toRupiah((filteredRev * 0.1).round());
+
+    String badgePeriodText = '';
+    if (_selectedPeriodIndex < _periodOptions.length) {
+      badgePeriodText = _periodOptions[_selectedPeriodIndex];
+    } else if (_selectedPeriodIndex == 3) {
+      badgePeriodText = 'Tahun $_selectedYear';
+    } else {
+      badgePeriodText = 'Kustom';
+    }
 
     return Column(
       children: [
@@ -352,10 +406,10 @@ class _DashboardTabState extends State<DashboardTab> {
           children: [
             Expanded(
               child: _buildMetricCard(
-                title: 'GMV Platform',
+                title: 'Pendapatan Kotor',
                 value: gmvStr,
                 icon: Icons.account_balance_wallet_outlined,
-                badgeText: _periodOptions[_selectedPeriodIndex],
+                badgeText: badgePeriodText,
                 badgeBg: const Color(0xFFDCFCE7),
                 badgeFg: const Color(0xFF15803D),
                 subText: 'Realtime DB',
@@ -364,10 +418,10 @@ class _DashboardTabState extends State<DashboardTab> {
             const SizedBox(width: 10),
             Expanded(
               child: _buildMetricCard(
-                title: 'Komisi (10%)',
+                title: 'Komisi',
                 value: komisiStr,
                 icon: Icons.receipt_long_outlined,
-                badgeText: 'Net Revenue',
+                badgeText: 'Komisi 10%',
                 badgeBg: const Color(0xFFCFFAFE),
                 badgeFg: const Color(0xFF0891B2),
                 subText: 'Tercatat',
@@ -528,6 +582,26 @@ class _DashboardTabState extends State<DashboardTab> {
   // 6. National Booking Volume Trend Card
   // ---------------------------------------------------------------------------
   Widget _buildBookingTrendCard() {
+    final counts = _weeklyBookingCounts;
+    final totalWeekly = counts.fold<int>(0, (sum, item) => sum + item);
+    final now = DateTime.now();
+
+    // Hari 7 hari terakhir: 6 hari lalu s/d hari ini
+    const dayNames = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+    final labels = List.generate(7, (i) {
+      final d = now.subtract(Duration(days: 6 - i));
+      return dayNames[d.weekday - 1];
+    });
+
+    int maxCount = 0;
+    int maxIdx = 6;
+    for (int i = 0; i < counts.length; i++) {
+      if (counts[i] >= maxCount) {
+        maxCount = counts[i];
+        maxIdx = i;
+      }
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -549,26 +623,28 @@ class _DashboardTabState extends State<DashboardTab> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    'Tren Volume Booking Nasional',
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF0F172A),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Tren Volume Booking Nasional',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    '7 Hari Terakhir • Puncak Sabtu (9.420 tiket)',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF64748B),
+                    const SizedBox(height: 2),
+                    Text(
+                      '7 Hari Terakhir • Total: $totalWeekly booking tercatat',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF64748B),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -577,7 +653,7 @@ class _DashboardTabState extends State<DashboardTab> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Text(
-                  'Live',
+                  'Live DB',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
@@ -593,7 +669,11 @@ class _DashboardTabState extends State<DashboardTab> {
           SizedBox(
             height: 140,
             child: CustomPaint(
-              painter: _BookingTrendPainter(),
+              painter: _BookingTrendPainter(
+                counts: counts,
+                labels: labels,
+                peakIndex: maxIdx,
+              ),
               child: Container(),
             ),
           ),
@@ -602,19 +682,16 @@ class _DashboardTabState extends State<DashboardTab> {
           // Day labels row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: const [
-              _DayLabel(label: 'Sen', isHighlight: false),
-              _DayLabel(label: 'Sel', isHighlight: false),
-              _DayLabel(label: 'Rab', isHighlight: false),
-              _DayLabel(label: 'Kam', isHighlight: false),
-              _DayLabel(label: 'Jum', isHighlight: false),
-              _DayLabel(label: 'Sab', isHighlight: true),
-              _DayLabel(label: 'Min', isHighlight: false),
-            ],
+            children: List.generate(7, (i) {
+              return _DayLabel(
+                label: labels[i],
+                isHighlight: i == maxIdx,
+              );
+            }),
           ),
           const SizedBox(height: 14),
 
-          // Omzet Harian Tertinggi Banner
+          // Booking Harian Tertinggi Banner
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             decoration: BoxDecoration(
@@ -636,7 +713,7 @@ class _DashboardTabState extends State<DashboardTab> {
                     ),
                     const SizedBox(width: 8),
                     const Text(
-                      'Omzet Harian Tertinggi',
+                      'Volume Harian Tertinggi',
                       style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w600,
@@ -645,9 +722,9 @@ class _DashboardTabState extends State<DashboardTab> {
                     ),
                   ],
                 ),
-                const Text(
-                  'Rp 8,12 M (Sabtu)',
-                  style: TextStyle(
+                Text(
+                  '$maxCount Tiket (${labels[maxIdx]})',
+                  style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                     color: Color(0xFF0F172A),
@@ -657,279 +734,6 @@ class _DashboardTabState extends State<DashboardTab> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // 6. Sebaran Hotel Populer (Dinamis dari Database)
-  // ---------------------------------------------------------------------------
-  Widget _buildPopularHotelsSection() {
-    if (_hotels.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Center(
-            child: Text(
-              'Belum ada hotel terdaftar',
-              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-            ),
-          ),
-        ),
-      );
-    }
-
-    final list = _hotels.map((h) {
-      return {
-        'title': h.name,
-        'count': '${h.totalRooms} Kamar Terdaftar',
-        'occupancy': '⭐ ${h.rating.toStringAsFixed(1)}',
-        'image': h.thumbnailUrl ??
-            (h.photoUrls.isNotEmpty
-                ? h.photoUrls.first
-                : 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=200'),
-        'verified': h.status == HotelStatus.active,
-      };
-    }).toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  'Sebaran Hotel Terdaftar',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF0F172A),
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Daftar mitra properti aktif di database',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF64748B),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        ...list.map((item) => _buildHotelRegionCard(item)),
-      ],
-    );
-  }
-
-  Widget _buildHotelRegionCard(Map<String, dynamic> item) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        children: [
-          // Thumbnail image
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: Image.network(
-              item['image'] as String,
-              width: 50,
-              height: 50,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
-                width: 50,
-                height: 50,
-                color: const Color(0xFFE2E8F0),
-                child: const Icon(Icons.hotel_rounded, color: Color(0xFF94A3B8)),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-
-          // Info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        item['title'] as String,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0F172A),
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (item['verified'] == true) ...[
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.verified_rounded,
-                        color: Color(0xFF0284C7),
-                        size: 15,
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  item['count'] as String,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF64748B),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Occupancy Stat
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                item['occupancy'] as String,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF0D9488),
-                ),
-              ),
-              const Text(
-                'Okupansi',
-                style: TextStyle(
-                  fontSize: 9.5,
-                  color: Color(0xFF64748B),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // 8. Aksi Cepat Super Admin
-  // ---------------------------------------------------------------------------
-  Widget _buildQuickActionsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Aksi Cepat Super Admin',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFF0F172A),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildQuickActionButton(
-                label: '+ Buat Promo\nNasional',
-                icon: Icons.campaign_rounded,
-                bgColor: const Color(0xFF00809A),
-                iconColor: Colors.white,
-                onTap: () => widget.onNavigateTab?.call(2), // Promo Tab
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildQuickActionButton(
-                label: 'Audit Legalitas\nMitra',
-                icon: Icons.fact_check_rounded,
-                bgColor: const Color(0xFFE0F2FE),
-                iconColor: const Color(0xFF0284C7),
-                onTap: () => widget.onNavigateTab?.call(3), // Kelola Hotel Tab
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildQuickActionButton(
-                label: 'Laporan Escrow\nPayout',
-                icon: Icons.account_balance_rounded,
-                bgColor: const Color(0xFFEEF2FF),
-                iconColor: const Color(0xFF4F46E5),
-                onTap: () => widget.onNavigateTab?.call(1), // Keuangan Tab
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildQuickActionButton({
-    required String label,
-    required IconData icon,
-    required Color bgColor,
-    required Color iconColor,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: bgColor,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: iconColor, size: 21),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 10.5,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF0F172A),
-                height: 1.25,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -958,24 +762,40 @@ class _DayLabel extends StatelessWidget {
 }
 
 // -----------------------------------------------------------------------------
-// Custom Chart Painter for Booking Trend
+// Custom Chart Painter for Booking Trend (Data Asli dari Database)
 // -----------------------------------------------------------------------------
 class _BookingTrendPainter extends CustomPainter {
+  final List<int> counts;
+  final List<String> labels;
+  final int peakIndex;
+
+  _BookingTrendPainter({
+    required this.counts,
+    required this.labels,
+    required this.peakIndex,
+  });
+
   @override
   void paint(Canvas canvas, Size size) {
-    // 7 columns
-    final values = [0.35, 0.45, 0.52, 0.60, 0.70, 0.95, 0.58];
-    final count = values.length;
+    final count = counts.length;
     final columnWidth = 22.0;
     final spacing = (size.width - (count * columnWidth)) / (count - 1);
+
+    int maxCount = 0;
+    for (final c in counts) {
+      if (c > maxCount) maxCount = c;
+    }
+    final divisor = maxCount > 0 ? maxCount : 1;
 
     final linePoints = <Offset>[];
 
     for (int i = 0; i < count; i++) {
       final left = i * (columnWidth + spacing);
-      final height = values[i] * (size.height - 30);
+      final normalized = maxCount > 0 ? (counts[i] / divisor) : 0.08;
+      // Berikan tinggi minimal 8px agar tetap kelihatan bar walau 0
+      final height = (normalized * (size.height - 40)).clamp(8.0, size.height - 30);
       final top = size.height - height;
-      final isPeak = i == 5; // Sabtu
+      final isPeak = i == peakIndex && counts[i] > 0;
 
       // Draw vertical bar with rounded top
       final barPaint = Paint()
@@ -995,66 +815,72 @@ class _BookingTrendPainter extends CustomPainter {
     }
 
     // Draw smooth curve line over the bars
-    final path = Path();
-    path.moveTo(linePoints.first.dx, linePoints.first.dy);
+    if (linePoints.isNotEmpty) {
+      final path = Path();
+      path.moveTo(linePoints.first.dx, linePoints.first.dy);
 
-    for (int i = 0; i < linePoints.length - 1; i++) {
-      final p0 = linePoints[i];
-      final p1 = linePoints[i + 1];
-      final controlX = (p0.dx + p1.dx) / 2;
-      path.cubicTo(controlX, p0.dy, controlX, p1.dy, p1.dx, p1.dy);
+      for (int i = 0; i < linePoints.length - 1; i++) {
+        final p0 = linePoints[i];
+        final p1 = linePoints[i + 1];
+        final controlX = (p0.dx + p1.dx) / 2;
+        path.cubicTo(controlX, p0.dy, controlX, p1.dy, p1.dx, p1.dy);
+      }
+
+      final linePaint = Paint()
+        ..color = const Color(0xFF007A94)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.6
+        ..strokeCap = StrokeCap.round;
+
+      canvas.drawPath(path, linePaint);
+
+      // Draw peak point dot and tooltip above peak point
+      if (peakIndex >= 0 && peakIndex < linePoints.length && counts[peakIndex] > 0) {
+        final peakPoint = linePoints[peakIndex];
+        final dotPaint = Paint()..color = const Color(0xFF00C2FF);
+        canvas.drawCircle(peakPoint, 4, dotPaint);
+
+        final whiteDotPaint = Paint()..color = Colors.white;
+        canvas.drawCircle(peakPoint, 2, whiteDotPaint);
+
+        // Draw tooltip box above peak point
+        final tipText = '${labels[peakIndex]}: ${counts[peakIndex]}';
+        final textSpan = TextSpan(
+          text: tipText,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 9,
+            fontWeight: FontWeight.w800,
+          ),
+        );
+        final textPainter = TextPainter(
+          text: textSpan,
+          textDirection: TextDirection.ltr,
+        )..layout();
+
+        final tooltipWidth = textPainter.width + 16;
+        final tooltipRect = RRect.fromRectAndRadius(
+          Rect.fromCenter(
+            center: Offset(peakPoint.dx, peakPoint.dy - 16),
+            width: tooltipWidth,
+            height: 20,
+          ),
+          const Radius.circular(10),
+        );
+        final tooltipBg = Paint()..color = const Color(0xFF0F172A);
+        canvas.drawRRect(tooltipRect, tooltipBg);
+
+        textPainter.paint(
+          canvas,
+          Offset(
+            peakPoint.dx - (textPainter.width / 2),
+            peakPoint.dy - 16 - (textPainter.height / 2),
+          ),
+        );
+      }
     }
-
-    final linePaint = Paint()
-      ..color = const Color(0xFF007A94)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.6
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawPath(path, linePaint);
-
-    // Draw peak point dot and tooltip above Saturday (index 5)
-    final peakPoint = linePoints[5];
-    final dotPaint = Paint()..color = const Color(0xFF00C2FF);
-    canvas.drawCircle(peakPoint, 4, dotPaint);
-
-    final whiteDotPaint = Paint()..color = Colors.white;
-    canvas.drawCircle(peakPoint, 2, whiteDotPaint);
-
-    // Draw tooltip box above peak point
-    final tooltipRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(
-        center: Offset(peakPoint.dx, peakPoint.dy - 16),
-        width: 72,
-        height: 20,
-      ),
-      const Radius.circular(10),
-    );
-    final tooltipBg = Paint()..color = const Color(0xFF0F172A);
-    canvas.drawRRect(tooltipRect, tooltipBg);
-
-    // Draw tooltip text "Sabtu: 9.420"
-    final textSpan = const TextSpan(
-      text: 'Sabtu: 9.420',
-      style: TextStyle(
-        color: Colors.white,
-        fontSize: 9,
-        fontWeight: FontWeight.w800,
-      ),
-    );
-    final textPainter = TextPainter(
-      text: textSpan,
-      textDirection: TextDirection.ltr,
-    )..layout();
-    textPainter.paint(
-      canvas,
-      Offset(
-        peakPoint.dx - (textPainter.width / 2),
-        peakPoint.dy - 16 - (textPainter.height / 2),
-      ),
-    );
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

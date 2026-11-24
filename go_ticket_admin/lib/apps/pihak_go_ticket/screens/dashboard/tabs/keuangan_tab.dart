@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:go_ticket_admin/core/widgets/app_pagination_bar.dart';
 import '../../../../../core/services/super_admin_service.dart';
 import '../../../../../core/utils/currency_formatter.dart';
 
@@ -17,6 +18,8 @@ class _KeuanganTabState extends State<KeuanganTab> {
 
   Map<String, dynamic> _stats = {};
   bool _isLoading = true;
+  int _currentPage = 1;
+  static const int _pageSize = 10;
 
   @override
   void initState() {
@@ -42,6 +45,18 @@ class _KeuanganTabState extends State<KeuanganTab> {
         });
       }
     }
+  }
+
+  List<Map<String, dynamic>> get _rawPayments {
+    return (_stats['paymentsList'] as List<Map<String, dynamic>>?) ?? [];
+  }
+
+  List<Map<String, dynamic>> get _pagedPayments {
+    final list = _rawPayments;
+    final startIndex = (_currentPage - 1) * _pageSize;
+    if (startIndex >= list.length) return [];
+    final endIndex = (startIndex + _pageSize).clamp(0, list.length);
+    return list.sublist(startIndex, endIndex);
   }
 
   @override
@@ -83,7 +98,7 @@ class _KeuanganTabState extends State<KeuanganTab> {
                   ),
                   SizedBox(height: 3),
                   Text(
-                    'Rekapitulasi pendapatan kotor, omzet bersih, dan komisi sistem.',
+                    'Rekapitulasi pendapatan kotor, omzet bersih, dan transaksi pembayaran.',
                     style: TextStyle(
                       fontSize: 11.5,
                       color: Color(0xFF64748B),
@@ -101,11 +116,11 @@ class _KeuanganTabState extends State<KeuanganTab> {
         _buildPeriodSegmentedControl(),
         const SizedBox(height: 12),
 
-        // 3. Hero Card: PENDAPATAN BERSIH (NET REVENUE)
+        // 3. Hero Card: Pendapatan Bersih
         _buildNetRevenueHeroCard(),
         const SizedBox(height: 12),
 
-        // 4. Two Metric Cards (Dinamis dari Database)
+        // 4. Two Metric Cards (Total Booking & Tamu)
         Row(
           children: [
             Expanded(
@@ -127,8 +142,8 @@ class _KeuanganTabState extends State<KeuanganTab> {
         ),
         const SizedBox(height: 16),
 
-        // 5. Metode Pembayaran Card with multi-segment bar
-        _buildPaymentMethodsCard(),
+        // 5. Data Transaksi Tiap Pembayaran (Pagination 10 data, simple uang masuk)
+        _buildTransactionsCard(),
         const SizedBox(height: 24),
       ],
     );
@@ -187,19 +202,17 @@ class _KeuanganTabState extends State<KeuanganTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // Hero Card: PENDAPATAN BERSIH
+  // Hero Card: Pendapatan Bersih
   // ---------------------------------------------------------------------------
   Widget _buildNetRevenueHeroCard() {
     final baseRev = (_stats['totalRevenue'] as num?)?.toDouble() ?? 0;
-    // Multiplier berdasarkan filter periode: 0 = Harian (0.05), 1 = Bulanan (1.0), 2 = Tahunan (12.0)
     final periodMultiplier = _selectedPeriod == 0
         ? 0.05
         : (_selectedPeriod == 1 ? 1.0 : 12.0);
     final totalRev = baseRev * periodMultiplier;
     final netRev = totalRev * 0.9; // setelah fee 10%
-    final baseBooks = (_stats['totalBookings'] as num?)?.toInt() ?? 0;
-    final totalBooks = (baseBooks * periodMultiplier).round();
-    final adr = totalBooks > 0 ? (totalRev / totalBooks).round() : 0;
+    final komisi = totalRev * 0.1;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -223,54 +236,11 @@ class _KeuanganTabState extends State<KeuanganTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top row: LIVE AUDIT & Shield
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF00E5FF),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Text(
-                      'LIVE AUDIT PERIODE AKTIF',
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFFE0F7FA),
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(
-                Icons.verified_user_outlined,
-                color: Color(0xFF00E5FF),
-                size: 20,
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
           // Title
           const Text(
-            'PENDAPATAN BERSIH (NET REVENUE)',
+            'Pendapatan Bersih',
             style: TextStyle(
-              fontSize: 10.5,
+              fontSize: 12,
               fontWeight: FontWeight.w700,
               color: Color(0xFFB2EBF2),
               letterSpacing: 0.5,
@@ -288,25 +258,7 @@ class _KeuanganTabState extends State<KeuanganTab> {
               letterSpacing: -0.5,
             ),
           ),
-          const SizedBox(height: 4),
-
-          // Subtitle info
-          Row(
-            children: const [
-              Icon(Icons.info_outline_rounded, color: Color(0xFF80DEEA), size: 13),
-              SizedBox(width: 5),
-              Expanded(
-                child: Text(
-                  'Bersih setelah potongan diskon voucher & fee operasional',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    color: Color(0xFFB2EBF2),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
           // Divider line inside card
           Container(
@@ -322,17 +274,17 @@ class _KeuanganTabState extends State<KeuanganTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Total Pendapatan Kotor',
+                    const Text(
+                      'Pendapatan Kotor',
                       style: TextStyle(
-                        fontSize: 10.5,
+                        fontSize: 11,
                         color: Color(0xFFB2EBF2),
                       ),
                     ),
-                    SizedBox(height: 3),
+                    const SizedBox(height: 3),
                     Text(
                       totalRev > 0 ? CurrencyFormatter.toRupiah(totalRev.round()) : 'Rp 0',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w800,
                         color: Colors.white,
@@ -345,17 +297,17 @@ class _KeuanganTabState extends State<KeuanganTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Rata-rata ADR / Booking',
+                    const Text(
+                      'Komisi Sistem (10%)',
                       style: TextStyle(
-                        fontSize: 10.5,
+                        fontSize: 11,
                         color: Color(0xFFB2EBF2),
                       ),
                     ),
-                    SizedBox(height: 3),
+                    const SizedBox(height: 3),
                     Text(
-                      adr > 0 ? CurrencyFormatter.toRupiah(adr) : 'Rp 0',
-                      style: TextStyle(
+                      komisi > 0 ? CurrencyFormatter.toRupiah(komisi.round()) : 'Rp 0',
+                      style: const TextStyle(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w800,
                         color: Colors.white,
@@ -425,9 +377,12 @@ class _KeuanganTabState extends State<KeuanganTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // Metode Pembayaran Card
+  // Data Transaksi Tiap Pembayaran (Pagination 10 data, teks simple uang masuk)
   // ---------------------------------------------------------------------------
-  Widget _buildPaymentMethodsCard() {
+  Widget _buildTransactionsCard() {
+    final list = _pagedPayments;
+    final total = _rawPayments.length;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -443,12 +398,12 @@ class _KeuanganTabState extends State<KeuanganTab> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
-                children: const [
-                  Icon(Icons.pie_chart_outline_rounded,
+                children: [
+                  const Icon(Icons.receipt_long_rounded,
                       size: 18, color: Color(0xFF0096B4)),
-                  SizedBox(width: 8),
-                  Text(
-                    'Metode Pembayaran',
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Data Transaksi Pembayaran',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
@@ -463,11 +418,11 @@ class _KeuanganTabState extends State<KeuanganTab> {
                   color: const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text(
-                  'Oktober 2025',
-                  style: TextStyle(
+                child: Text(
+                  '$total Data',
+                  style: const TextStyle(
                     fontSize: 10,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                     color: Color(0xFF64748B),
                   ),
                 ),
@@ -476,115 +431,118 @@ class _KeuanganTabState extends State<KeuanganTab> {
           ),
           const SizedBox(height: 14),
 
-          // Multi-Segment Bar (54% Teal, 32% Cyan, 14% Slate)
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: SizedBox(
-              height: 10,
-              child: Row(
-                children: const [
-                  Expanded(
-                    flex: 54,
-                    child: ColoredBox(color: Color(0xFF006678)),
-                  ),
-                  SizedBox(width: 2),
-                  Expanded(
-                    flex: 32,
-                    child: ColoredBox(color: Color(0xFF38BDF8)),
-                  ),
-                  SizedBox(width: 2),
-                  Expanded(
-                    flex: 14,
-                    child: ColoredBox(color: Color(0xFF94A3B8)),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Breakdown List
-          _buildPaymentBreakdownRow(
-            color: const Color(0xFF006678),
-            label: 'QRIS & E-Wallet',
-            share: '54% transaksi',
-            amount: 'Rp 80.200.000',
-          ),
-          const SizedBox(height: 10),
-          _buildPaymentBreakdownRow(
-            color: const Color(0xFF38BDF8),
-            label: 'Virtual Account Bank',
-            share: '32% transaksi',
-            amount: 'Rp 47.520.000',
-          ),
-          const SizedBox(height: 10),
-          _buildPaymentBreakdownRow(
-            color: const Color(0xFF94A3B8),
-            label: 'Kartu Kredit / Debit',
-            share: '14% transaksi',
-            amount: 'Rp 20.800.000',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPaymentBreakdownRow({
-    required Color color,
-    required String label,
-    required String share,
-    required String amount,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
+          if (list.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Column(
+                  children: const [
+                    Icon(Icons.inbox_outlined, size: 36, color: Color(0xFF94A3B8)),
+                    SizedBox(height: 8),
+                    Text(
+                      'Belum ada transaksi pembayaran masuk',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF0F172A),
+            )
+          else ...[
+            ...list.map((trx) {
+              final nominal = (trx['nominal_bayar'] as num?)?.toDouble() ?? 0;
+              final nominalStr = CurrencyFormatter.toRupiah(nominal.round());
+              final tgl = trx['tgl_bayar']?.toString() ?? '';
+              final metode = trx['metode_pembayaran']?.toString() ?? 'Transfer';
+              final noRef = trx['no_referensi_trx']?.toString() ?? '-';
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDCFCE7),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_downward_rounded,
+                            size: 16,
+                            color: Color(0xFF16A34A),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Uang Masuk',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '$metode • Ref: $noRef',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ),
-                  Text(
-                    share,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: Color(0xFF64748B),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '+$nominalStr',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF16A34A),
+                          ),
+                        ),
+                        if (tgl.isNotEmpty)
+                          Text(
+                            tgl.length >= 10 ? tgl.substring(0, 10) : tgl,
+                            style: const TextStyle(
+                              fontSize: 9.5,
+                              color: Color(0xFF94A3B8),
+                            ),
+                          ),
+                      ],
                     ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          Text(
-            amount,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF0F172A),
+                  ],
+                ),
+              );
+            }),
+
+            const SizedBox(height: 12),
+
+            // Pagination Controls (10 data per halaman)
+            AppPaginationBar(
+              currentPage: _currentPage,
+              totalItems: total,
+              pageSize: _pageSize,
+              itemLabel: 'transaksi',
+              onPageChanged: (newPage) {
+                setState(() => _currentPage = newPage);
+              },
             ),
-          ),
+          ],
         ],
       ),
     );

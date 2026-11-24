@@ -28,12 +28,26 @@ class SuperAdminService {
 
         // Hitung total revenue dari booking yang completed / confirmed
         double totalRevenue = 0;
+        final List<Map<String, dynamic>> rawBookings = [];
         if (bookingsRes != null) {
           for (final b in (bookingsRes as List)) {
             final m = Map<String, dynamic>.from(b);
+            rawBookings.add(m);
             if (m['status_booking'] == 'confirmed' || m['status_booking'] == 'completed') {
               totalRevenue += (m['total_harga'] as num?)?.toDouble() ?? 0;
             }
+          }
+        }
+
+        // Ambil data transaksi pembayaran untuk laporan keuangan
+        final paymentsRes = await sb
+            .table(SupabaseConfig.tablePembayaran)
+            ?.select()
+            .order('tgl_bayar', ascending: false);
+        final List<Map<String, dynamic>> rawPayments = [];
+        if (paymentsRes != null) {
+          for (final p in (paymentsRes as List)) {
+            rawPayments.add(Map<String, dynamic>.from(p));
           }
         }
 
@@ -43,6 +57,8 @@ class SuperAdminService {
           'totalBookings': bookingsCount,
           'totalRevenue': totalRevenue.toInt(),
           'activePartners': hotelsCount,
+          'bookingsList': rawBookings,
+          'paymentsList': rawPayments,
         };
       } catch (e) {
         debugPrint('⚠️ [SuperAdminService] getPlatformStats error: $e');

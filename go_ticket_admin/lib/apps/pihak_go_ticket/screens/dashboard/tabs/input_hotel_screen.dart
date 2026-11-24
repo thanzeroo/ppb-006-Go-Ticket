@@ -12,6 +12,8 @@ import 'package:go_ticket_admin/core/services/hotel_image_upload_service.dart';
 import 'formatters.dart';
 
 /// Data model form untuk tipe kamar di Section D
+/// Model penampung form tipe kamar (Section D).
+/// Mendukung penambahan fasilitas kamar secara dinamis (list kustom) per tipe kamar.
 class RoomTypeFormData {
   final TextEditingController nameController;
   final TextEditingController sizeController;
@@ -20,9 +22,12 @@ class RoomTypeFormData {
   final TextEditingController weekendPriceController;
   final TextEditingController extraBedController;
   final TextEditingController totalUnitController;
+  // Controller untuk mengetik fasilitas kamar kustom baru
+  final TextEditingController amenityInputController;
   int guestCapacity;
   String selectedBedType;
-  Map<String, bool> roomAmenities;
+  // Fasilitas kamar dinamis dalam bentuk List<String>
+  List<String> roomAmenities;
 
   RoomTypeFormData({
     String name = '',
@@ -33,7 +38,7 @@ class RoomTypeFormData {
     String extraBed = '',
     String totalUnit = '10',
     String bedType = '1 King Bed (180x200)',
-    Map<String, bool>? amenities,
+    List<String>? amenities,
   })  : nameController = TextEditingController(text: name),
         sizeController = TextEditingController(text: size),
         capacityController = TextEditingController(text: '$capacity'),
@@ -41,17 +46,10 @@ class RoomTypeFormData {
         weekendPriceController = TextEditingController(text: weekendPrice),
         extraBedController = TextEditingController(text: extraBed),
         totalUnitController = TextEditingController(text: totalUnit),
+        amenityInputController = TextEditingController(),
         guestCapacity = capacity,
         selectedBedType = bedType,
-        roomAmenities = amenities ??
-            {
-              'Smart TV 55"': false,
-              'Bathtub Ocean View': false,
-              'Mesin Espresso': false,
-              'Balkon Pribadi': false,
-              'AC Inverter': false,
-              'Safe Deposit Box': false,
-            };
+        roomAmenities = amenities != null ? List<String>.from(amenities) : [];
 
   void dispose() {
     nameController.dispose();
@@ -61,6 +59,7 @@ class RoomTypeFormData {
     weekendPriceController.dispose();
     extraBedController.dispose();
     totalUnitController.dispose();
+    amenityInputController.dispose();
   }
 }
 
@@ -97,21 +96,14 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
   late final TextEditingController _latitudeController;
   late final TextEditingController _longitudeController;
 
-  int _selectedCategory = 0; // 0 = Resor Bintang 5
+  // Kategori: 0 = Resor, 1 = Hotel, 2 = Vila
+  int _selectedCategory = 0;
 
-  // Section B: Facilities (semua default false saat awal buat mitra baru)
-  final Map<String, bool> _facilities = {
-    'Infinity Pool': false,
-    'WiFi 100Mbps': false,
-    'Spa & Wellness': false,
-    'Sarapan Buffet': false,
-    'Parkir Valet Gratis': false,
-    'Shuttle Bandara': false,
-    'Resto & Bar 24 Jam': false,
-    'Pet-Friendly': false,
-  };
+  // Section B: Controller input fasilitas properti kustom & list dinamis
+  final TextEditingController _facilityInputController = TextEditingController();
+  List<String> _facilities = [];
 
-  // Section C: Foto Galeri (kosong dari awal saat buat mitra baru)
+  // Section C: Foto Galeri/Utama hotel (Hanya 1 foto per hotel)
   List<String> _photoUrls = [];
 
   // Section D: List Tipe Kamar (bisa banyak tipe kamar)
@@ -165,22 +157,29 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
       text: h?.longitude != null ? h!.longitude.toString() : '',
     );
 
+    // Kategori: Resor (0), Hotel (1), Vila (2)
     _selectedCategory = 0;
-
-    // Section B: Fasilitas dicentang jika edit hotel, kosong jika buat baru
-    if (h != null && h.amenities.isNotEmpty) {
-      for (final f in _facilities.keys.toList()) {
-        _facilities[f] = h.amenities.contains(f);
-      }
-    } else {
-      for (final f in _facilities.keys.toList()) {
-        _facilities[f] = false;
+    if (h != null) {
+      final name = h.name.toLowerCase();
+      if (name.contains('vila') || name.contains('villa')) {
+        _selectedCategory = 2;
+      } else if (name.contains('resor') || name.contains('resort')) {
+        _selectedCategory = 0;
+      } else {
+        _selectedCategory = 1;
       }
     }
 
-    // Section C: Galeri foto kosong dari awal saat tambah mitra baru
+    // Section B: Fasilitas kustom hotel (list dinamis)
+    if (h != null && h.amenities.isNotEmpty) {
+      _facilities = List<String>.from(h.amenities);
+    } else {
+      _facilities = [];
+    }
+
+    // Section C: Foto Utama hotel (Maksimal 1 foto saja per hotel)
     if (h != null && h.photoUrls.isNotEmpty) {
-      _photoUrls = List<String>.from(h.photoUrls);
+      _photoUrls = [h.photoUrls.first];
     } else if (h != null && h.mainImageUrl != null && h.mainImageUrl!.isNotEmpty) {
       _photoUrls = [h.mainImageUrl!];
     } else {
@@ -239,19 +238,6 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
       if (dbRooms.isNotEmpty && mounted) {
         setState(() {
           _roomTypes = dbRooms.map((r) {
-            final Map<String, bool> amenities = {
-              'Smart TV 55"': false,
-              'Bathtub Ocean View': false,
-              'Mesin Espresso': false,
-              'Balkon Pribadi': false,
-              'AC Inverter': false,
-              'Safe Deposit Box': false,
-            };
-            for (final a in r.amenities) {
-              if (amenities.containsKey(a)) {
-                amenities[a] = true;
-              }
-            }
             final bed = r.bedType ?? '1 King Bed (180x200)';
             if (!_bedTypeOptions.contains(bed)) {
               _bedTypeOptions.add(bed);
@@ -266,7 +252,7 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
               extraBed: '',
               totalUnit: '${r.totalUnits}',
               bedType: bed,
-              amenities: amenities,
+              amenities: List<String>.from(r.amenities),
             );
           }).toList();
         });
@@ -285,6 +271,15 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
           if (!_bedTypeOptions.contains(bed)) {
             _bedTypeOptions.add(bed);
           }
+          List<String> loadedAmenities = [];
+          if (res['fasilitas_kamar'] != null) {
+            loadedAmenities = res['fasilitas_kamar']
+                .toString()
+                .split(',')
+                .map((s) => s.trim())
+                .where((s) => s.isNotEmpty)
+                .toList();
+          }
           final room = RoomTypeFormData(
             name: res['nama_tipe']?.toString() ?? '',
             size: res['luas_m2']?.toString() ?? '',
@@ -297,6 +292,7 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
                 : '',
             totalUnit: res['total_unit']?.toString() ?? '10',
             bedType: bed,
+            amenities: loadedAmenities,
           );
           _roomTypes = [room];
         });
@@ -316,6 +312,7 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
 
   @override
   void dispose() {
+    _facilityInputController.dispose();
     _hotelNameController.dispose();
     _nibController.dispose();
     _npwpController.dispose();
@@ -805,63 +802,65 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
     );
   }
 
+  /// Section A: Pilihan Kategori Hotel (Resor, Hotel, Vila)
+  /// Ditata secara rapi dalam satu baris (3 kolom) untuk mencegah overflow di layar HP.
   Widget _buildCategoryGrid() {
     final categories = [
-      {'label': 'Resor Bintang 5', 'icon': Icons.apartment_rounded},
-      {'label': 'Hotel Butik Modern', 'icon': Icons.hotel_rounded},
-      {'label': 'Villa Mewah Privat', 'icon': Icons.holiday_village_rounded},
-      {'label': 'Glamping Eksklusif', 'icon': Icons.terrain_rounded},
+      {'label': 'Resor', 'icon': Icons.apartment_rounded},
+      {'label': 'Hotel', 'icon': Icons.hotel_rounded},
+      {'label': 'Vila', 'icon': Icons.holiday_village_rounded},
     ];
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: 4,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 2.8,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-      ),
-      itemBuilder: (context, index) {
+    return Row(
+      children: List.generate(categories.length, (index) {
         final isSelected = _selectedCategory == index;
         final cat = categories[index];
-        return InkWell(
-          onTap: () => setState(() => _selectedCategory = index),
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            decoration: BoxDecoration(
-              color: isSelected ? const Color(0xFF006678) : Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isSelected ? const Color(0xFF006678) : const Color(0xFFE2E8F0),
-              ),
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: index == 0 ? 0 : 4,
+              right: index == categories.length - 1 ? 0 : 4,
             ),
-            child: Row(
-              children: [
-                Icon(
-                  cat['icon'] as IconData,
-                  size: 15,
-                  color: isSelected ? Colors.white : const Color(0xFF64748B),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    cat['label'] as String,
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                      color: isSelected ? Colors.white : const Color(0xFF334155),
-                    ),
-                    overflow: TextOverflow.ellipsis,
+            child: InkWell(
+              onTap: () => setState(() => _selectedCategory = index),
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? const Color(0xFF006678) : Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isSelected ? const Color(0xFF006678) : const Color(0xFFE2E8F0),
+                    width: isSelected ? 1.5 : 1.0,
                   ),
                 ),
-              ],
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      cat['icon'] as IconData,
+                      size: 16,
+                      color: isSelected ? Colors.white : const Color(0xFF64748B),
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        cat['label'] as String,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                          color: isSelected ? Colors.white : const Color(0xFF334155),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         );
-      },
+      }),
     );
   }
 
@@ -899,7 +898,7 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
           const SizedBox(height: 4),
           _buildInputBox(
             controller: _nibController,
-            hint: 'Contoh: 9120005431100',
+            hint: '',
           ),
           const SizedBox(height: 8),
           const Text(
@@ -909,7 +908,7 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
           const SizedBox(height: 4),
           _buildInputBox(
             controller: _npwpController,
-            hint: 'Contoh: 01.590.342.1-901.000',
+            hint: '',
           ),
           const SizedBox(height: 8),
           const Text(
@@ -919,7 +918,7 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
           const SizedBox(height: 4),
           _buildInputBox(
             controller: _ptNameController,
-            hint: 'Contoh: PT Graha Wisata Indonesia',
+            hint: '',
           ),
         ],
       ),
@@ -929,18 +928,21 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
   // ---------------------------------------------------------------------------
   // Section B: Fasilitas Unggulan Properti
   // ---------------------------------------------------------------------------
-  Widget _buildSectionB() {
-    final facilityIcons = {
-      'Infinity Pool': Icons.pool_rounded,
-      'WiFi 100Mbps': Icons.wifi_rounded,
-      'Spa & Wellness': Icons.spa_rounded,
-      'Sarapan Buffet': Icons.restaurant_rounded,
-      'Parkir Valet Gratis': Icons.local_parking_rounded,
-      'Shuttle Bandara': Icons.directions_bus_rounded,
-      'Resto & Bar 24 Jam': Icons.local_bar_rounded,
-      'Pet-Friendly': Icons.pets_rounded,
-    };
+  // Fungsi untuk menambahkan fasilitas hotel baru ke dalam daftar
+  void _addCustomFacility() {
+    final text = _facilityInputController.text.trim();
+    if (text.isEmpty) return;
+    if (!_facilities.contains(text)) {
+      setState(() {
+        _facilities.add(text);
+      });
+    }
+    _facilityInputController.clear();
+  }
 
+  /// Section B: Fasilitas Unggulan Properti
+  /// Pengguna dapat mengetik dan mendaftarkan fasilitas kustom sendiri tanpa batasan checklist kaku.
+  Widget _buildSectionB() {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -967,7 +969,7 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
                     Text(
-                      'Section B: Fasilitas Unggulan\nProperti',
+                      'Section B: Fasilitas Unggulan Properti',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w900,
@@ -977,7 +979,7 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
                     ),
                     SizedBox(height: 2),
                     Text(
-                      'Fasilitas publik & layanan utama yang tampil di badge pencarian',
+                      'Ketik fasilitas publik & layanan hotel lalu tekan tombol Tambah',
                       style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
                     ),
                   ],
@@ -987,57 +989,128 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
           ),
           const SizedBox(height: 14),
 
-          // 8 Checklist Fasilitas
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _facilities.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 2.7,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-            ),
-            itemBuilder: (context, index) {
-              final key = _facilities.keys.elementAt(index);
-              final isChecked = _facilities[key] ?? false;
-              final icon = facilityIcons[key] ?? Icons.check_circle_outline;
-
-              return InkWell(
-                onTap: () => setState(() => _facilities[key] = !isChecked),
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isChecked ? const Color(0xFF0096B4) : const Color(0xFFE2E8F0),
+          // Input field untuk mengetik fasilitas kustom hotel
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 42,
+                  child: TextField(
+                    controller: _facilityInputController,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _addCustomFacility(),
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0F172A),
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Ketik fasilitas properti (misal: Kolam Renang, Gym)...',
+                      hintStyle: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: Color(0xFF0096B4), width: 1.5),
+                      ),
                     ),
                   ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 42,
+                child: ElevatedButton.icon(
+                  onPressed: _addCustomFacility,
+                  icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                  label: const Text(
+                    'Tambah',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00758F),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Daftar fasilitas kustom yang telah ditambahkan (menggunakan Wrap agar responsive di layar HP)
+          if (_facilities.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Text(
+                'Belum ada fasilitas yang ditambahkan. Ketik nama fasilitas di atas lalu tekan Tambah.',
+                style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
+                textAlign: TextAlign.center,
+              ),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _facilities.map((fac) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0F7FA),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF0096B4).withValues(alpha: 0.3)),
+                  ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        isChecked ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
-                        size: 16,
-                        color: isChecked ? const Color(0xFF0096B4) : const Color(0xFF94A3B8),
+                      const Icon(Icons.check_circle_rounded, size: 14, color: Color(0xFF007A94)),
+                      const SizedBox(width: 6),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 220),
+                        child: Text(
+                          fac,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF0F172A),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                       const SizedBox(width: 6),
-                      Icon(icon, size: 14, color: const Color(0xFF64748B)),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          key,
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-                          overflow: TextOverflow.ellipsis,
+                      InkWell(
+                        onTap: () {
+                          setState(() {
+                            _facilities.remove(fac);
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(10),
+                        child: const Padding(
+                          padding: EdgeInsets.all(2),
+                          child: Icon(Icons.close_rounded, size: 14, color: Color(0xFF64748B)),
                         ),
                       ),
                     ],
                   ),
-                ),
-              );
-            },
-          ),
+                );
+              }).toList(),
+            ),
         ],
       ),
     );
@@ -1046,6 +1119,8 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
   // ---------------------------------------------------------------------------
   // Section C: Galeri Media & Foto Resmi (Point 4: Berfungsi Penuh)
   // ---------------------------------------------------------------------------
+  /// Section C: Galeri & Foto Utama Hotel (Dibatasi 1 Foto Saja)
+  /// Pengguna hanya dapat menambahkan/mengunggah 1 foto utama per hotel.
   Widget _buildSectionC() {
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1065,8 +1140,7 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
                   color: const Color(0xFFE0F7FA),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.photo_library_outlined,
-                    size: 18, color: Color(0xFF0096B4)),
+                child: const Icon(Icons.photo_library_outlined, size: 18, color: Color(0xFF0096B4)),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -1074,7 +1148,7 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
                     Text(
-                      'Section C : Galeri Media &\nFoto Resmi',
+                      'Section C : Foto Utama Hotel',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w900,
@@ -1084,7 +1158,7 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
                     ),
                     SizedBox(height: 2),
                     Text(
-                      'Format JPG/PNG, rasio 16:9, foto pertama menjadi Cover Utama',
+                      'Format JPG/PNG, rasio 16:9, foto tunggal untuk profil hotel',
                       style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
                     ),
                   ],
@@ -1097,7 +1171,7 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  '${_photoUrls.length}/10\nFoto',
+                  '${_photoUrls.length}/1 Foto',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 9,
@@ -1111,192 +1185,148 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
           ),
           const SizedBox(height: 14),
 
-          // Dashed border upload card (Bisa diklik untuk upload/tambah foto)
-          InkWell(
-            onTap: _showAddPhotoModal,
-            borderRadius: BorderRadius.circular(14),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0F9FF),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: const Color(0xFF7DD3FC),
-                  style: BorderStyle.solid,
-                  width: 1.2,
-                ),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFBAE6FD),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.cloud_upload_outlined,
-                        size: 24, color: Color(0xFF0284C7)),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Unggah Foto Hotel / Tambah Gambar',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0F172A),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Ketuk untuk pilih dari kamera, galeri HP, atau masukkan URL foto',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Dynamic Thumbnail Previews
+          // Tampilan jika foto masih kosong: Tombol unggah besar
           if (_photoUrls.isEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                children: const [
-                  Icon(Icons.photo_library_outlined, size: 28, color: Color(0xFF94A3B8)),
-                  SizedBox(height: 6),
-                  Text(
-                    'Belum ada foto galeri yang diunggah.',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF475569)),
+            InkWell(
+              onTap: _showAddPhotoModal,
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0F9FF),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: const Color(0xFF7DD3FC),
+                    style: BorderStyle.solid,
+                    width: 1.2,
                   ),
-                  SizedBox(height: 2),
-                  Text(
-                    'Gunakan tombol di atas atau di bawah untuk menambah foto hotel dari galeri HP atau URL.',
-                    style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFBAE6FD),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.cloud_upload_outlined, size: 26, color: Color(0xFF0284C7)),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Unggah Foto Hotel (Maksimal 1 Foto)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Ketuk untuk pilih dari kamera, galeri HP, atau masukkan URL foto',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
               ),
             )
           else
-            SizedBox(
-              height: 110,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _photoUrls.length,
-                separatorBuilder: (context, index) => const SizedBox(width: 8),
-                itemBuilder: (context, idx) {
-                  final url = _photoUrls[idx];
-                  final isCover = idx == 0;
-                  return Stack(
-                    children: [
-                      Container(
-                        width: 140,
-                        height: 105,
+            // Tampilan jika sudah ada 1 foto: Preview 16:9 + opsi Ganti & Hapus
+            Column(
+              children: [
+                Stack(
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      height: 180,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFF00758F), width: 2),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: HotelImageUploadService.instance.buildSafeImage(
+                          _photoUrls.first,
+                          width: double.infinity,
+                          height: 180,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    // Badge Foto Utama
+                    Positioned(
+                      top: 10,
+                      left: 10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: isCover
-                                ? const Color(0xFF00758F)
-                                : const Color(0xFFE2E8F0),
-                            width: isCover ? 2 : 1,
-                          ),
+                          color: const Color(0xFF00758F).withValues(alpha: 0.9),
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: HotelImageUploadService.instance.buildSafeImage(
-                            url,
-                            width: 140,
-                            height: 105,
-                            fit: BoxFit.cover,
+                        child: const Text(
+                          'Foto Utama ⭐',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
                         ),
                       ),
-                      // Badge Cover
-                      Positioned(
-                        bottom: 6,
-                        left: 6,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: isCover
-                                ? const Color(0xFF00758F).withValues(alpha: 0.9)
-                                : Colors.black54,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            isCover ? 'Cover Utama ⭐' : 'Foto ${idx + 1}',
-                            style: const TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _showAddPhotoModal,
+                        icon: const Icon(Icons.photo_camera_back_outlined, size: 15, color: Color(0xFF00758F)),
+                        label: const Text(
+                          'Ganti Foto',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF00758F)),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF0F9FF),
+                          side: const BorderSide(color: Color(0xFFBAE6FD)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                         ),
                       ),
-                      // Hapus tombol
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: InkWell(
-                          onTap: () {
-                            setState(() => _photoUrls.removeAt(idx));
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(3),
-                            decoration: const BoxDecoration(
-                              color: Colors.black54,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.close,
-                                size: 13, color: Colors.white),
-                          ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _photoUrls.clear();
+                          });
+                        },
+                        icon: const Icon(Icons.delete_outline, size: 15, color: Color(0xFFDC2626)),
+                        label: const Text(
+                          'Hapus Foto',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFDC2626)),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFEF2F2),
+                          side: const BorderSide(color: Color(0xFFFECACA)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                         ),
                       ),
-                    ],
-                  );
-                },
-              ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          const SizedBox(height: 12),
-
-          // Tambah Foto Button
-          SizedBox(
-            width: double.infinity,
-            height: 38,
-            child: OutlinedButton.icon(
-              onPressed: _showAddPhotoModal,
-              icon: const Icon(Icons.add_photo_alternate_outlined,
-                  size: 16, color: Color(0xFF007A94)),
-              label: const Text(
-                '+ Tambah Foto / URL Galeri',
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF007A94)),
-              ),
-              style: OutlinedButton.styleFrom(
-                backgroundColor: const Color(0xFFEEF2FE),
-                side: const BorderSide(color: Color(0xFFBAE6FD)),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
 
+  /// Dialog modal pemilihan sumber foto (Kamera, Galeri, atau URL)
+  /// Karena hanya boleh 1 foto, foto baru akan langsung menggantikan foto sebelumnya.
   void _showAddPhotoModal() {
     final urlCtrl = TextEditingController();
 
@@ -1321,7 +1351,7 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'Tambah Foto Hotel',
+                  'Pilih Foto Hotel (1 Foto)',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                 ),
                 IconButton(
@@ -1340,8 +1370,7 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
                   color: const Color(0xFFE0F7FA),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.camera_alt_outlined,
-                    color: Color(0xFF007A94)),
+                child: const Icon(Icons.camera_alt_outlined, color: Color(0xFF007A94)),
               ),
               title: const Text('Ambil dari Kamera',
                   style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
@@ -1355,12 +1384,13 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
                       await picker.pickImage(source: ImageSource.camera, imageQuality: 85);
                   if (picked != null) {
                     setState(() {
-                      _photoUrls.add(picked.path);
+                      // Ganti foto yang ada dengan 1 foto baru
+                      _photoUrls = [picked.path];
                     });
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Foto kamera berhasil ditambahkan!'),
+                          content: Text('Foto kamera berhasil dipilih!'),
                           backgroundColor: Color(0xFF16A34A),
                         ),
                       );
@@ -1381,8 +1411,7 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
                   color: const Color(0xFFE0F7FA),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.photo_library_outlined,
-                    color: Color(0xFF007A94)),
+                child: const Icon(Icons.photo_library_outlined, color: Color(0xFF007A94)),
               ),
               title: const Text('Pilih dari Galeri Perangkat',
                   style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
@@ -1396,12 +1425,13 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
                       await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
                   if (picked != null) {
                     setState(() {
-                      _photoUrls.add(picked.path);
+                      // Ganti foto yang ada dengan 1 foto baru
+                      _photoUrls = [picked.path];
                     });
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Foto galeri berhasil ditambahkan!'),
+                          content: Text('Foto galeri berhasil dipilih!'),
                           backgroundColor: Color(0xFF16A34A),
                         ),
                       );
@@ -1427,8 +1457,7 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
                 hintText: 'https://example.com/foto-hotel.jpg',
                 hintStyle: const TextStyle(fontSize: 11),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               ),
             ),
             const SizedBox(height: 10),
@@ -1438,13 +1467,12 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF00758F),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
                 onPressed: () {
                   final url = urlCtrl.text.trim();
                   if (url.isNotEmpty) {
-                    setState(() => _photoUrls.add(url));
+                    setState(() => _photoUrls = [url]);
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -1454,7 +1482,7 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
                     );
                   }
                 },
-                child: const Text('Tambahkan URL Foto',
+                child: const Text('Simpan URL Foto',
                     style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ),
@@ -1909,58 +1937,150 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
           ),
           const SizedBox(height: 10),
 
-          // Fasilitas Kamar Eksklusif
+          // Fasilitas Kamar Eksklusif (Bisa dilist sendiri secara dinamis)
           const Text(
             'Fasilitas Kamar Eksklusif Terpasang',
             style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
           ),
+          const SizedBox(height: 4),
+          const Text(
+            'Ketik fasilitas kamar (misal: Bathtub, Balkon, Smart TV) lalu tekan Tambah',
+            style: TextStyle(fontSize: 9.5, color: Color(0xFF64748B)),
+          ),
           const SizedBox(height: 6),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: room.roomAmenities.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 2.8,
-              crossAxisSpacing: 6,
-              mainAxisSpacing: 6,
-            ),
-            itemBuilder: (context, idx) {
-              final key = room.roomAmenities.keys.elementAt(idx);
-              final isChecked = room.roomAmenities[key] ?? false;
-              return InkWell(
-                onTap: () => setState(() => room.roomAmenities[key] = !isChecked),
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isChecked ? const Color(0xFF0096B4) : const Color(0xFFCBD5E1),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 38,
+                  child: TextField(
+                    controller: room.amenityInputController,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) {
+                      final val = room.amenityInputController.text.trim();
+                      if (val.isNotEmpty && !room.roomAmenities.contains(val)) {
+                        setState(() => room.roomAmenities.add(val));
+                        room.amenityInputController.clear();
+                      }
+                    },
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0F172A),
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Ketik fasilitas kamar baru...',
+                      hintStyle: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8)),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Color(0xFF0096B4), width: 1.5),
+                      ),
                     ),
                   ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              SizedBox(
+                height: 38,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    final val = room.amenityInputController.text.trim();
+                    if (val.isNotEmpty && !room.roomAmenities.contains(val)) {
+                      setState(() => room.roomAmenities.add(val));
+                      room.amenityInputController.clear();
+                    }
+                  },
+                  icon: const Icon(Icons.add_rounded, size: 14, color: Colors.white),
+                  label: const Text(
+                    'Tambah',
+                    style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00758F),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Daftar fasilitas kamar dalam bentuk Chips yang bisa dihapus
+          if (room.roomAmenities.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Text(
+                'Belum ada fasilitas kamar. Masukkan fasilitas kamar di atas.',
+                style: TextStyle(fontSize: 9.5, color: Color(0xFF64748B)),
+                textAlign: TextAlign.center,
+              ),
+            )
+          else
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: room.roomAmenities.map((amenity) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFF16A34A).withValues(alpha: 0.3)),
+                  ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        isChecked ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
-                        size: 14,
-                        color: isChecked ? const Color(0xFF0096B4) : const Color(0xFF94A3B8),
+                      const Icon(Icons.check_circle_rounded, size: 13, color: Color(0xFF16A34A)),
+                      const SizedBox(width: 5),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 180),
+                        child: Text(
+                          amenity,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF0F172A),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                       const SizedBox(width: 5),
-                      Expanded(
-                        child: Text(
-                          key,
-                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-                          overflow: TextOverflow.ellipsis,
+                      InkWell(
+                        onTap: () {
+                          setState(() {
+                            room.roomAmenities.remove(amenity);
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: const Padding(
+                          padding: EdgeInsets.all(2),
+                          child: Icon(Icons.close_rounded, size: 13, color: Color(0xFF64748B)),
                         ),
                       ),
                     ],
                   ),
-                ),
-              );
-            },
-          ),
+                );
+              }).toList(),
+            ),
         ],
       ),
     );
@@ -2250,17 +2370,15 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
       final checkInTime = formatTime(_checkInController.text, '14:00:00');
       final checkOutTime = formatTime(_checkOutController.text, '12:00:00');
 
-      final activeFacilities = _facilities.entries
-          .where((e) => e.value)
-          .map((e) => e.key)
-          .toList();
+      // Fasilitas kustom hotel dari Section B
+      final activeFacilities = List<String>.from(_facilities);
 
       final lat = double.tryParse(_latitudeController.text.trim());
       final long = double.tryParse(_longitudeController.text.trim());
 
-      // Unggah foto lokal perangkat ke Supabase Storage (bucket avatars) jika ada
+      // Unggah foto lokal ke Supabase Storage (hanya 1 foto sesuai ketentuan)
       final List<String> finalPhotoUrls = [];
-      for (final p in _photoUrls) {
+      for (final p in _photoUrls.take(1)) {
         if (_isLocalFile(p)) {
           final file = File(p.replaceFirst('file://', ''));
           if (file.existsSync()) {
@@ -2292,10 +2410,8 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
         final totalU = int.tryParse(
                 room.totalUnitController.text.replaceAll(RegExp(r'[^0-9]'), '')) ??
             10;
-        final activeRoomAmenities = room.roomAmenities.entries
-            .where((e) => e.value)
-            .map((e) => e.key)
-            .toList();
+        // Fasilitas kustom tipe kamar dari Section D
+        final activeRoomAmenities = List<String>.from(room.roomAmenities);
 
         roomTypesPayload.add({
           'name': rName,

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/services/auth_service.dart';
-import '../../../../core/widgets/tiko_chat_bubble.dart';
 import '../auth/admin_login_screen.dart';
 import 'tabs/dashboard_tab.dart';
 import 'tabs/kelola_hotel_tab.dart';
@@ -42,41 +41,36 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Scaffold(
-          backgroundColor: const Color(0xFFF8FAFD),
-          body: SafeArea(
-            child: Column(
-              children: [
-                // Header Top Bar yang beradaptasi sesuai Tab yang aktif
-                _buildTopAppBar(),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFD),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header Top Bar yang konsisten di semua tab
+            _buildTopAppBar(),
 
-                // IndexedStack untuk perpindahan tab yang cepat dan mulus
-                Expanded(
-                  child: IndexedStack(
-                    index: _currentTabIndex,
-                    children: [
-                      DashboardTab(onNavigateTab: _onSelectTab),
-                      const KeuanganTab(),
-                      const PromoTab(),
-                      const KelolaHotelTab(),
-                      const UserTab(),
-                    ],
-                  ),
-                ),
-              ],
+            // IndexedStack untuk perpindahan tab yang cepat dan mulus
+            Expanded(
+              child: IndexedStack(
+                index: _currentTabIndex,
+                children: [
+                  DashboardTab(onNavigateTab: _onSelectTab),
+                  const KeuanganTab(),
+                  const PromoTab(),
+                  const KelolaHotelTab(),
+                  const UserTab(),
+                ],
+              ),
             ),
-          ),
-          bottomNavigationBar: _buildBottomNav(),
+          ],
         ),
-        const TikoChatBubble(),
-      ],
+      ),
+      bottomNavigationBar: _buildBottomNav(),
     );
   }
 
   // ===========================================================================
-  // TOP APP BAR (Sesuai Masing-masing Gambar)
+  // TOP APP BAR (Konsisten: Logo + Super Admin di kiri, Tombol Keluar di kanan)
   // ===========================================================================
   Widget _buildTopAppBar() {
     return Container(
@@ -90,10 +84,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Logo & Branding Kiri
+          // Logo & Super Admin Kiri
           _buildLeftBranding(),
 
-          // Aksi Kanan (Status Online / Bell Notifikasi + Profile Avatar)
+          // Aksi Kanan (Hanya icon logout tanpa teks)
           _buildRightActions(),
         ],
       ),
@@ -101,169 +95,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildLeftBranding() {
-    switch (_currentTabIndex) {
-      case 1: // Keuangan (Image 4)
-        return Row(
-          children: [
-            _buildLogoIcon(),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    const Text(
-                      'Go Ticket',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF0F172A),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 1.5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFCFFAFE),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        'SUPER ADMIN',
-                        style: TextStyle(
-                          fontSize: 8.5,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0891B2),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const Text(
-                  'Keuangan Laporan',
-                  style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
-                ),
-              ],
-            ),
-          ],
-        );
-
-      case 2: // Promo (Image 5)
-        return Row(
-          children: [
-            _buildLogoIcon(),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    const Text(
-                      'Go Ticket',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF0F172A),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 1.5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFCFFAFE),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        'SUPER ADMIN',
-                        style: TextStyle(
-                          fontSize: 8.5,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0891B2),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const Text(
-                  'Promo Vouchers',
-                  style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
-                ),
-              ],
-            ),
-          ],
-        );
-
-      case 3: // Kelola Hotel (Image 2)
-        return Row(
-          children: [
-            _buildLogoIcon(),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: const [
-                Text(
-                  'GO TICKET ADMIN',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF007A94),
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                Text(
-                  'More Hotel Kamar',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF0F172A),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        );
-
-      case 0: // Dashboard (Image 1)
-      case 4: // User (Image 3)
-      default:
-        return Row(
-          children: [
-            _buildLogoIcon(),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: const [
-                Text(
-                  'Go Ticket',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF0F172A),
-                  ),
-                ),
-                Text(
-                  'ADMIN PANEL',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF007A94),
-                    letterSpacing: 0.6,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        );
-    }
+    return Row(
+      children: [
+        _buildLogoIcon(),
+        const SizedBox(width: 10),
+        const Text(
+          'Super Admin',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF0F172A),
+            letterSpacing: 0.2,
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildLogoIcon() {
@@ -338,52 +184,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildRightActions() {
-    return Row(
-      children: [
-        // Logout button
-        InkWell(
-          onTap: _handleLogout,
-          borderRadius: BorderRadius.circular(20),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFEE2E2),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFFECACA)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: const [
-                Icon(Icons.logout_rounded, size: 14, color: Color(0xFFDC2626)),
-                SizedBox(width: 4),
-                Text(
-                  'Keluar',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFFDC2626),
-                  ),
-                ),
-              ],
-            ),
-          ),
+    return InkWell(
+      onTap: _handleLogout,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEE2E2),
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFFFECACA)),
         ),
-        const SizedBox(width: 8),
-        // User Avatar Circle
-        Container(
-          width: 32,
-          height: 32,
-          decoration: const BoxDecoration(
-            color: Color(0xFF006678),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.person_rounded,
-            color: Colors.white,
-            size: 20,
-          ),
+        child: const Icon(
+          Icons.logout_rounded,
+          size: 18,
+          color: Color(0xFFDC2626),
         ),
-      ],
+      ),
     );
   }
 

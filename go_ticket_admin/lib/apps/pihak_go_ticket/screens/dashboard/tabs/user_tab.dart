@@ -842,50 +842,26 @@ class _UserTabState extends State<UserTab> {
       child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [
-          // 1. Title & Super Admin Badge
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'Direktori Pengguna &\nStaf',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF0F172A),
-                        letterSpacing: -0.3,
-                        height: 1.2,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Kelola izin akses, akun tamu, serta status akun pengguna',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
+          // 1. Title & Subtitle (Konsisten tanpa badge Super Admin)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text(
+                'Direktori Pengguna &\nStaf',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF0F172A),
+                  letterSpacing: -0.3,
+                  height: 1.2,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFCFFAFE),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Text(
-                  'Super\nAdmin',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0891B2),
-                    height: 1.15,
-                  ),
+              SizedBox(height: 4),
+              Text(
+                'Kelola izin akses, akun tamu, serta status akun pengguna',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: Color(0xFF64748B),
                 ),
               ),
             ],
