@@ -296,7 +296,7 @@ class _UserTabState extends State<UserTab> {
   }
 
   void _showAddUserModal() {
-    int accountType = 0; // 0 = Administrator Hotel, 1 = Tamu
+    int accountType = 0; // 0 = Administrator / Staf Hotel, 1 = Tamu
     String? selectedHotelId = _hotels.isNotEmpty ? _hotels.first.id : null;
     String selectedRoleJabatan = 'administrator'; // administrator, front_office, maintenance
     String selectedShift = 'General';
@@ -418,29 +418,6 @@ class _UserTabState extends State<UserTab> {
                   const SizedBox(height: 14),
 
                   if (accountType == 0) ...[
-                    // Info Banner
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0FDF4),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFBBF7D0)),
-                      ),
-                      child: Row(
-                        children: const [
-                          Icon(Icons.info_outline, size: 16, color: Color(0xFF16A34A)),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Akun Administrator Hotel dibuat agar mitra dapat mengelola properti, kamar, dan menambahkan karyawan hotel.',
-                              style: TextStyle(fontSize: 10.5, color: Color(0xFF15803D)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
                     // Pilih Hotel
                     if (_hotels.isEmpty)
                       Container(
@@ -574,7 +551,7 @@ class _UserTabState extends State<UserTab> {
                           child: TextField(
                             controller: nikCtrl,
                             decoration: InputDecoration(
-                              labelText: 'NIK Karyawan (Opsional)',
+                              labelText: 'ID Karyawan (Opsional)',
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             ),
@@ -662,7 +639,7 @@ class _UserTabState extends State<UserTab> {
                               email: email,
                               password: pass,
                               phoneNumber: phoneCtrl.text.trim(),
-                              nik: nikCtrl.text.trim(),
+                              idKaryawan: nikCtrl.text.trim(),
                               roleJabatan: selectedRoleJabatan,
                               shiftTugas: selectedShift,
                             );

@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import '../config/supabase_config.dart';
 import '../models/payout_model.dart';
@@ -293,28 +295,44 @@ class SuperAdminService {
     required String email,
     required String password,
     String? phoneNumber,
-    String? nik,
+    String? idKaryawan,
     String roleJabatan = 'administrator',
     String shiftTugas = 'General',
   }) async {
     final sb = SupabaseService.instance;
-    if (!sb.isReady || sb.client == null) return false;
+    if (!sb.isReady) return false;
 
     try {
       final cleanEmail = email.trim().toLowerCase();
+      final svcKey = SupabaseConfig.supabaseServiceRoleKey.isNotEmpty
+          ? SupabaseConfig.supabaseServiceRoleKey
+          : SupabaseConfig.activeApiKey;
 
-      // 1. Daftarkan akun auth ke Supabase Auth agar bisa login signInWithPassword
+      // 1. Daftarkan akun auth via Admin REST API (Service Role Key).
+      //    JANGAN pakai sb.client!.auth.signUp() — itu menggantikan session super admin
+      //    yang sedang login dan menyebabkan super admin terlogout.
       try {
-        await sb.client!.auth.signUp(
-          email: cleanEmail,
-          password: password,
-          data: {
-            'full_name': fullName.trim(),
-            'role': roleJabatan,
+        final authUri = Uri.parse('${SupabaseConfig.supabaseUrl}/auth/v1/admin/users');
+        await http.post(
+          authUri,
+          headers: {
+            'apikey': svcKey,
+            'Authorization': 'Bearer $svcKey',
+            'Content-Type': 'application/json',
           },
+          body: jsonEncode({
+            'email': cleanEmail,
+            'password': password.trim(),
+            'email_confirm': true,
+            'user_metadata': {
+              'full_name': fullName.trim(),
+              'role': roleJabatan,
+              'id_penginapan': hotelId,
+            },
+          }),
         );
       } catch (authErr) {
-        debugPrint('⚠️ [SuperAdminService] createHotelStaff auth signUp notice: $authErr');
+        debugPrint('⚠️ [SuperAdminService] createHotelStaff auth notice: $authErr');
       }
 
       // 2. Generate ID Staf terstruktur (contoh: ADM-2025-102)
@@ -325,22 +343,31 @@ class SuperAdminService {
       final randSuffix = (DateTime.now().millisecondsSinceEpoch % 900 + 100).toString();
       final idStaf = '$prefix-$year-$randSuffix';
 
-      // 3. Masukkan ke tabel staf_hotel
-      final payload = <String, dynamic>{
-        'id_staf': idStaf,
-        'id_penginapan': hotelId,
-        'nama_staf': fullName.trim(),
-        'email': cleanEmail,
-        'password': '',
-        'no_telepon': phoneNumber?.trim() ?? '',
-        'nik_staf': (nik != null && nik.trim().isNotEmpty) ? nik.trim() : 'NIK-$randSuffix',
-        'role_jabatan': roleJabatan,
-        'shift_tugas': shiftTugas,
-        'status_karyawan': 'Aktif',
-        'status_duty': 'Off',
-      };
+      // 3. Masukkan ke tabel staf_hotel via Service Role REST API (bypass RLS)
+      final staffUri = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableStafHotel}');
+      await http.post(
+        staffUri,
+        headers: {
+          'apikey': svcKey,
+          'Authorization': 'Bearer $svcKey',
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal',
+        },
+        body: jsonEncode({
+          'id_staf': idStaf,
+          'id_penginapan': hotelId,
+          'nama_staf': fullName.trim(),
+          'email': cleanEmail,
+          'password': 'MANAGED_BY_SUPABASE_AUTH',
+          'no_telepon': phoneNumber?.trim().isEmpty == false ? phoneNumber!.trim() : null,
+          'nik_staf': (idKaryawan != null && idKaryawan.trim().isNotEmpty) ? idKaryawan.trim() : null,
+          'role_jabatan': roleJabatan,
+          'shift_tugas': shiftTugas,
+          'status_karyawan': 'Aktif',
+          'status_duty': 'Off',
+        }),
+      );
 
-      await sb.table(SupabaseConfig.tableStafHotel)?.insert(payload);
       return true;
     } catch (e) {
       debugPrint('⚠️ [SuperAdminService] createHotelStaff error: $e');

@@ -935,12 +935,12 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
           ),
           const SizedBox(height: 12),
 
-          // NIK
-          _buildFieldLabel('NIK KTP Karyawan'),
+          // ID Karyawan
+          _buildFieldLabel('ID Karyawan (Opsional)'),
           _buildInput(
             controller: _nikController,
-            hint: '16 Digit NIK Karyawan',
-            prefixIcon: Icons.credit_card_outlined,
+            hint: 'Contoh: STF-001 / ID Karyawan',
+            prefixIcon: Icons.badge_outlined,
           ),
           const SizedBox(height: 12),
 

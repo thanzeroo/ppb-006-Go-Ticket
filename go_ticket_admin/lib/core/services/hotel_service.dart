@@ -665,25 +665,9 @@ class HotelService {
         debugPrint('⚠️ [createHotel] Gagal insert staf_hotel admin: $stafErr');
       }
 
-      // c. Simpan ke tabel users (jika ada)
-      try {
-        final userUri = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableUsers}');
-        await http.post(
-          userUri,
-          headers: {
-            'apikey': svcKeyAdmin,
-            'Authorization': 'Bearer $svcKeyAdmin',
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal',
-          },
-          body: jsonEncode({
-            'email': genAdminEmail,
-            'nama_lengkap': 'Administrator $name',
-            'role': 'Admin Hotel',
-            'id_penginapan': newHotelId,
-          }),
-        );
-      } catch (_) {}
+      // c. Simpan ke tabel users tidak dilakukan karena tabel users tidak memiliki
+      //    kolom id_penginapan. Data administrator sudah tersimpan di staf_hotel.
+      // (Dihapus untuk menghindari error PGRST204 column not found)
     }
 
     final resMap = Map<String, dynamic>.from(insertedHotel);

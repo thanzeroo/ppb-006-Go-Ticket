@@ -2796,7 +2796,7 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Akun administrator hotel telah dibuat secara otomatis untuk portal pihak hotel:',
+                    'Kredensial login administrator hotel untuk portal pihak hotel:',
                     style: TextStyle(fontSize: 11, color: Color(0xFF475569)),
                   ),
                   const SizedBox(height: 12),
