@@ -29,6 +29,7 @@ class _PesananTabState extends State<PesananTab>
   late TabController _tabController;
   late final PageController _subPageController;
   final TextEditingController _searchController = TextEditingController();
+  late Future<List<BookingModel>> _bookingsFuture;
   String _searchQuery = '';
   final Map<String, int> _tabPages = {
     'all': 1,
@@ -41,6 +42,7 @@ class _PesananTabState extends State<PesananTab>
   @override
   void initState() {
     super.initState();
+    _bookingsFuture = _fetchBookings();
     _tabController = TabController(length: 5, vsync: this);
     _tabController.addListener(() {
       setState(() {});
@@ -56,7 +58,11 @@ class _PesananTabState extends State<PesananTab>
   }
 
   void _onOperationsUpdated() {
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {
+        _bookingsFuture = _fetchBookings();
+      });
+    }
   }
 
   void _onSubTabChanged() {
@@ -126,13 +132,17 @@ class _PesananTabState extends State<PesananTab>
   Future<List<BookingModel>> _fetchBookings() async {
     final remoteList = await BookingService.instance.getMyBookings();
     final localList = await UserBookingStorage.instance.getBookings();
+    final currentUserId = AuthService.instance.currentUser?.id;
+    final filteredLocal = currentUserId == null
+        ? localList
+        : localList.where((b) => b.customerId == currentUserId).toList();
 
     final Map<String, BookingModel> map = {};
     for (final b in remoteList) {
       final key = b.bookingCode.isNotEmpty ? b.bookingCode : b.id;
       map[key] = b;
     }
-    for (final b in localList) {
+    for (final b in filteredLocal) {
       final key = b.bookingCode.isNotEmpty ? b.bookingCode : b.id;
       if (map.containsKey(key)) {
         final remote = map[key]!;
@@ -203,7 +213,7 @@ class _PesananTabState extends State<PesananTab>
   // ---------------------------------------------------------------------------
   Widget _buildPemesananView() {
     return FutureBuilder<List<BookingModel>>(
-      future: _fetchBookings(),
+      future: _bookingsFuture,
       builder: (context, snapshot) {
         final allBookings = snapshot.data ?? [];
         final countPending = allBookings
@@ -244,7 +254,11 @@ class _PesananTabState extends State<PesananTab>
                     : RefreshIndicator(
                         color: const Color(0xFF00B4D8),
                         onRefresh: () async {
-                          setState(() {});
+                          final future = _fetchBookings();
+                          setState(() {
+                            _bookingsFuture = future;
+                          });
+                          await future;
                         },
                         child: TabBarView(
                           controller: _tabController,

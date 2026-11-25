@@ -206,7 +206,8 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
                       child: TextField(
                         controller: _messageController,
                         focusNode: _focusNode,
-                        maxLines: null,
+                        minLines: 1,
+                        maxLines: 4,
                         textInputAction: TextInputAction.send,
                         onSubmitted: (_) => _sendMessage(),
                         decoration: const InputDecoration(

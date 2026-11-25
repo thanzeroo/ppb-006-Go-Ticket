@@ -203,16 +203,20 @@ class _GuestDetailFormScreenState extends State<GuestDetailFormScreen> {
                 Text('Total Pembayaran (${_args.nights} Malam)',
                     style:
                         const TextStyle(fontSize: 11, color: GT.muted)),
-                Row(children: [
-                  Text(rp(_args.subtotal),
-                      style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          color: GT.teal)),
-                  const SizedBox(width: 6),
-                  const GTChip('Termasuk Pajak',
-                      bg: Color(0xFFDCFCE7), fg: GT.green),
-                ]),
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    Text(rp(_args.subtotal),
+                        style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: GT.teal)),
+                    const GTChip('Termasuk Pajak',
+                        bg: Color(0xFFDCFCE7), fg: GT.green),
+                  ],
+                ),
               ],
             ),
           ),
