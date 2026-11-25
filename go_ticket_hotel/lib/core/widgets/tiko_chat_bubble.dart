@@ -104,20 +104,24 @@ class _TikoChatBubbleState extends State<TikoChatBubble>
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Color(0xFF00B4D8),
+                  Color(0xFF00C2FF),
                   Color(0xFF0077B6),
                 ],
               ),
               shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.85),
+                width: 2,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF00B4D8).withOpacity(0.4),
+                  color: const Color(0xFF00B4D8).withValues(alpha: 0.4),
                   blurRadius: 16,
                   offset: const Offset(0, 4),
                   spreadRadius: 2,
                 ),
                 BoxShadow(
-                  color: const Color(0xFF0077B6).withOpacity(0.2),
+                  color: const Color(0xFF0077B6).withValues(alpha: 0.2),
                   blurRadius: 24,
                   offset: const Offset(0, 8),
                   spreadRadius: 0,
@@ -125,9 +129,9 @@ class _TikoChatBubbleState extends State<TikoChatBubble>
               ],
             ),
             child: const Icon(
-              Icons.smart_toy_rounded,
+              Icons.auto_awesome_rounded,
               color: Colors.white,
-              size: 28,
+              size: 26,
             ),
           ),
         ),

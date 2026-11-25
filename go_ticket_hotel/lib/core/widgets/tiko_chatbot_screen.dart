@@ -91,7 +91,7 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
                 shape: BoxShape.circle,
               ),
               child: const Icon(
-                Icons.smart_toy_rounded,
+                Icons.auto_awesome_rounded,
                 color: Colors.white,
                 size: 20,
               ),
@@ -101,18 +101,18 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Tiko',
+                  'Tiko AI Hotel',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 Text(
-                  _isLoading ? 'Sedang mengetik...' : 'Asisten AI Go Ticket',
+                  _isLoading ? 'Sedang mengetik...' : 'Asisten Operasional & Manajemen Hotel',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w400,
-                    color: Colors.white.withOpacity(0.85),
+                    color: Colors.white.withValues(alpha: 0.85),
                   ),
                 ),
               ],
@@ -274,18 +274,29 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: _tikoPrimary.withOpacity(0.1),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF00C2FF), Color(0xFF0077B6)],
+                ),
                 shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: _tikoPrimary.withValues(alpha: 0.25),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
               child: const Icon(
-                Icons.smart_toy_rounded,
-                size: 40,
-                color: _tikoPrimary,
+                Icons.auto_awesome_rounded,
+                size: 38,
+                color: Colors.white,
               ),
             ),
             const SizedBox(height: 20),
             const Text(
-              'Halo! Aku Tiko 👋',
+              'Halo! Aku Tiko AI Hotel',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
@@ -294,7 +305,7 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Asisten AI Go Ticket siap membantu kamu.\nTanya apa saja seputar Go Ticket!',
+              'Asisten AI khusus pengelolaan & operasional hotel.\nTanya apa saja seputar manajemen properti, kamar, staf, atau keuangan!',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,
@@ -310,9 +321,10 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
               runSpacing: 8,
               alignment: WrapAlignment.center,
               children: [
-                _buildSuggestionChip('Cara booking hotel?'),
-                _buildSuggestionChip('Apa itu Go Ticket?'),
-                _buildSuggestionChip('Alur check-in'),
+                _buildSuggestionChip('Cara tambah & atur staf hotel?'),
+                _buildSuggestionChip('Cara kelola tipe kamar & tarif?'),
+                _buildSuggestionChip('Alur check-in & check-out tamu'),
+                _buildSuggestionChip('Laporan keuangan & pencairan dana'),
               ],
             ),
           ],
@@ -362,7 +374,7 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
                 shape: BoxShape.circle,
               ),
               child: const Icon(
-                Icons.smart_toy_rounded,
+                Icons.auto_awesome_rounded,
                 color: Colors.white,
                 size: 16,
               ),
@@ -424,7 +436,7 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
               shape: BoxShape.circle,
             ),
             child: const Icon(
-              Icons.smart_toy_rounded,
+              Icons.auto_awesome_rounded,
               color: Colors.white,
               size: 16,
             ),

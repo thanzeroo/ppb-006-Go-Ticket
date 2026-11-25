@@ -8,7 +8,6 @@ import '../../../../../core/models/hotel_admin_model.dart';
 import '../../../../../core/theme/hotel_admin_theme.dart';
 import 'add_staff_screen.dart';
 import 'edit_staff_screen.dart';
-import '../widgets/request_admin_email_sheet.dart';
 
 /// Tab 3: Manajemen Staf & Hak Akses Administrator
 /// Menampilkan daftar karyawan dengan filter 3 Role Utama:
@@ -87,9 +86,13 @@ class _StafTimTabState extends State<StafTimTab> {
   Widget build(BuildContext context) {
     final filtered = _filteredStaff;
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
+    return RefreshIndicator(
+      onRefresh: () async => widget.onRefresh?.call(),
+      color: cDarkActive,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        children: [
         // Title
         const Text(
           'Manajemen Staf & Hak Akses',
@@ -127,51 +130,20 @@ class _StafTimTabState extends State<StafTimTab> {
             elevation: 0,
           ),
         ),
-        const SizedBox(height: 8),
-
-        // Outlined Button: Request Penambahan Akun Administrator via Email ke Go Ticket
-        OutlinedButton.icon(
-          onPressed: () => showRequestAdminEmailModal(context),
-          icon: const Icon(Icons.mark_email_unread_outlined, size: 16, color: Color(0xFF00758F)),
-          label: const Text(
-            'Ajukan Akun Admin Baru (Email ke Go Ticket)',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF00758F)),
-          ),
-          style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: Color(0xFFBAE6FD)),
-            minimumSize: const Size.fromHeight(40),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          ),
-        ),
         const SizedBox(height: 16),
 
         // Status Roster Hari Ini (Dihitung Dinamis dari Database)
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: const [
-                Icon(Icons.calendar_month_outlined,
-                    size: 15, color: Color(0xFF0F172A)),
-                SizedBox(width: 6),
-                Text(
-                  'Status Roster Hari Ini',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0F172A)),
-                ),
-              ],
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                  color: cLight, borderRadius: BorderRadius.circular(10)),
-              child: const Text('Live Sync',
-                  style: TextStyle(
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w800,
-                      color: cDarkActive)),
+          children: const [
+            Icon(Icons.calendar_month_outlined,
+                size: 15, color: Color(0xFF0F172A)),
+            SizedBox(width: 6),
+            Text(
+              'Status Roster Hari Ini',
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A)),
             ),
           ],
         ),
@@ -287,6 +259,7 @@ class _StafTimTabState extends State<StafTimTab> {
 
         const SizedBox(height: 24),
       ],
+      ),
     );
   }
 
@@ -394,19 +367,14 @@ class _StafTimTabState extends State<StafTimTab> {
                   CircleAvatar(
                     radius: 23,
                     backgroundColor: const Color(0xFFE0F4FB),
-                    backgroundImage: s.avatarUrl.isNotEmpty
-                        ? NetworkImage(s.avatarUrl)
-                        : null,
-                    child: s.avatarUrl.isEmpty
-                        ? Text(
-                            s.name.isNotEmpty ? s.name[0].toUpperCase() : 'S',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF007A87),
-                            ),
-                          )
-                        : null,
+                    child: Text(
+                      s.name.isNotEmpty ? s.name[0].toUpperCase() : 'S',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF007A87),
+                      ),
+                    ),
                   ),
                   Positioned(
                     bottom: 0,
@@ -591,14 +559,14 @@ class _StafTimTabState extends State<StafTimTab> {
 
           const SizedBox(height: 8),
 
-          // WhatsApp & Kontak
+          // Nomor HP / WhatsApp (tanpa label 'Kontak:')
           Row(
             children: [
               const Icon(Icons.phone_android,
                   size: 12, color: Color(0xFF007A87)),
               const SizedBox(width: 4),
               Text(
-                'Kontak: ${s.wa}',
+                s.wa.isNotEmpty ? s.wa : '-',
                 style:
                     const TextStyle(fontSize: 10.5, color: Color(0xFF475569)),
               ),
@@ -756,9 +724,9 @@ class _StafTimTabState extends State<StafTimTab> {
                           setSheetState(() => selectedShift = val!),
                     ),
                     _buildShiftRadioItem(
-                      title: 'Normal Shift (Office Hours)',
-                      time: '08:00 – 17:00 WIB',
-                      value: 'Normal Shift (08:00 – 17:00 WIB)',
+                      title: 'Full Time',
+                      time: 'Jadwal Penuh',
+                      value: 'Full Time',
                       groupValue: selectedShift,
                       onChanged: (val) =>
                           setSheetState(() => selectedShift = val!),

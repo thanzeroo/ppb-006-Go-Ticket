@@ -291,7 +291,7 @@ class _AdministratorDashboardScreenState
             ),
             const SizedBox(width: 8),
           ],
-          // Logo & Title
+          // Logo & Tag Administrator
           Image.asset(
             'assets/logo.png',
             height: 30,
@@ -308,61 +308,40 @@ class _AdministratorDashboardScreenState
             ),
           ),
           const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text(
-                'Go Ticket Administrator',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
-                ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: cLight,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: cLightActive),
+            ),
+            child: const Text(
+              'Administrator',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+                color: cDarkActive,
               ),
-              Text(
-                'Hotel Partner Portal',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF64748B),
-                ),
-              ),
-            ],
+            ),
           ),
           const Spacer(),
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF0284C7)),
-            onPressed: _loadData,
-            tooltip: 'Segarkan data',
-          ),
-          const SizedBox(width: 4),
-          // Tombol Logout Merah
+          // Tombol Logout (Hanya Icon)
           Tooltip(
-            message: 'Keluar / Logout',
+            message: 'Keluar',
             child: InkWell(
               onTap: _handleLogout,
               borderRadius: BorderRadius.circular(8),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFEE2E2),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: const Color(0xFFFCA5A5)),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(Icons.logout_rounded, color: Color(0xFFDC2626), size: 16),
-                    SizedBox(width: 4),
-                    Text(
-                      'Logout',
-                      style: TextStyle(
-                        color: Color(0xFFDC2626),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
+                child: const Icon(
+                  Icons.logout_rounded,
+                  color: Color(0xFFDC2626),
+                  size: 18,
                 ),
               ),
             ),

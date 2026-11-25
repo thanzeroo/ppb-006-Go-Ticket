@@ -1,13 +1,9 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:image_picker/image_picker.dart';
 
 import '../../../../../../core/config/supabase_config.dart';
 import '../../../../../../core/services/auth_service.dart';
-import '../widgets/request_admin_email_sheet.dart';
-import '../../../services/hotel_image_upload_service.dart';
 
 /// Halaman Tambah Karyawan Baru untuk Administrator Hotel
 /// Mendukung 3 Role:
@@ -22,10 +18,8 @@ class AddStaffScreen extends StatefulWidget {
 }
 
 class _AddStaffScreenState extends State<AddStaffScreen> {
-  static const Color _teal = Color(0xFF005E73);
   static const Color _bg = Color(0xFFF6F8FB);
   static const Color _cardBorder = Color(0xFFE5E9F0);
-  static const Color _cNormal = Color(0xFF00D1FF);
 
   // Controllers (Semua field bersih tanpa data dummy)
   late TextEditingController _nameController;
@@ -39,19 +33,9 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
   // 0: Staf (Front Office), 1: Maintenance, 2: Administrator
   int _selectedRole = 0;
   int _gender = 0; // 0: Laki-laki, 1: Perempuan
+  String _selectedShift = 'Pagi';
   bool _obscurePassword = true;
   bool _isSaving = false;
-
-  // Foto Profil Karyawan (File lokal dari Kamera/Galeri atau URL Web)
-  File? _selectedImageFile;
-  String? _selectedAvatarUrl;
-
-  final List<String> _sampleAvatars = [
-    'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=300&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=300&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=300&auto=format&fit=crop',
-  ];
 
   @override
   void initState() {
@@ -63,7 +47,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
     _emailController = TextEditingController();
     _phoneController = TextEditingController();
     _nikController = TextEditingController();
-    _shiftController = TextEditingController();
+    _shiftController = TextEditingController(text: 'Pagi');
   }
 
   @override
@@ -93,298 +77,9 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
   }
 
   void _onRoleChanged(int newRole) {
-    if (newRole == 2) {
-      showRequestAdminEmailModal(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Akun Administrator hanya dapat dibuat oleh Super Admin/Pihak Go Ticket. Silakan ajukan via formulir email.',
-          ),
-          backgroundColor: Color(0xFF007A87),
-          duration: Duration(seconds: 3),
-        ),
-      );
-      return;
-    }
     setState(() {
       _selectedRole = newRole;
     });
-  }
-
-  /// Bottom Sheet Pemilih Foto: Kamera Langsung atau Galeri HP / File Komputer
-  void _showPhotoPickerSheet() {
-    final isDesktop =
-        Platform.isLinux || Platform.isWindows || Platform.isMacOS;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: SafeArea(
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Pilih Foto Profil Karyawan',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, size: 20),
-                        onPressed: () => Navigator.pop(ctx),
-                      ),
-                    ],
-                  ),
-                  Text(
-                    isDesktop
-                        ? 'Pilih berkas foto dari laptop atau gunakan avatar sampel cepat.'
-                        : 'Ambil foto langsung dengan kamera atau pilih dari penyimpanan ponsel.',
-                    style:
-                        const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Pilihan 1: Kamera Langsung (Smartphone)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE0F4FB),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.camera_alt_rounded,
-                          color: Color(0xFF007A87), size: 24),
-                    ),
-                    title: Row(
-                      children: [
-                        const Text(
-                          'Ambil Foto dari Kamera',
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF0F172A),
-                          ),
-                        ),
-                        if (isDesktop) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFEF3C7),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text(
-                              'Khusus HP',
-                              style: TextStyle(
-                                  fontSize: 9,
-                                  color: Color(0xFFB45309),
-                                  fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    subtitle: Text(
-                      isDesktop
-                          ? 'Kamera native hanya aktif di perangkat ponsel Android/iOS'
-                          : 'Otomatis membuka kamera untuk memotret',
-                      style: const TextStyle(
-                          fontSize: 11, color: Color(0xFF64748B)),
-                    ),
-                    trailing: const Icon(Icons.chevron_right,
-                        color: Color(0xFF94A3B8)),
-                    onTap: () async {
-                      Navigator.pop(ctx);
-                      if (isDesktop) {
-                        _showError(
-                            'Kamera perangkat langsung hanya didukung di smartphone. Membuka pemilih berkas foto laptop...');
-                        await _pickImage(ImageSource.gallery);
-                      } else {
-                        await _pickImage(ImageSource.camera);
-                      }
-                    },
-                  ),
-                  const Divider(height: 14),
-
-                  // Pilihan 2: Galeri / File Penyimpanan Komputer/HP
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEDE9FE),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.photo_library_rounded,
-                          color: Color(0xFF7C3AED), size: 24),
-                    ),
-                    title: Text(
-                      isDesktop
-                          ? 'Pilih Foto dari Penyimpanan Laptop'
-                          : 'Pilih dari Galeri / Penyimpanan HP',
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0F172A),
-                      ),
-                    ),
-                    subtitle: Text(
-                      isDesktop
-                          ? 'Membuka penjelajah berkas laptop untuk memilih gambar'
-                          : 'Pilih foto dari berkas galeri penyimpanan ponsel',
-                      style: const TextStyle(
-                          fontSize: 11, color: Color(0xFF64748B)),
-                    ),
-                    trailing: const Icon(Icons.chevron_right,
-                        color: Color(0xFF94A3B8)),
-                    onTap: () async {
-                      Navigator.pop(ctx);
-                      await _pickImage(ImageSource.gallery);
-                    },
-                  ),
-                  const Divider(height: 14),
-
-                  // Pilihan 3: Avatar Sampel (Praktis untuk developer di laptop)
-                  const Text(
-                    'Atau Pilih Avatar Sampel Cepat (Cocok untuk Uji Coba):',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF334155),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: _sampleAvatars.map((url) {
-                      final isSel = _selectedAvatarUrl == url &&
-                          _selectedImageFile == null;
-                      return GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _selectedImageFile = null;
-                            _selectedAvatarUrl = url;
-                          });
-                          Navigator.pop(ctx);
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: isSel
-                                  ? const Color(0xFF00C2FF)
-                                  : const Color(0xFFE2E8F0),
-                              width: isSel ? 2.5 : 1,
-                            ),
-                          ),
-                          child: CircleAvatar(
-                            radius: 24,
-                            backgroundImage: NetworkImage(url),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-
-                  if (_selectedImageFile != null ||
-                      _selectedAvatarUrl != null) ...[
-                    const Divider(height: 16),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEE2E2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.delete_outline_rounded,
-                            color: Color(0xFFDC2626), size: 24),
-                      ),
-                      title: const Text(
-                        'Hapus Foto Terpilih',
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFFDC2626),
-                        ),
-                      ),
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        setState(() {
-                          _selectedImageFile = null;
-                          _selectedAvatarUrl = null;
-                        });
-                      },
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  /// Eksekusi ambil gambar dari kamera atau galeri dengan penanganan error desktop yang aman
-  Future<void> _pickImage(ImageSource source) async {
-    try {
-      final picker = ImagePicker();
-      final XFile? pickedFile = await picker.pickImage(
-        source: source,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 85,
-      );
-
-      if (pickedFile != null) {
-        setState(() {
-          _selectedImageFile = File(pickedFile.path);
-          _selectedAvatarUrl = null;
-        });
-      }
-    } catch (e) {
-      debugPrint('⚠️ [AddStaff] Error picking image: $e');
-      final errStr = e.toString();
-      if (errStr.contains('MissingPluginException') ||
-          errStr.contains('channel')) {
-        _showError(
-            'Plugin kamera memerlukan restart penuh aplikasi (flutter run), dan fitur kamera langsung hanya didukung di smartphone.');
-        // Fallback coba buka file galeri laptop
-        try {
-          final picker = ImagePicker();
-          final XFile? picked =
-              await picker.pickImage(source: ImageSource.gallery);
-          if (picked != null) {
-            setState(() {
-              _selectedImageFile = File(picked.path);
-              _selectedAvatarUrl = null;
-            });
-          }
-        } catch (_) {}
-      } else {
-        _showError('Gagal memilih foto: $e');
-      }
-    }
   }
 
   /// Submit Staff ke Supabase Database & Supabase Auth
@@ -421,31 +116,35 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
       final roleMapping = ['front_office', 'maintenance', 'administrator'];
       final roleDb = roleMapping[_selectedRole.clamp(0, 2)];
 
-      // 1. Upload Foto Profil jika Administrator memilih foto dari kamera/galeri
-      String? photoUrl = _selectedAvatarUrl;
-      if (_selectedImageFile != null && _selectedImageFile!.existsSync()) {
-        try {
-          final cleanId = idStaf.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
-          final uploaded = await HotelImageUploadService.instance.uploadFile(
-            _selectedImageFile!,
-            prefix: 'staf_$cleanId',
-          );
-          if (uploaded != null && uploaded.isNotEmpty) {
-            photoUrl = uploaded;
-            debugPrint('✅ [AddStaff] Foto profil berhasil diunggah: $photoUrl');
+      final serviceKey = SupabaseConfig.supabaseServiceRoleKey.isNotEmpty
+          ? SupabaseConfig.supabaseServiceRoleKey
+          : SupabaseConfig.activeApiKey;
+
+      // 1. Jika memilih role Administrator, cek batas maksimal 3 akun administrator per hotel
+      if (roleDb == 'administrator') {
+        final checkUri = Uri.parse(
+            '${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableStafHotel}?id_penginapan=eq.$hotelId&role_jabatan=eq.administrator&select=id_staf');
+        final checkResp = await http.get(
+          checkUri,
+          headers: {
+            'apikey': serviceKey,
+            'Authorization': 'Bearer $serviceKey',
+          },
+        );
+        if (checkResp.statusCode == 200) {
+          final List<dynamic> admins = jsonDecode(checkResp.body);
+          if (admins.length >= 3) {
+            setState(() => _isSaving = false);
+            _showError(
+                'Batas maksimal akun Administrator (3 akun) untuk hotel ini sudah tercapai.');
+            return;
           }
-        } catch (uploadErr) {
-          debugPrint('⚠️ [AddStaff] Upload foto gagal: $uploadErr');
         }
       }
 
       // 2. Daftarkan akun ke Supabase Auth via Admin REST API (Service Role Key)
       // Supaya staf dapat langsung login via auth.signInWithPassword
       try {
-        final serviceKey = SupabaseConfig.supabaseServiceRoleKey.isNotEmpty
-            ? SupabaseConfig.supabaseServiceRoleKey
-            : SupabaseConfig.activeApiKey;
-
         final authUrl =
             Uri.parse('${SupabaseConfig.supabaseUrl}/auth/v1/admin/users');
         final userMetadata = <String, dynamic>{
@@ -453,9 +152,6 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
           'id_staf': idStaf,
           'role': roleDb,
         };
-        if (photoUrl != null) {
-          userMetadata['avatar_url'] = photoUrl;
-        }
 
         await http.post(
           authUrl,
@@ -490,16 +186,10 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
             ? null
             : _nikController.text.trim(),
         'role_jabatan': roleDb,
-        'shift_tugas': _shiftController.text.trim().isEmpty
-            ? null
-            : _shiftController.text.trim(),
+        'shift_tugas': _selectedShift,
         'status_karyawan': 'Aktif',
         'status_duty': 'Off',
       };
-
-      final serviceKey = SupabaseConfig.supabaseServiceRoleKey.isNotEmpty
-          ? SupabaseConfig.supabaseServiceRoleKey
-          : SupabaseConfig.activeApiKey;
 
       final restUri = Uri.parse(
           '${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableStafHotel}');
@@ -687,7 +377,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
             _buildTopBadges(),
             const SizedBox(height: 16),
 
-            // Card 1: Foto Profil & Identitas Karyawan (Kamera & Galeri HP)
+            // Card 1: Identitas Karyawan
             _buildIdentityCard(),
             const SizedBox(height: 16),
 
@@ -695,11 +385,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
             _buildRoleDepartmentCard(),
             const SizedBox(height: 16),
 
-            // Card 3: Hak Akses Otomatis Sesuai Role & Portal
-            _buildAccessModuleCard(),
-            const SizedBox(height: 16),
-
-            // Card 4: Akun & Kredensial Login (ID Staf & Password)
+            // Card 3: Akun & Kredensial Login (ID Staf & Password)
             _buildCredentialsSecurityCard(),
             const SizedBox(height: 24),
 
@@ -755,182 +441,20 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
     );
   }
 
-  /// Card 1: Data Identitas & Foto Profil (Pilih Kamera / Galeri HP)
+  /// Card 1: Data Identitas & Kontak
   Widget _buildIdentityCard() {
     return _buildSectionContainer(
       icon: Icons.badge_outlined,
       title: 'Data Identitas & Kontak',
-      subtitle: 'Informasi personal dan foto profil resmi karyawan',
+      subtitle: 'Informasi personal karyawan',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Row Foto Profil
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Row(
-              children: [
-                GestureDetector(
-                  onTap: _showPhotoPickerSheet,
-                  child: Stack(
-                    children: [
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(0xFFF1F5FD),
-                          border: Border.all(color: _cNormal, width: 2),
-                        ),
-                        child: _selectedImageFile != null
-                            ? ClipOval(
-                                child: Image.file(
-                                  _selectedImageFile!,
-                                  fit: BoxFit.cover,
-                                  width: 64,
-                                  height: 64,
-                                ),
-                              )
-                            : _selectedAvatarUrl != null
-                                ? ClipOval(
-                                    child: Image.network(
-                                      _selectedAvatarUrl!,
-                                      fit: BoxFit.cover,
-                                      width: 64,
-                                      height: 64,
-                                      errorBuilder:
-                                          (context, error, stackTrace) =>
-                                              const Center(
-                                        child: Icon(
-                                          Icons.person_outline_rounded,
-                                          size: 34,
-                                          color: Color(0xFF005E73),
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                : const Center(
-                                    child: Icon(
-                                      Icons.person_outline_rounded,
-                                      size: 34,
-                                      color: Color(0xFF005E73),
-                                    ),
-                                  ),
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(5),
-                          decoration: const BoxDecoration(
-                            color: _teal,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.camera_alt,
-                              size: 13, color: Colors.white),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Foto Profil Karyawan',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF0F172A)),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _selectedImageFile != null
-                            ? 'Foto dari file perangkat dipilih'
-                            : _selectedAvatarUrl != null
-                                ? 'Foto avatar profil dipilih'
-                                : 'Belum ada foto yang dipilih',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          color: (_selectedImageFile != null ||
-                                  _selectedAvatarUrl != null)
-                              ? const Color(0xFF059669)
-                              : const Color(0xFF64748B),
-                          fontWeight: (_selectedImageFile != null ||
-                                  _selectedAvatarUrl != null)
-                              ? FontWeight.w600
-                              : FontWeight.normal,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: _showPhotoPickerSheet,
-                            icon: const Icon(Icons.add_a_photo_outlined,
-                                size: 13),
-                            label: Text((_selectedImageFile != null ||
-                                    _selectedAvatarUrl != null)
-                                ? 'Ubah Foto'
-                                : 'Pilih Foto'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF007A87),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 4),
-                              minimumSize: const Size(0, 28),
-                              textStyle: const TextStyle(
-                                  fontSize: 10.5, fontWeight: FontWeight.w700),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                            ),
-                          ),
-                          if (_selectedImageFile != null ||
-                              _selectedAvatarUrl != null) ...[
-                            const SizedBox(width: 8),
-                            InkWell(
-                              onTap: () => setState(() {
-                                _selectedImageFile = null;
-                                _selectedAvatarUrl = null;
-                              }),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFEE2E2),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Text(
-                                  'Hapus',
-                                  style: TextStyle(
-                                      fontSize: 10.5,
-                                      color: Color(0xFFDC2626),
-                                      fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Nama Lengkap (Kosong Bersih)
+          // Nama Lengkap
           _buildFieldLabel('Nama Lengkap Karyawan *'),
           _buildInput(
             controller: _nameController,
-            hint: 'Contoh: Ahmad Fauzi / Dewi Ayu',
+            hint: 'Masukkan nama',
             prefixIcon: Icons.person_outline,
           ),
           const SizedBox(height: 12),
@@ -939,7 +463,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
           _buildFieldLabel('ID Karyawan (Opsional)'),
           _buildInput(
             controller: _nikController,
-            hint: 'Contoh: STF-001 / ID Karyawan',
+            hint: 'Masukkan id',
             prefixIcon: Icons.badge_outlined,
           ),
           const SizedBox(height: 12),
@@ -948,7 +472,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
           _buildFieldLabel('Nomor WhatsApp / HP Aktif'),
           _buildInput(
             controller: _phoneController,
-            hint: 'Contoh: 081234567890',
+            hint: 'Masukkan nomor telepon',
             prefixIcon: Icons.phone_android_outlined,
           ),
           const SizedBox(height: 12),
@@ -1034,9 +558,6 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
             index: 0,
             title: 'Staf (Front Office)',
             dept: 'Departemen Front Desk & Resepsionis',
-            badge: 'Portal FO',
-            badgeBg: const Color(0xFFE0F4FB),
-            badgeFg: const Color(0xFF0284C7),
             desc:
                 'Bertugas melakukan konfirmasi Check-In / Check-Out tamu, alokasi kamar fisik, dan verifikasi e-tiket booking.',
             icon: Icons.desk_rounded,
@@ -1048,46 +569,35 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
             index: 1,
             title: 'Maintenance',
             dept: 'Departemen Engineering & Housekeeping',
-            badge: 'Portal Maintenance',
-            badgeBg: const Color(0xFFEDE9FE),
-            badgeFg: const Color(0xFF7C3AED),
             desc:
                 'Bertugas mengelola kebersihan kamar (Housekeeping), inspeksi sanitasi, dan menindaklanjuti laporan kerusakan fasilitas hotel.',
             icon: Icons.build_circle_outlined,
           ),
           const SizedBox(height: 10),
 
-          // 3. Role Administrator (Hanya via Go Ticket)
+          // 3. Role Administrator (Maksimal 3 akun per hotel)
           _buildRoleOption(
             index: 2,
             title: 'Administrator',
-            dept: 'Wewenang Pihak Go Ticket',
-            badge: 'Via Email Go Ticket',
-            badgeBg: const Color(0xFFFEF3C7),
-            badgeFg: const Color(0xFFB45309),
+            dept: 'Manajemen Hotel & Keuangan (Maks. 3 Akun)',
             desc:
-                'Hanya Super Admin / Pihak Go Ticket yang dapat membuatkan akun Administrator. Klik untuk mengajukan via email.',
+                'Memiliki akses penuh mengelola akun staf, master kamar, tarif, dan laporan keuangan hotel.',
             icon: Icons.admin_panel_settings_outlined,
           ),
           const SizedBox(height: 16),
 
-          // Shift Tugas
+          // Shift Tugas Operasional (4 tombol horizontal sejajar)
           _buildFieldLabel('Shift Tugas Operasional'),
-          _buildInput(
-            controller: _shiftController,
-            hint: 'Contoh: Shift Pagi / Siang / Malam',
-            prefixIcon: Icons.access_time,
-          ),
-          const SizedBox(height: 8),
-
-          // Quick Chips Pilihan Shift
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
+          const SizedBox(height: 4),
+          Row(
             children: [
-              _buildShiftPresetChip('Shift Pagi (07:00 – 15:00 WIB)'),
-              _buildShiftPresetChip('Shift Siang (15:00 – 23:00 WIB)'),
-              _buildShiftPresetChip('Shift Malam (23:00 – 07:00 WIB)'),
+              _buildShiftButton('Pagi', '07-15'),
+              const SizedBox(width: 6),
+              _buildShiftButton('Siang', '15-23'),
+              const SizedBox(width: 6),
+              _buildShiftButton('Malam', '23-07'),
+              const SizedBox(width: 6),
+              _buildShiftButton('Full Time', 'Full'),
             ],
           ),
         ],
@@ -1095,27 +605,56 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
     );
   }
 
-  Widget _buildShiftPresetChip(String shiftText) {
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _shiftController.text = shiftText;
-        });
-      },
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFCBD5E1)),
-        ),
-        child: Text(
-          shiftText,
-          style: const TextStyle(
-            fontSize: 10,
-            color: Color(0xFF334155),
-            fontWeight: FontWeight.w600,
+  Widget _buildShiftButton(String label, String sub) {
+    final isSel = _selectedShift == label;
+    return Expanded(
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _selectedShift = label;
+            _shiftController.text = label;
+          });
+        },
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+          decoration: BoxDecoration(
+            color: isSel ? const Color(0xFFE0F4FB) : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSel ? const Color(0xFF00C2FF) : const Color(0xFFE2E8F0),
+              width: isSel ? 1.5 : 1,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: isSel
+                      ? const Color(0xFF007A87)
+                      : const Color(0xFF334155),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                sub,
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w600,
+                  color: isSel
+                      ? const Color(0xFF0284C7)
+                      : const Color(0xFF94A3B8),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1126,9 +665,6 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
     required int index,
     required String title,
     required String dept,
-    required String badge,
-    required Color badgeBg,
-    required Color badgeFg,
     required String desc,
     required IconData icon,
   }) {
@@ -1163,36 +699,15 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Icon(icon, size: 16, color: const Color(0xFF007A87)),
-                          const SizedBox(width: 6),
-                          Text(
-                            title,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF0F172A),
-                            ),
-                          ),
-                        ],
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: badgeBg,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          badge,
-                          style: TextStyle(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w800,
-                            color: badgeFg,
-                          ),
+                      Icon(icon, size: 16, color: const Color(0xFF007A87)),
+                      const SizedBox(width: 6),
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A),
                         ),
                       ),
                     ],
@@ -1220,186 +735,6 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  /// Card 3: Hak Akses Otomatis Sesuai Role
-  Widget _buildAccessModuleCard() {
-    final roleName = _selectedRole == 0
-        ? 'Staf (Front Office)'
-        : _selectedRole == 1
-            ? 'Maintenance'
-            : 'Administrator';
-
-    return _buildSectionContainer(
-      icon: Icons.shield_outlined,
-      title: 'Hak Akses & Modul Otomatis',
-      subtitle: 'Hak akses disesuaikan secara otomatis sesuai portal $roleName',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0F9FF),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFBAE6FD)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.auto_awesome,
-                    size: 16, color: Color(0xFF0284C7)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Modul aktif otomatis disesuaikan dengan Dashboard $roleName',
-                    style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF0369A1),
-                        fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Tampilkan hak akses khusus role yang dipilih
-          if (_selectedRole == 0) ...[
-            _buildAutoAccessItem(
-              icon: Icons.confirmation_number_outlined,
-              title: 'Verifikasi & Konfirmasi Booking Tamu',
-              desc:
-                  'Meninjau rincian reservasi, verifikasi pembayaran, & penerbitan e-tiket.',
-            ),
-            _buildAutoAccessItem(
-              icon: Icons.meeting_room_outlined,
-              title: 'Eksekusi Check-In & Alokasi Kunci RFID',
-              desc: 'Pencarian kode booking dan registrasi kedatangan tamu.',
-            ),
-            _buildAutoAccessItem(
-              icon: Icons.door_sliding_outlined,
-              title: 'Eksekusi Check-Out & Turnover Kamar',
-              desc:
-                  'Proses kepulangan tamu, pengembalian deposit, & update kamar kotor.',
-            ),
-            _buildAutoAccessItem(
-              icon: Icons.dashboard_outlined,
-              title: 'Ringkasan Okupansi Kamar Harian',
-              desc: 'Monitor rasio kamar terisi dan ketersediaan real-time.',
-            ),
-          ] else if (_selectedRole == 1) ...[
-            _buildAutoAccessItem(
-              icon: Icons.cleaning_services_outlined,
-              title: 'Papan Kebersihan Kamar & Housekeeping',
-              desc:
-                  'Pembaruan status kamar Bersih, Kotor, Sedang Dibersihkan, & Inspeksi.',
-            ),
-            _buildAutoAccessItem(
-              icon: Icons.checklist_rtl_rounded,
-              title: 'Checklist Sanitasi & Standar Amenitas',
-              desc:
-                  'Pemeriksaan sprei, linen, handuk, perlengkapan mandi, & minibar.',
-            ),
-            _buildAutoAccessItem(
-              icon: Icons.build_outlined,
-              title: 'Pencatatan & Laporan Kerusakan Fasilitas',
-              desc:
-                  'Input kendala unit AC, kelistrikan, pipa bocor, & perbaikan inventaris.',
-            ),
-            _buildAutoAccessItem(
-              icon: Icons.history_toggle_off_rounded,
-              title: 'Log Riwayat Perbaikan & Maintenance',
-              desc:
-                  'Dokumentasi tindak lanjut penugasan teknisi dan status perbaikan.',
-            ),
-          ] else ...[
-            _buildAutoAccessItem(
-              icon: Icons.manage_accounts_outlined,
-              title: 'Pengelolaan Akun Karyawan & Staf',
-              desc:
-                  'Pendaftaran akun Staf Front Office, Maintenance, dan pengaturan shift.',
-            ),
-            _buildAutoAccessItem(
-              icon: Icons.hotel_outlined,
-              title: 'Manajemen Kamar, Tarif & Fasilitas',
-              desc:
-                  'Pengaturan tipe kamar, harga sewa per malam, dan inventaris kamar.',
-            ),
-            _buildAutoAccessItem(
-              icon: Icons.account_balance_wallet_outlined,
-              title: 'Laporan Keuangan & Penarikan Dana',
-              desc:
-                  'Monitor saldo pendapatan hotel, buku kas transaksi, & mutasi rekening.',
-            ),
-            _buildAutoAccessItem(
-              icon: Icons.admin_panel_settings_outlined,
-              title: 'Kontrol Penuh Sistem & Akses Hotel',
-              desc:
-                  'Otoritas tertinggi administrasi operasional properti hotel mitra.',
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAutoAccessItem({
-    required IconData icon,
-    required String title,
-    required String desc,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE0F4FB),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Icon(icon, size: 16, color: const Color(0xFF007A87)),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                    ),
-                    const Icon(Icons.check_circle,
-                        size: 14, color: Color(0xFF10B981)),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  desc,
-                  style:
-                      const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1453,7 +788,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
           ),
           _buildInput(
             controller: _idStafController,
-            hint: 'Ketik manual atau klik Buat ID Otomatis',
+            hint: 'Masukkan id petugas',
             prefixIcon: Icons.badge_outlined,
           ),
           const SizedBox(height: 4),
@@ -1473,7 +808,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                 fontWeight: FontWeight.w600,
                 color: Color(0xFF0F172A)),
             decoration: InputDecoration(
-              hintText: 'Minimal 6 karakter kata sandi baru',
+              hintText: 'Masukkan password',
               hintStyle:
                   const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
               prefixIcon:
@@ -1510,7 +845,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
           _buildFieldLabel('Email Akun (Sinkronisasi Auth) *'),
           _buildInput(
             controller: _emailController,
-            hint: 'Contoh: staf.hotel@gmail.com',
+            hint: 'Masukkan email',
             prefixIcon: Icons.alternate_email,
           ),
         ],

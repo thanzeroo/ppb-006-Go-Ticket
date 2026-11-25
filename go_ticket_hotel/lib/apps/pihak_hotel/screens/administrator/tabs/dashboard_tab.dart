@@ -75,9 +75,6 @@ class _AdministratorDashboardTabState
   double get _totalRevenue =>
       _filtered.fold<double>(0, (s, b) => s + (b.totalPrice));
 
-  int get _nightsSold => _filtered.fold<int>(
-      0, (s, b) => s + b.checkOutDate.difference(b.checkInDate).inDays);
-
   double get _avgRating {
     if (_reviews.isEmpty) return 0;
     return _reviews.fold<double>(0, (s, r) => s + r.overallRating) /
@@ -98,7 +95,7 @@ class _AdministratorDashboardTabState
     }
 
     final revenue = _totalRevenue;
-    final nights = _nightsSold;
+    final bookedRooms = _filtered.length;
     final rating = _avgRating;
     final reviewCount = _reviews.length;
 
@@ -168,7 +165,7 @@ class _AdministratorDashboardTabState
 
           const SizedBox(height: 14),
 
-          // ── Card 1: Total Pendapatan ─────────────────────────────────────
+          // ── Card 1: Total Pendapatan Kotor ───────────────────────────────
           _buildCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -178,21 +175,23 @@ class _AdministratorDashboardTabState
                   children: [
                     const Text('Total Pendapatan Kotor',
                         style: TextStyle(
-                            fontSize: 11, color: Color(0xFF64748B))),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF64748B))),
                     Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
                         color: cLight,
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Icon(
                           Icons.account_balance_outlined,
-                          size: 16,
+                          size: 18,
                           color: cDarkActive),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
                   revenue == 0 ? '–' : _fmt(revenue),
                   style: const TextStyle(
@@ -206,7 +205,7 @@ class _AdministratorDashboardTabState
                       ? 'Belum ada booking'
                       : '${_filtered.length} booking tercatat',
                   style: const TextStyle(
-                      fontSize: 10, color: Color(0xFF94A3B8)),
+                      fontSize: 11, color: Color(0xFF94A3B8)),
                 ),
               ],
             ),
@@ -214,118 +213,103 @@ class _AdministratorDashboardTabState
 
           const SizedBox(height: 12),
 
-          // ── Row mini cards ───────────────────────────────────────────────
-          Row(
-            children: [
-              Expanded(
-                child: _buildCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Malam Terjual',
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  color: Color(0xFF64748B))),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                                color: cLight,
-                                borderRadius: BorderRadius.circular(4)),
-                            child: const Icon(Icons.key,
-                                size: 12, color: cDarkActive),
-                          ),
-                        ],
+          // ── Card 2: Total Kamar Dibooking ────────────────────────────────
+          _buildCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Total Kamar Dibooking',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF64748B))),
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: cLight,
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                          nights == 0 ? '–' : '$nights',
-                          style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF0F172A))),
-                      const Text('Nights',
-                          style: TextStyle(
-                              fontSize: 9, color: Color(0xFF64748B))),
-                    ],
-                  ),
+                      child: const Icon(Icons.key_rounded,
+                          size: 18, color: cDarkActive),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _buildCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Kepuasan Tamu',
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  color: Color(0xFF64748B))),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                                color: const Color(0xFFFEF3C7),
-                                borderRadius: BorderRadius.circular(4)),
-                            child: const Icon(Icons.star,
-                                size: 12, color: Color(0xFFD97706)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                          rating == 0
-                              ? '–'
-                              : rating.toStringAsFixed(1),
-                          style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF0F172A))),
-                      const Text('/ 5.0',
-                          style: TextStyle(
-                              fontSize: 9, color: Color(0xFF64748B))),
-                      const SizedBox(height: 2),
-                      Text(
-                          reviewCount == 0
-                              ? 'Belum ada ulasan'
-                              : '$reviewCount ulasan terverifikasi',
-                          style: const TextStyle(
-                              fontSize: 8, color: Color(0xFF94A3B8))),
-                    ],
-                  ),
+                const SizedBox(height: 6),
+                Text(
+                  bookedRooms == 0 ? '–' : '$bookedRooms',
+                  style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A)),
                 ),
-              ),
-            ],
+                const SizedBox(height: 4),
+                Text(
+                  bookedRooms == 0
+                      ? 'Belum ada kamar dibooking'
+                      : 'Kamar terpesan pada periode ini',
+                  style: const TextStyle(
+                      fontSize: 11, color: Color(0xFF94A3B8)),
+                ),
+              ],
+            ),
           ),
 
           const SizedBox(height: 12),
 
-          // ── Info Banner ──────────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: cLight,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: cLightActive),
-            ),
-            child: const Row(
+          // ── Card 3: Kepuasan Tamu ────────────────────────────────────────
+          _buildCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.info_outline, color: cDarkActive, size: 18),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Tarik ke bawah untuk memperbarui data.',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: cDarker),
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Kepuasan Tamu',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF64748B))),
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.star_rounded,
+                          size: 18, color: Color(0xFFD97706)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      rating == 0 ? '–' : rating.toStringAsFixed(1),
+                      style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A)),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text('/ 5.0',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF64748B))),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  reviewCount == 0
+                      ? 'Belum ada ulasan'
+                      : '$reviewCount ulasan terverifikasi',
+                  style: const TextStyle(
+                      fontSize: 11, color: Color(0xFF94A3B8)),
                 ),
               ],
             ),

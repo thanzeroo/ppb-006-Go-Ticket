@@ -389,20 +389,15 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
           CircleAvatar(
             radius: 26,
             backgroundColor: const Color(0xFFE0F4FB),
-            backgroundImage: widget.staff?.avatarUrl.isNotEmpty == true
-                ? NetworkImage(widget.staff!.avatarUrl)
-                : null,
-            child: (widget.staff?.avatarUrl.isEmpty ?? true)
-                ? Text(
-                    _nameController.text.isNotEmpty
-                        ? _nameController.text[0].toUpperCase()
-                        : 'S',
-                    style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: _teal),
-                  )
-                : null,
+            child: Text(
+              _nameController.text.isNotEmpty
+                  ? _nameController.text[0].toUpperCase()
+                  : 'S',
+              style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: _teal),
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -497,17 +492,17 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildFieldLabel('Nama Lengkap Karyawan *'),
-          _buildInput(controller: _nameController, hint: 'Nama Lengkap'),
+          _buildInput(controller: _nameController, hint: 'Masukkan nama'),
           const SizedBox(height: 12),
           _buildFieldLabel('ID Karyawan (Opsional)'),
-          _buildInput(controller: _nikController, hint: 'Contoh: STF-001 / ID Karyawan'),
+          _buildInput(controller: _nikController, hint: 'Masukkan id'),
           const SizedBox(height: 12),
           _buildFieldLabel('Nomor WhatsApp / HP Aktif'),
-          _buildInput(controller: _phoneController, hint: '081234567890'),
+          _buildInput(controller: _phoneController, hint: 'Masukkan nomor telepon'),
           const SizedBox(height: 12),
           _buildFieldLabel('Email Akun Login'),
           _buildInput(
-              controller: _emailController, hint: 'email.karyawan@hotel.com'),
+              controller: _emailController, hint: 'Masukkan email'),
         ],
       ),
     );
@@ -622,20 +617,16 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildFieldLabel('Shift Tugas Operasional'),
-          _buildInput(
-            controller: _shiftController,
-            hint: 'Shift Pagi / Siang / Malam',
-          ),
-          const SizedBox(height: 8),
-
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
+          const SizedBox(height: 6),
+          Row(
             children: [
-              _buildShiftChip('Shift Pagi (07:00 – 15:00 WIB)'),
-              _buildShiftChip('Shift Siang (15:00 – 23:00 WIB)'),
-              _buildShiftChip('Shift Malam (23:00 – 07:00 WIB)'),
-              _buildShiftChip('Normal Shift (08:00 – 17:00 WIB)'),
+              _buildShiftHorizButton('Pagi', '07-15'),
+              const SizedBox(width: 6),
+              _buildShiftHorizButton('Siang', '15-23'),
+              const SizedBox(width: 6),
+              _buildShiftHorizButton('Malam', '23-07'),
+              const SizedBox(width: 6),
+              _buildShiftHorizButton('Full Time', 'Full'),
             ],
           ),
           const SizedBox(height: 14),
@@ -694,23 +685,54 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
     );
   }
 
-  Widget _buildShiftChip(String label) {
-    return InkWell(
-      onTap: () => setState(() => _shiftController.text = label),
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFCBD5E1)),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF334155)),
+  Widget _buildShiftHorizButton(String label, String sub) {
+    final current = _shiftController.text.toLowerCase();
+    final isSel = current == label.toLowerCase() ||
+        current.contains(label.toLowerCase());
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _shiftController.text = label),
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+          decoration: BoxDecoration(
+            color: isSel ? const Color(0xFFE0F4FB) : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSel ? const Color(0xFF00C2FF) : const Color(0xFFE2E8F0),
+              width: isSel ? 1.5 : 1,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: isSel
+                      ? const Color(0xFF007A87)
+                      : const Color(0xFF334155),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                sub,
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w600,
+                  color: isSel
+                      ? const Color(0xFF0284C7)
+                      : const Color(0xFF94A3B8),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
