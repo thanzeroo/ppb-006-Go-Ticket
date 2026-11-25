@@ -69,10 +69,10 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
   @override
   Widget build(BuildContext context) {
     final messages = TikoChatService.instance.history;
-    final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
 
     return Scaffold(
       backgroundColor: _bgColor,
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: _tikoPrimary,
         foregroundColor: Colors.white,
@@ -176,84 +176,111 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
                   ),
           ),
 
-          // Input area
+          // Input area yang rapi dan responsif terhadap keyboard
           Container(
-            padding: EdgeInsets.only(
-              left: 16,
-              right: 8,
-              top: 10,
-              bottom: 10 + bottomPadding,
-            ),
             decoration: BoxDecoration(
               color: Colors.white,
+              border: const Border(
+                top: BorderSide(color: Color(0xFFE2E8F0)),
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 8,
                   offset: const Offset(0, -2),
                 ),
               ],
             ),
             child: SafeArea(
               top: false,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      constraints: const BoxConstraints(maxHeight: 120),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: TextField(
-                        controller: _messageController,
-                        focusNode: _focusNode,
-                        maxLines: null,
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (_) => _sendMessage(),
-                        decoration: const InputDecoration(
-                          hintText: 'Ketik pesan ke Tiko...',
-                          hintStyle: TextStyle(
-                            color: Color(0xFF94A3B8),
-                            fontSize: 14,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 120),
+                        child: TextField(
+                          controller: _messageController,
+                          focusNode: _focusNode,
+                          minLines: 1,
+                          maxLines: 4,
+                          textAlignVertical: TextAlignVertical.center,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => _sendMessage(),
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            color: Color(0xFF0F172A),
+                            height: 1.35,
                           ),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 18,
-                            vertical: 10,
+                          decoration: InputDecoration(
+                            hintText: 'Masukkan pertanyaan seputar hotel...',
+                            hintStyle: const TextStyle(
+                              color: Color(0xFF94A3B8),
+                              fontSize: 13,
+                            ),
+                            filled: true,
+                            fillColor: const Color(0xFFF8FAFC),
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 11,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: const BorderSide(
+                                color: _tikoPrimary,
+                                width: 1.4,
+                              ),
+                            ),
                           ),
                         ),
-                        style: const TextStyle(fontSize: 14),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: _isLoading
-                          ? const Color(0xFF94A3B8)
-                          : _tikoPrimary,
-                      shape: BoxShape.circle,
+                    const SizedBox(width: 8),
+                    Material(
+                      color: _isLoading ? const Color(0xFF94A3B8) : _tikoPrimary,
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: _isLoading ? null : _sendMessage,
+                        child: SizedBox(
+                          width: 42,
+                          height: 42,
+                          child: Center(
+                            child: _isLoading
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.send_rounded,
+                                    color: Colors.white,
+                                    size: 19,
+                                  ),
+                          ),
+                        ),
+                      ),
                     ),
-                    child: IconButton(
-                      icon: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.send_rounded,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                      onPressed: _isLoading ? null : _sendMessage,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

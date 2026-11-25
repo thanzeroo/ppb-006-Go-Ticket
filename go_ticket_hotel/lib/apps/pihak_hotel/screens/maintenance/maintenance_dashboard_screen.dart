@@ -88,110 +88,57 @@ class _MaintenanceDashboardScreenState
   Widget _buildTopAppBar() {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              Image.asset(
-                'assets/logo.png',
-                height: 28,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) => const Icon(
-                  Icons.confirmation_number_outlined,
-                  color: Color(0xFF00B4D8),
-                  size: 26,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Go Ticket Maintenance',
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0F172A),
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      const Text(
-                        'The Grand Amora Resort • ',
-                        style:
-                            TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                      ),
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF00C2FF),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Text(
-                        'On-Duty: 6 Staf',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF0284C7),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
+          Image.asset(
+            'assets/logo.png',
+            height: 30,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) => const Icon(
+              Icons.confirmation_number_outlined,
+              color: Color(0xFF00B4D8),
+              size: 26,
+            ),
           ),
-          Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF0A5868),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.person, color: Colors.white, size: 18),
+          const SizedBox(width: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE0F4FB),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFBAE6FD)),
+            ),
+            child: const Text(
+              'Maintenance',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF00758F),
               ),
-              const SizedBox(width: 8),
-              // Tombol Logout Merah
-              Tooltip(
-                message: 'Keluar / Logout',
-                child: InkWell(
-                  onTap: _handleLogout,
+            ),
+          ),
+          const Spacer(),
+          // Tombol Logout Merah (Hanya Icon)
+          Tooltip(
+            message: 'Keluar',
+            child: InkWell(
+              onTap: _handleLogout,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEE2E2),
                   borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFEE2E2),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFFCA5A5)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.logout_rounded,
-                            color: Color(0xFFDC2626), size: 16),
-                        SizedBox(width: 4),
-                        Text(
-                          'Logout',
-                          style: TextStyle(
-                            color: Color(0xFFDC2626),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  border: Border.all(color: const Color(0xFFFCA5A5)),
+                ),
+                child: const Icon(
+                  Icons.logout_rounded,
+                  color: Color(0xFFDC2626),
+                  size: 18,
                 ),
               ),
-            ],
+            ),
           ),
         ],
       ),

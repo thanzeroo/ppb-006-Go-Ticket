@@ -27,6 +27,7 @@ class _FoCheckOutTabState extends State<FoCheckOutTab> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   List<BookingModel> _activeGuests = [];
+  List<BookingModel> _checkedOutDb = [];
   bool _isLoading = true;
   int _currentPage = 1;
 
@@ -52,11 +53,16 @@ class _FoCheckOutTabState extends State<FoCheckOutTab> {
     setState(() => _isLoading = true);
     final hotelId = AuthService.instance.currentUser?.managedHotelId ?? '1';
     try {
-      final list = await BookingService.instance
-          .getHotelBookings(hotelId, status: BookingStatus.checkedIn);
+      final results = await Future.wait([
+        BookingService.instance
+            .getHotelBookings(hotelId, status: BookingStatus.checkedIn),
+        BookingService.instance
+            .getHotelBookings(hotelId, status: BookingStatus.checkedOut),
+      ]);
       if (mounted) {
         setState(() {
-          _activeGuests = list;
+          _activeGuests = results[0];
+          _checkedOutDb = results[1];
           _isLoading = false;
         });
       }
@@ -64,6 +70,7 @@ class _FoCheckOutTabState extends State<FoCheckOutTab> {
       if (mounted) {
         setState(() {
           _activeGuests = [];
+          _checkedOutDb = [];
           _isLoading = false;
         });
       }
@@ -112,8 +119,35 @@ class _FoCheckOutTabState extends State<FoCheckOutTab> {
     _loadData();
   }
 
+  List<CheckoutRecord> get _allRealHistory {
+    final storeHistory = HotelOperationsStore.instance.checkoutHistory;
+    final seenBookingIds = storeHistory.map((e) => e.bookingId).toSet();
+    final combined = <CheckoutRecord>[...storeHistory];
+
+    for (final b in _checkedOutDb) {
+      if (!seenBookingIds.contains(b.id)) {
+        combined.add(CheckoutRecord(
+          id: 'db-${b.id}',
+          bookingId: b.id,
+          bookingCode: b.bookingCode,
+          guestName: b.customerName,
+          guestPhone: b.customerPhone,
+          roomNumber: b.roomTypeName,
+          floorNumber: 1,
+          roomTypeName: b.roomTypeName,
+          checkInDate: b.checkInDate,
+          scheduledCheckOutDate: b.checkOutDate,
+          actualCheckOutDate: b.checkOutDate,
+          type: CheckoutType.normal,
+          processedBy: 'Front Office',
+        ));
+      }
+    }
+    return combined;
+  }
+
   List<CheckoutRecord> get _filteredHistory {
-    final list = HotelOperationsStore.instance.checkoutHistory;
+    final list = _allRealHistory;
     final q = _searchQuery.trim().toLowerCase();
 
     return list.where((rec) {
@@ -133,7 +167,7 @@ class _FoCheckOutTabState extends State<FoCheckOutTab> {
   @override
   Widget build(BuildContext context) {
     final store = HotelOperationsStore.instance;
-    final allHistory = store.checkoutHistory;
+    final allHistory = _allRealHistory;
     final normalCount = allHistory.where((r) => r.type == CheckoutType.normal).length;
     final earlyCount = allHistory.where((r) => r.type == CheckoutType.early).length;
     final forcedCount = allHistory.where((r) => r.type == CheckoutType.forcedExpulsion).length;
@@ -156,39 +190,6 @@ class _FoCheckOutTabState extends State<FoCheckOutTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Subheader
-            Row(
-              children: const [
-                Icon(Icons.meeting_room_outlined, size: 15, color: Color(0xFF0284C7)),
-                SizedBox(width: 6),
-                Text(
-                  'TERMINAL CHECK-OUT & HISTORI',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0284C7),
-                    letterSpacing: 0.8,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Histori & Proses Check-Out',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF0F172A),
-                letterSpacing: -0.4,
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Pencatatan tamu yang selesai normal, check-out lebih cepat, maupun yang dikeluarkan paksa karena pelanggaran.',
-              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-            ),
-            const SizedBox(height: 14),
-
             // Section 1: Antrean Tamu yang Durasinya Habis Hari Ini (Belum Perpanjangan)
             if (dueTodayGuests.isNotEmpty) ...[
               Container(

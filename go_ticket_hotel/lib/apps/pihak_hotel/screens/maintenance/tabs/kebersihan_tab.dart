@@ -1,11 +1,14 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 import 'package:go_ticket_hotel/core/widgets/app_pagination_bar.dart';
+import '../../../../../core/config/supabase_config.dart';
 import '../../../../../core/models/maintenance_ticket_model.dart';
+import '../../../../../core/services/auth_service.dart';
 import '../../../../../core/services/maintenance_service.dart';
 import '../../../services/hotel_operations_store.dart';
 import '../widgets/form_cek_kebersihan_sheet.dart';
-import '../widgets/lapor_kerusakan_sheet.dart';
 
 /// Tab 2: Papan Kebersihan Kamar & Checklist Housekeeping
 /// Sesuai instruksi:
@@ -42,12 +45,261 @@ class _KebersihanTabState extends State<KebersihanTab> {
     if (mounted) setState(() {});
   }
 
+  List<CleaningTaskItem> _dbCleaningTasks = [];
+
   Future<void> _loadData() async {
     try {
-      await MaintenanceService.instance.getTickets(
-        category: TicketCategory.cleaning,
-      );
+      final hotelId = AuthService.instance.currentUser?.managedHotelId ?? '1';
+      final svcKey = SupabaseConfig.supabaseServiceRoleKey.isNotEmpty
+          ? SupabaseConfig.supabaseServiceRoleKey
+          : SupabaseConfig.activeApiKey;
+
+      final results = await Future.wait([
+        MaintenanceService.instance.getTickets(category: TicketCategory.cleaning),
+        http.get(
+          Uri.parse(
+              '${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableKamar}?id_penginapan=eq.$hotelId&select=*,tipe_kamar(nama_tipe)&order=nomor_kamar.asc'),
+          headers: {
+            'apikey': svcKey,
+            'Authorization': 'Bearer $svcKey',
+          },
+        ),
+      ]);
+
+      final kamarResp = results[1] as http.Response;
+      final List<CleaningTaskItem> synced = [];
+      if (kamarResp.statusCode == 200) {
+        final List<dynamic> rooms = jsonDecode(kamarResp.body);
+        for (final r in rooms) {
+          final status = (r['status_kamar'] ?? '').toString().toLowerCase();
+          // Abaikan kamar yang rusak; fokus pada kamar kotor/proses/bersih
+          if (status.contains('rusak') || status.contains('maint')) continue;
+          if (status.contains('kotor') ||
+              status.contains('dirty') ||
+              status.contains('bersih') ||
+              status.contains('clean')) {
+            final roomNo = (r['nomor_kamar'] ?? r['id_kamar']).toString();
+            final floor = int.tryParse((r['lantai'] ?? '1').toString()) ?? 1;
+            final tipeMap = r['tipe_kamar'];
+            final tipeName = tipeMap is Map
+                ? (tipeMap['nama_tipe'] ?? 'Kamar').toString()
+                : 'Kamar';
+            final isCleaning =
+                status.contains('proses') || status.contains('sedang');
+            synced.add(CleaningTaskItem(
+              id: 'DB-${r['id_kamar']}',
+              roomNumber: roomNo,
+              floorNumber: floor,
+              roomTypeName: tipeName,
+              checkoutTime: DateTime.now(),
+              checkoutType: CheckoutType.normal,
+              isCleaning: isCleaning,
+              isCleaned: false,
+            ));
+          }
+        }
+      }
+      if (mounted) {
+        setState(() => _dbCleaningTasks = synced);
+      }
     } catch (_) {}
+  }
+
+  /// Modal Laporan Kebersihan Kamar (pengganti Lapor Kerusakan di tab Kebersihan)
+  void _showLaporanKebersihanModal() {
+    final roomCtrl = TextEditingController();
+    final notesCtrl = TextEditingController();
+    String statusKebersihan = 'Selesai Dibersihkan (Siap Huni)';
+    bool isSaving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Container(
+          padding: EdgeInsets.only(
+            left: 18,
+            right: 18,
+            top: 16,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Laporan Kebersihan Kamar',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: roomCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Nomor Kamar *',
+                    hintText: 'Masukkan nomor kamar (contoh: 102)',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: statusKebersihan,
+                  decoration: InputDecoration(
+                    labelText: 'Status Kebersihan',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'Selesai Dibersihkan (Siap Huni)',
+                      child: Text('Selesai Dibersihkan (Siap Huni)',
+                          style: TextStyle(fontSize: 12.5)),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Sedang Dibersihkan',
+                      child: Text('Sedang Dibersihkan',
+                          style: TextStyle(fontSize: 12.5)),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Perlu Pembersihan Ulang',
+                      child: Text('Perlu Pembersihan Ulang',
+                          style: TextStyle(fontSize: 12.5)),
+                    ),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) {
+                      setSheetState(() => statusKebersihan = v);
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: notesCtrl,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: 'Catatan Kebersihan & Sanitasi',
+                    hintText: 'Masukkan catatan kondisi kebersihan kamar',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: ElevatedButton.icon(
+                    onPressed: isSaving
+                        ? null
+                        : () async {
+                            final roomNo = roomCtrl.text.trim();
+                            if (roomNo.isEmpty) {
+                              _showActionSnackbar('Nomor kamar wajib diisi.');
+                              return;
+                            }
+                            setSheetState(() => isSaving = true);
+                            try {
+                              final svcKey = SupabaseConfig
+                                      .supabaseServiceRoleKey.isNotEmpty
+                                  ? SupabaseConfig.supabaseServiceRoleKey
+                                  : SupabaseConfig.activeApiKey;
+                              final hotelId = AuthService
+                                      .instance.currentUser?.managedHotelId ??
+                                  '1';
+                              final staffId =
+                                  AuthService.instance.currentUser?.id ??
+                                      'MTC';
+
+                              await http.post(
+                                Uri.parse(
+                                    '${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableLaporanKebersihan}'),
+                                headers: {
+                                  'apikey': svcKey,
+                                  'Authorization': 'Bearer $svcKey',
+                                  'Content-Type': 'application/json',
+                                  'Prefer': 'return=minimal',
+                                },
+                                body: jsonEncode({
+                                  'id_kamar': roomNo,
+                                  'id_staf': staffId,
+                                  'status_kebersihan': statusKebersihan,
+                                  'catatan_sanitasi': notesCtrl.text.trim(),
+                                  'tgl_tugas': DateTime.now().toIso8601String(),
+                                }),
+                              );
+
+                              // Update status kamar jika sudah selesai dibersihkan
+                              if (statusKebersihan.contains('Selesai')) {
+                                await http.patch(
+                                  Uri.parse(
+                                      '${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableKamar}?id_penginapan=eq.$hotelId&nomor_kamar=eq.$roomNo'),
+                                  headers: {
+                                    'apikey': svcKey,
+                                    'Authorization': 'Bearer $svcKey',
+                                    'Content-Type': 'application/json',
+                                  },
+                                  body: jsonEncode({'status_kamar': 'Tersedia'}),
+                                );
+                              }
+
+                              if (!ctx.mounted) return;
+                              Navigator.pop(ctx);
+                              _showActionSnackbar(
+                                  'Laporan kebersihan Kamar $roomNo berhasil dikirim!');
+                              _loadData();
+                            } catch (e) {
+                              setSheetState(() => isSaving = false);
+                              _showActionSnackbar('Gagal mengirim laporan: $e');
+                            }
+                          },
+                    icon: isSaving
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.cleaning_services_rounded, size: 18),
+                    label: const Text('Kirim Laporan Kebersihan',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00758F),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _showActionSnackbar(String message) {
@@ -63,7 +315,11 @@ class _KebersihanTabState extends State<KebersihanTab> {
 
   List<CleaningTaskItem> get _filteredTasks {
     final store = HotelOperationsStore.instance;
-    final allQueue = store.cleaningQueue;
+    final seenRooms = store.cleaningQueue.map((e) => e.roomNumber).toSet();
+    final allQueue = [
+      ...store.cleaningQueue,
+      ..._dbCleaningTasks.where((d) => !seenRooms.contains(d.roomNumber)),
+    ];
     final allCleaned = store.cleanedHistory;
 
     List<CleaningTaskItem> combined = [];
@@ -108,39 +364,6 @@ class _KebersihanTabState extends State<KebersihanTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Subheader
-            Row(
-              children: const [
-                Icon(Icons.cleaning_services_rounded, size: 15, color: Color(0xFF0284C7)),
-                SizedBox(width: 6),
-                Text(
-                  'DIVISI HOUSEKEEPING & SANITASI',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0284C7),
-                    letterSpacing: 0.8,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Papan Kebersihan Kamar Hotel',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF0F172A),
-                letterSpacing: -0.4,
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Daftar kamar yang baru saja check-out lengkap beserta informasi lantai untuk segera dibersihkan & disanitasi.',
-              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-            ),
-            const SizedBox(height: 14),
-
             // Horizontal Filter Lantai
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -266,15 +489,15 @@ class _KebersihanTabState extends State<KebersihanTab> {
 
             const SizedBox(height: 16),
 
-            // Tombol + Lapor Kerusakan Fasilitas (jika ditemukan kerusakan saat bersih-bersih)
+            // Tombol + Laporan Kebersihan Kamar
             SizedBox(
               width: double.infinity,
               height: 44,
               child: ElevatedButton.icon(
-                onPressed: () => showLaporKerusakanModal(context),
-                icon: const Icon(Icons.build_circle_outlined, color: Colors.white, size: 18),
+                onPressed: _showLaporanKebersihanModal,
+                icon: const Icon(Icons.cleaning_services_rounded, color: Colors.white, size: 18),
                 label: const Text(
-                  '+ Lapor Temuan Kerusakan Kamar',
+                  '+ Laporan Kebersihan',
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white),
                 ),
                 style: ElevatedButton.styleFrom(

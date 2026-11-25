@@ -6,7 +6,6 @@ import '../../../../../core/services/auth_service.dart';
 import '../../../../../core/services/booking_service.dart';
 import '../../../../../core/utils/currency_formatter.dart';
 import '../../../services/hotel_operations_store.dart';
-import '../widgets/fo_barcode_scanner_modal.dart';
 
 /// Tab 3: Check-In Tamu Front Office
 /// Menampilkan:
@@ -24,7 +23,6 @@ class FoCheckInTab extends StatefulWidget {
 
 class _FoCheckInTabState extends State<FoCheckInTab> {
   final TextEditingController _checkInSearchController = TextEditingController();
-  List<BookingModel> _allBookings = [];
   List<BookingModel> _checkedInGuests = [];
   bool _isLoading = true;
   String _searchQuery = '';
@@ -55,7 +53,6 @@ class _FoCheckInTabState extends State<FoCheckInTab> {
       final list = await BookingService.instance.getHotelBookings(hotelId);
       if (mounted) {
         setState(() {
-          _allBookings = list;
           _checkedInGuests = list.where((b) => b.status == BookingStatus.checkedIn).toList();
           _isLoading = false;
         });
@@ -63,7 +60,6 @@ class _FoCheckInTabState extends State<FoCheckInTab> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _allBookings = [];
           _checkedInGuests = [];
           _isLoading = false;
         });
@@ -80,17 +76,6 @@ class _FoCheckInTabState extends State<FoCheckInTab> {
         duration: const Duration(seconds: 2),
       ),
     );
-  }
-
-  /// Buka modal scanner kamera
-  Future<void> _openCameraScanner() async {
-    final res = await FoBarcodeScannerModal.show(
-      context,
-      availableBookings: _allBookings,
-    );
-    if (res != null) {
-      _loadData();
-    }
   }
 
   /// -------------------------------------------------------------------------
@@ -845,97 +830,6 @@ class _FoCheckInTabState extends State<FoCheckInTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Subheader
-            Row(
-              children: const [
-                Icon(Icons.vpn_key_outlined, size: 15, color: Color(0xFF0284C7)),
-                SizedBox(width: 6),
-                Text(
-                  'KONTER CHECK-IN & TAMU AKTIF',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0284C7),
-                    letterSpacing: 0.8,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Manajemen Check-in Hotel',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF0F172A),
-                letterSpacing: -0.4,
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Validasi e-tiket tamu baru, monitor tamu yang sedang menginap, serta kelola perpanjangan & check-out.',
-              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-            ),
-            const SizedBox(height: 14),
-
-            // Banner Aksi Cepat Scan Barcode Kamera E-Tiket
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF00758F), Color(0xFF00C2FF)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.qr_code_scanner_rounded, color: Colors.white, size: 26),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          'Scan Barcode / QR E-Tiket',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Buka kamera langsung untuk check-in instan',
-                          style: TextStyle(fontSize: 11, color: Colors.white70),
-                        ),
-                      ],
-                    ),
-                  ),
-                  ElevatedButton(
-                    onPressed: _openCameraScanner,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF00758F),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    ),
-                    child: const Text('Buka Kamera', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
             // Search Bar
             Container(
               height: 44,

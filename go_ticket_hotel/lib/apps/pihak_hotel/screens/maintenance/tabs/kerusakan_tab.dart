@@ -116,34 +116,6 @@ class _KerusakanTabState extends State<KerusakanTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Subheader: LIVE MAINTENANCE HUB
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(width: 7, height: 7, decoration: const BoxDecoration(color: Color(0xFF00C2FF), shape: BoxShape.circle)),
-                    const SizedBox(width: 6),
-                    const Text('LIVE MAINTENANCE HUB', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF0284C7), letterSpacing: 0.8)),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEEF2FE),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Text('Shift Aktif', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF1E40AF))),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Tiket Kerusakan & Pemeliharaan',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0F172A), letterSpacing: -0.4),
-            ),
-            const SizedBox(height: 14),
-
             // 3 Ringkasan Kotak (Dinamis dari DB)
             Row(
               children: [
