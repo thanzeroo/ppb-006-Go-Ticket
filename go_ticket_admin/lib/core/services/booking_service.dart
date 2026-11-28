@@ -54,9 +54,9 @@ class BookingService {
         }
 
         final row = <String, dynamic>{
-          if (userIdNum != null) 'id_user': userIdNum,
-          if (hotelIdNum != null) 'id_penginapan': hotelIdNum,
-          if (validRoomTypeId != null) 'id_tipe_kamar': validRoomTypeId,
+          'id_user': ?userIdNum,
+          'id_penginapan': ?hotelIdNum,
+          'id_tipe_kamar': ?validRoomTypeId,
           'kode_booking': booking.bookingCode,
           'tgl_booking': DateTime.now().toIso8601String(),
           'tgl_checkin':

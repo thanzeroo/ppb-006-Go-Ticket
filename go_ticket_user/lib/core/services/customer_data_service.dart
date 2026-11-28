@@ -15,18 +15,11 @@ class CustomerDataService {
   CustomerDataService._();
   static final CustomerDataService instance = CustomerDataService._();
 
-  static const String demoUserId = 'usr-customer-01';
-
-  /// Cek apakah pengguna saat ini adalah pengguna baru / fresh account
-  bool get isFreshUser {
-    final user = AuthService.instance.currentUser;
-    if (user == null) return false;
-    return user.id != demoUserId && !user.id.contains('demo');
-  }
 
   // ---------------------------------------------------------------------------
   // POIN & MEMBERSHIP TIER
   // ---------------------------------------------------------------------------
+  /// Mengambil saldo poin loyalitas pelanggan dari tabel `users` (default `0`).
   Future<int> getRewardPoints() async {
     final user = AuthService.instance.currentUser;
     if (user == null) return 0;
@@ -52,10 +45,10 @@ class CustomerDataService {
       }
     }
 
-    if (isFreshUser) return 0;
-    return 1250;
+    return 0;
   }
 
+  /// Mengambil tingkat membership pelanggan aktif (default `MEMBER BRONZE GO TICKET`).
   Future<String> getMembershipTier() async {
     final user = AuthService.instance.currentUser;
     if (user == null) return 'MEMBER BRONZE GO TICKET';
@@ -82,8 +75,7 @@ class CustomerDataService {
       }
     }
 
-    if (isFreshUser) return 'MEMBER BRONZE GO TICKET';
-    return 'MEMBER PLATINUM GO TICKET';
+    return 'MEMBER BRONZE GO TICKET';
   }
 
   // ---------------------------------------------------------------------------
@@ -92,6 +84,7 @@ class CustomerDataService {
   static final ValueNotifier<int> savedHotelsCountNotifier =
       ValueNotifier<int>(0);
 
+  /// Mengambil daftar hotel favorit pelanggan dari Supabase dengan fallback cache lokal.
   Future<List<Map<String, dynamic>>> getSavedHotels() async {
     final user = AuthService.instance.currentUser;
     if (user == null) return [];
@@ -172,6 +165,7 @@ class CustomerDataService {
     return [];
   }
 
+  /// Menambah atau menghapus hotel dari daftar favorit pelanggan (`true` = tersimpan).
   Future<bool> toggleSavedHotel(Map<String, dynamic> hotel) async {
     final user = AuthService.instance.currentUser;
     if (user == null) return false;
@@ -242,6 +236,7 @@ class CustomerDataService {
     return isSavedNow;
   }
 
+  /// Mengecek apakah hotel dengan [hotelIdOrName] sudah ada di daftar favorit.
   Future<bool> isHotelSaved(String hotelIdOrName) async {
     final list = await getSavedHotels();
     return list.any((h) =>
@@ -252,6 +247,7 @@ class CustomerDataService {
   // ---------------------------------------------------------------------------
   // DATA TAMU TERSIMPAN (SAVED GUESTS) PER USER — Supabase Cloud CRUD
   // ---------------------------------------------------------------------------
+  /// Mengambil daftar profil tamu tersimpan milik pelanggan dari Supabase / cache lokal.
   Future<List<Map<String, dynamic>>> getSavedGuests() async {
     final user = AuthService.instance.currentUser;
     if (user == null) return [];
@@ -311,6 +307,7 @@ class CustomerDataService {
     return [];
   }
 
+  /// Menambahkan profil tamu tersimpan baru ke tabel `saved_guests` Supabase.
   Future<Map<String, dynamic>?> addSavedGuest({
     required String name,
     String? nik,
@@ -359,6 +356,7 @@ class CustomerDataService {
     return null;
   }
 
+  /// Memperbarui data profil tamu tersimpan berdasarkan [guestId].
   Future<bool> updateSavedGuest({
     required int guestId,
     required String name,
@@ -396,6 +394,7 @@ class CustomerDataService {
     return false;
   }
 
+  /// Menghapus profil tamu tersimpan berdasarkan [guestId].
   Future<bool> deleteSavedGuest(int guestId) async {
     final sb = SupabaseService.instance;
     if (sb.isReady && sb.client != null) {

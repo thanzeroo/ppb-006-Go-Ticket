@@ -7,6 +7,7 @@ import '../config/supabase_config.dart';
 import '../models/review_model.dart';
 import 'supabase_service.dart';
 
+/// Service singleton pengelola ulasan dan rating bintang hotel pada tabel `ulasan` Supabase.
 class ReviewService {
   ReviewService._();
   static final ReviewService instance = ReviewService._();

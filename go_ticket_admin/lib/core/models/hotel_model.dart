@@ -9,6 +9,9 @@
 // - Rating dan jumlah review
 // =============================================================================
 
+import '../config/supabase_config.dart';
+import '../constants/app_constants.dart';
+
 /// Enum status hotel di platform Go Ticket
 enum HotelStatus {
   /// Hotel baru mendaftar, menunggu persetujuan Super Admin
@@ -183,14 +186,14 @@ class HotelModel {
     this.adminUserId,
     int? startingPrice,
     int? pricePerNight,
-    int? originalPrice,
-    int? starRating,
-    bool? isRecommended,
-    bool? isPopular,
-    String? whatsapp,
-    String? checkInTime,
-    String? checkOutTime,
-    String? cancellationPolicy,
+    this._originalPrice,
+    this._starRating,
+    this._isRecommended,
+    this._isPopular,
+    this._whatsapp,
+    this._checkInTime,
+    this._checkOutTime,
+    this._cancellationPolicy,
     this.generatedAdminEmail,
     this.generatedAdminPassword,
     this.generatedAdminStaffId,
@@ -199,15 +202,7 @@ class HotelModel {
     this.approvedAt,
   })  : mainImageUrl = mainImageUrl ?? thumbnailUrl,
         imageUrls = photoUrls ?? imageUrls,
-        startingPrice = startingPrice ?? pricePerNight,
-        _originalPrice = originalPrice,
-        _starRating = starRating,
-        _isRecommended = isRecommended,
-        _isPopular = isPopular,
-        _whatsapp = whatsapp,
-        _checkInTime = checkInTime,
-        _checkOutTime = checkOutTime,
-        _cancellationPolicy = cancellationPolicy;
+        startingPrice = startingPrice ?? pricePerNight;
 
   // ---------------------------------------------------------------------------
   // CONVENIENCE GETTERS
@@ -221,11 +216,11 @@ class HotelModel {
 
   /// Mendapatkan gambar utama atau placeholder
   String get displayImage =>
-      mainImageUrl ?? 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600';
+      mainImageUrl ?? AppConstants.placeholderHotelImage;
 
   int get pricePerNight {
     final price = startingPrice;
-    return price == null || price <= 0 ? 350000 : price;
+    return price == null || price <= 0 ? AppConstants.defaultHotelFallbackPrice : price;
   }
   int? get originalPrice => _originalPrice;
   String? get thumbnailUrl => mainImageUrl;
@@ -269,7 +264,7 @@ class HotelModel {
 
   static String resolvePhotoUrl(String? nameOrUrl) {
     if (nameOrUrl == null || nameOrUrl.trim().isEmpty) {
-      return 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800';
+      return AppConstants.placeholderHotelImage;
     }
     final trimmed = nameOrUrl.trim();
     if (trimmed.startsWith('http://') ||
@@ -278,7 +273,11 @@ class HotelModel {
         trimmed.startsWith('/')) {
       return trimmed;
     }
-    return 'https://yujbnwaapualgliixsmm.supabase.co/storage/v1/object/public/avatars/$trimmed';
+    return SupabaseConfig.storagePublicUrl(
+          AppConstants.defaultAvatarBucket,
+          trimmed,
+        ) ??
+        AppConstants.placeholderHotelImage;
   }
 
   // ---------------------------------------------------------------------------

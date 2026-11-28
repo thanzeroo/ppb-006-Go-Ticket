@@ -111,13 +111,13 @@ class _TikoChatBubbleState extends State<TikoChatBubble>
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF00B4D8).withOpacity(0.4),
+                  color: const Color(0xFF00B4D8).withValues(alpha: 0.4),
                   blurRadius: 16,
                   offset: const Offset(0, 4),
                   spreadRadius: 2,
                 ),
                 BoxShadow(
-                  color: const Color(0xFF0077B6).withOpacity(0.2),
+                  color: const Color(0xFF0077B6).withValues(alpha: 0.2),
                   blurRadius: 24,
                   offset: const Offset(0, 8),
                   spreadRadius: 0,

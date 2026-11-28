@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../config/supabase_config.dart';
+import '../constants/app_constants.dart';
 
 /// Service untuk upload dan rendering gambar di seluruh ekosistem Go Ticket.
 /// Mengunggah gambar (hotel, kamar, bukti kerusakan, foto profil) langsung ke Supabase Storage (bucket avatars)
@@ -12,7 +13,7 @@ class HotelImageUploadService {
   static final HotelImageUploadService instance = HotelImageUploadService._();
 
   /// Bucket penyimpanan umum di Supabase yang sudah aktif
-  static const String defaultBucket = 'avatars';
+  static const String defaultBucket = AppConstants.defaultAvatarBucket;
 
   /// Unggah berkas gambar tunggal ke Supabase Storage
   /// Mengembalikan public URL jika berhasil, atau null jika gagal/offline

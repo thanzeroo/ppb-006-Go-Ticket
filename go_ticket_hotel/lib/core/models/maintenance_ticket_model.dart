@@ -135,6 +135,7 @@ extension MaintenancePriorityExtension on MaintenancePriority {
 typedef TicketPriority = MaintenancePriority;
 typedef TicketStatus = MaintenanceStatus;
 
+/// Konstanta kategori tiket kerusakan dan pemeliharaan kamar hotel.
 class TicketCategory {
   TicketCategory._();
   static const String cleaning = 'Kebersihan';

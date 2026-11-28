@@ -35,7 +35,7 @@ class SupabaseService {
     try {
       await Supabase.initialize(
         url: SupabaseConfig.supabaseUrl,
-        anonKey: SupabaseConfig.activeApiKey,
+        publishableKey: SupabaseConfig.activeApiKey,
       );
       _isInitialized = true;
       debugPrint('✅ [SupabaseService] Supabase client berhasil diinisialisasi.');

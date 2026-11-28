@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../../../../core/config/supabase_config.dart';
+import '../../../../../../core/constants/app_constants.dart';
 import '../../../../../../core/services/auth_service.dart';
 
 /// Halaman Tambah Karyawan Baru untuk Administrator Hotel
@@ -120,7 +121,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
           ? SupabaseConfig.supabaseServiceRoleKey
           : SupabaseConfig.activeApiKey;
 
-      // 1. Jika memilih role Administrator, cek batas maksimal 3 akun administrator per hotel
+      // 1. Jika memilih role Administrator, cek batas maksimal akun administrator per hotel
       if (roleDb == 'administrator') {
         final checkUri = Uri.parse(
             '${SupabaseConfig.supabaseUrl}/rest/v1/${SupabaseConfig.tableStafHotel}?id_penginapan=eq.$hotelId&role_jabatan=eq.administrator&select=id_staf');
@@ -133,10 +134,10 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
         );
         if (checkResp.statusCode == 200) {
           final List<dynamic> admins = jsonDecode(checkResp.body);
-          if (admins.length >= 3) {
+          if (admins.length >= AppConstants.maxAdminPerHotel) {
             setState(() => _isSaving = false);
             _showError(
-                'Batas maksimal akun Administrator (3 akun) untuk hotel ini sudah tercapai.');
+                'Batas maksimal akun Administrator (${AppConstants.maxAdminPerHotel} akun) untuk hotel ini sudah tercapai.');
             return;
           }
         }

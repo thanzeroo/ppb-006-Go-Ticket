@@ -13,6 +13,7 @@ import 'package:go_ticket_user/core/services/promo_service.dart';
 import '../../../router/customer_router.dart';
 import '../customer_dashboard_screen.dart';
 
+/// Tab Beranda pelanggan: pencarian cepat, promo aktif, dan daftar hotel rekomendasi dari Supabase.
 class BerandaTab extends StatefulWidget {
   const BerandaTab({super.key});
 
@@ -166,7 +167,7 @@ class _BerandaTabState extends State<BerandaTab> {
                   Image.asset(
                     'assets/logo.png',
                     height: 28,
-                    errorBuilder: (_, __, ___) => Row(
+                    errorBuilder: (_, _, _) => Row(
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -262,7 +263,7 @@ class _BerandaTabState extends State<BerandaTab> {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF0077B6).withOpacity(0.3),
+                color: const Color(0xFF0077B6).withValues(alpha: 0.3),
                 blurRadius: 14,
                 offset: const Offset(0, 4),
               ),
@@ -283,7 +284,7 @@ class _BerandaTabState extends State<BerandaTab> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
@@ -319,7 +320,7 @@ class _BerandaTabState extends State<BerandaTab> {
                           Text(
                             desc,
                             style: GoogleFonts.inter(
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                               fontSize: 12,
                             ),
                           ),
@@ -330,7 +331,7 @@ class _BerandaTabState extends State<BerandaTab> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.18),
+                      color: Colors.white.withValues(alpha: 0.18),
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: const Icon(Icons.confirmation_number_outlined,
@@ -513,7 +514,7 @@ class _BerandaTabState extends State<BerandaTab> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withOpacity(0.06),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.06),
             blurRadius: 14,
             offset: const Offset(0, 4),
           ),
@@ -534,7 +535,7 @@ class _BerandaTabState extends State<BerandaTab> {
                   height: 190,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
+                  errorBuilder: (_, _, _) => Container(
                     height: 190,
                     color: const Color(0xFFE2E8F0),
                     child: const Icon(Icons.hotel, size: 48, color: Colors.grey),
@@ -555,7 +556,7 @@ class _BerandaTabState extends State<BerandaTab> {
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.12),
+                            color: Colors.black.withValues(alpha: 0.12),
                             blurRadius: 6,
                           ),
                         ],
@@ -613,7 +614,7 @@ class _BerandaTabState extends State<BerandaTab> {
                   child: Container(
                     padding: const EdgeInsets.all(7),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withValues(alpha: 0.9),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -821,7 +822,7 @@ class _BerandaTabState extends State<BerandaTab> {
                 border: Border.all(color: const Color(0xFFF1F5F9)),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF0F172A).withOpacity(0.04),
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.04),
                     blurRadius: 10,
                     offset: const Offset(0, 2),
                   ),

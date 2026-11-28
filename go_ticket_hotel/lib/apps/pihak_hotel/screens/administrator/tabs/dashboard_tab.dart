@@ -11,6 +11,7 @@ import '../../../../../core/theme/hotel_admin_theme.dart';
 // TAB 1 – DASHBOARD ADMINISTRATOR (data dinamis dari DB)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// Tab Dashboard eksekutif Administrator Hotel yang menampilkan ringkasan pendapatan, booking, dan rating ulasan.
 class AdministratorDashboardTab extends StatefulWidget {
   const AdministratorDashboardTab({super.key});
 

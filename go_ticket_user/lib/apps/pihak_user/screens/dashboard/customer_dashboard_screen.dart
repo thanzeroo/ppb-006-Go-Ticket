@@ -8,6 +8,7 @@ import 'tabs/cari_tab.dart';
 import 'tabs/pesanan_tab.dart';
 import 'tabs/pengaturan_tab.dart';
 
+/// Dashboard utama pelanggan dengan 4 tab navigasi (Beranda, Cari, Pesanan, Pengaturan) serta asisten AI Tiko.
 class CustomerDashboardScreen extends StatefulWidget {
   const CustomerDashboardScreen({super.key});
 
@@ -114,7 +115,7 @@ class _CustomerDashboardScreenState
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 16,
             offset: const Offset(0, -2),
           ),
@@ -150,7 +151,7 @@ class _CustomerDashboardScreenState
                     decoration: BoxDecoration(
                       color: isSelected
                           ? const Color(0xFF00B4D8)
-                              .withOpacity(0.1)
+                              .withValues(alpha: 0.1)
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(12),
                     ),

@@ -666,7 +666,7 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
                                       .createTicket(ticket);
                                   if (!ctx.mounted) return;
                                   Navigator.pop(ctx);
-                                  ScaffoldMessenger.of(context).showSnackBar(
+                                  ScaffoldMessenger.of(ctx).showSnackBar(
                                     const SnackBar(
                                       content: Text(
                                           'Laporan berhasil dikirim ke tim Maintenance!'),
@@ -675,8 +675,8 @@ class _FoDashboardTabState extends State<FoDashboardTab> {
                                   );
                                 } catch (e) {
                                   setSheetState(() => isSending = false);
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
+                                  if (ctx.mounted) {
+                                    ScaffoldMessenger.of(ctx).showSnackBar(
                                       SnackBar(
                                         content: Text('Gagal mengirim: $e'),
                                         backgroundColor: Colors.red,

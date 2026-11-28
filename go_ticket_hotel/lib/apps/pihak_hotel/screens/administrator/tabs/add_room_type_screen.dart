@@ -1,3 +1,4 @@
+// ignore_for_file: use_build_context_synchronously
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -18,6 +19,7 @@ class RoomPhotoItem {
   String get displayPath => url ?? file?.path ?? '';
 }
 
+/// Halaman formulir penambahan tipe kamar baru beserta kuota unit, tarif weekday/weekend, fasilitas, dan foto.
 class AddRoomTypeScreen extends StatefulWidget {
   const AddRoomTypeScreen({super.key});
 
@@ -272,8 +274,9 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
         });
       }
     } catch (e) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal mengambil foto: $e'), backgroundColor: const Color(0xFFEF4444)),
+        SnackBar(content: Text('Gagal mengambil foto: \$e'), backgroundColor: const Color(0xFFEF4444)),
       );
     }
   }
@@ -944,7 +947,7 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: _galleryPhotos.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
               itemBuilder: (ctx, i) {
                 final photo = _galleryPhotos[i];
                 final isCover = i == 0;
@@ -1068,7 +1071,7 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
               Switch(
                 value: _surgePricing,
                 onChanged: (val) => setState(() => _surgePricing = val),
-                activeColor: const Color(0xFF007A87),
+                activeThumbColor: const Color(0xFF007A87),
               ),
             ],
           ),
@@ -1129,7 +1132,7 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
           const SizedBox(height: 12),
           _buildFieldLabel('Kebijakan Pembatalan'),
           DropdownButtonFormField<int>(
-            value: _cancellationPolicy,
+            initialValue: _cancellationPolicy,
             items: const [
               DropdownMenuItem(value: 0, child: Text('Gratis Batal s/d H-1 Check-in')),
               DropdownMenuItem(value: 1, child: Text('Non-Refundable (Tidak Dapat Dibatalkan)')),
@@ -1232,7 +1235,7 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
 
   Widget _buildDropdown() {
     return DropdownButtonFormField<String>(
-      value: _selectedCategory,
+      initialValue: _selectedCategory,
       items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12.5)))).toList(),
       onChanged: (val) => setState(() => _selectedCategory = val ?? _selectedCategory),
       decoration: InputDecoration(
@@ -1249,7 +1252,7 @@ class _AddRoomTypeScreenState extends State<AddRoomTypeScreen> {
 
   Widget _buildBedDropdown() {
     return DropdownButtonFormField<String>(
-      value: '1 King Bed',
+      initialValue: '1 King Bed',
       items: const [
         DropdownMenuItem(value: '1 King Bed', child: Text('1 King Bed (200x200)', style: TextStyle(fontSize: 12))),
         DropdownMenuItem(value: '2 Twin Bed', child: Text('2 Twin Bed (100x200)', style: TextStyle(fontSize: 12))),

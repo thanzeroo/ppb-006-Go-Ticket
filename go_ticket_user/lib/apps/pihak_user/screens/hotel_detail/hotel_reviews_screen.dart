@@ -72,18 +72,18 @@ class _HotelReviewsScreenState extends State<HotelReviewsScreen> {
     final avgStr = avg == 0 ? '–' : avg.toStringAsFixed(1);
 
     // ─── Rata-rata per kategori ─────────────────────────────────────────────
-    double _catAvg(Iterable<int?> vals) {
+    double catAvg(Iterable<int?> vals) {
       final v = vals.whereType<int>().toList();
       if (v.isEmpty) return 0;
       return v.fold<int>(0, (s, x) => s + x) / v.length;
     }
 
-    final catCleanliness = _catAvg(_reviews.map((r) => r.cleanlinessRating));
+    final catCleanliness = catAvg(_reviews.map((r) => r.cleanlinessRating));
     final catComfort =
-        _catAvg(_reviews.map((r) => r.valueRating)); // nilai/kenyamanan
-    final catService = _catAvg(_reviews.map((r) => r.serviceRating));
-    final catLocation = _catAvg(_reviews.map((r) => r.locationRating));
-    final catFacility = _catAvg(_reviews.map((r) => r.facilityRating));
+        catAvg(_reviews.map((r) => r.valueRating)); // nilai/kenyamanan
+    final catService = catAvg(_reviews.map((r) => r.serviceRating));
+    final catLocation = catAvg(_reviews.map((r) => r.locationRating));
+    final catFacility = catAvg(_reviews.map((r) => r.facilityRating));
 
     final bars = [
       ['Kebersihan', catCleanliness],
@@ -324,7 +324,7 @@ class _HotelReviewsScreenState extends State<HotelReviewsScreen> {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: r.photoUrls.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
                 itemBuilder: (_, i) =>
                     GTImage(r.photoUrls[i], height: 90, radius: 12),
               ),

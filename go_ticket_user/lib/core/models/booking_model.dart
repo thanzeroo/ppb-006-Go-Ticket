@@ -9,6 +9,8 @@
 // - E-Tiket (QR code data)
 // =============================================================================
 
+import '../constants/app_constants.dart';
+
 /// Enum status pemesanan / lifecycle booking di Go Ticket
 enum BookingStatus {
   /// Booking dibuat, menunggu pembayaran dari Customer
@@ -252,11 +254,11 @@ class BookingModel {
     this.checkoutNotes,
     this.hasReviewed = false,
     this.createdAt,
-    String? hotelAddress,
-    String? hotelImageUrl,
-    String? guestEmail,
-    int? totalRooms,
-    int? taxAndServiceFee,
+    this._hotelAddress,
+    this._hotelImageUrl,
+    this._guestEmail,
+    this._totalRooms,
+    this._taxAndServiceFee,
     bool? isPaid,
   })  : customerId = customerId ?? userId ?? '',
         customerName = customerName ?? guestName ?? '',
@@ -265,12 +267,7 @@ class BookingModel {
         guestCount = guestCount ?? totalGuests ?? 1,
         subtotal = subtotal ?? subtotalPrice ?? 0,
         totalAmount = totalAmount ?? totalPrice ?? 0,
-        paymentStatus = isPaid == true ? 'paid' : paymentStatus,
-        _hotelAddress = hotelAddress,
-        _hotelImageUrl = hotelImageUrl,
-        _guestEmail = guestEmail,
-        _totalRooms = totalRooms,
-        _taxAndServiceFee = taxAndServiceFee;
+        paymentStatus = isPaid == true ? 'paid' : paymentStatus;
 
   String get userId => customerId;
   String get guestName => customerName;
@@ -278,14 +275,14 @@ class BookingModel {
   String? get guestEmail => _guestEmail ?? 'customer@goticket.id';
   String? get hotelAddress => _hotelAddress ?? 'Jl. Penginapan, Malang';
   String? get hotelImageUrl =>
-      _hotelImageUrl ??
-      'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600';
+      _hotelImageUrl ?? AppConstants.placeholderHotelImage;
   int get nights => totalNights;
   int get totalGuests => guestCount;
   int get totalRooms => _totalRooms ?? 1;
   int get totalPrice => totalAmount;
   int get subtotalPrice => subtotal;
-  int get taxAndServiceFee => _taxAndServiceFee ?? (totalAmount * 0.1).round();
+  int get taxAndServiceFee =>
+      _taxAndServiceFee ?? (totalAmount * AppConstants.taxAndServiceRate).round();
   bool get isPaid =>
       paymentStatus == 'paid' ||
       paidAt != null ||

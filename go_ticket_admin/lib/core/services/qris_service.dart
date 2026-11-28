@@ -5,6 +5,7 @@
 // Algoritma: TLV parser + CRC16-CCITT (poly 0x1021, init 0xFFFF)
 // =============================================================================
 
+/// Utilitas statis pengonversi payload QRIS statis menjadi QRIS dinamis sesuai nominal transaksi.
 class QrisService {
   QrisService._();
 

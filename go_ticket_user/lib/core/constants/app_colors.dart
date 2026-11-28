@@ -10,6 +10,7 @@
 
 import 'package:flutter/material.dart';
 
+/// Palet warna resmi platform Go Ticket (brand, semantik, netral, & latar).
 class AppColors {
   // ---------------------------------------------------------------------------
   // PRIVATE CONSTRUCTOR — Kelas ini tidak boleh diinstansiasi

@@ -320,7 +320,7 @@ class _FoCheckInTabState extends State<FoCheckInTab> {
                   ),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<String>(
-                    value: paymentMethod,
+                    initialValue: paymentMethod,
                     items: const [
                       DropdownMenuItem(
                         value: 'Tunai di Resepsionis',
@@ -681,7 +681,7 @@ class _FoCheckInTabState extends State<FoCheckInTab> {
                   ),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<String>(
-                    value: selectedViolation,
+                    initialValue: selectedViolation,
                     isExpanded: true,
                     items: violationPresets
                         .map((v) => DropdownMenuItem(

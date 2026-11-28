@@ -10,6 +10,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import '../constants/app_constants.dart';
+
 /// Model untuk satu pesan chat
 class TikoChatMessage {
   final String text;
@@ -57,15 +59,18 @@ ATURAN PENTING:
 - Jika di luar konteks Go Ticket, arahkan kembali ke pemesanan hotel dengan sopan.
 ''';
 
-  /// API Key Gemini dari .env
-  String get _apiKey => dotenv.env['GEMINI_API_KEY'] ?? '';
+  static const String _defineGeminiKey =
+      String.fromEnvironment('GEMINI_API_KEY');
 
-  /// Daftar model — coba dari yang paling ringan & stabil dulu
-  static const List<String> _models = [
-    'gemini-flash-lite-latest',
-    'gemini-3.5-flash-lite',
-    'gemini-flash-latest',
-  ];
+  /// API Key Gemini dari `--dart-define` atau `.env`.
+  String get _apiKey {
+    if (_defineGeminiKey.isNotEmpty) return _defineGeminiKey.trim();
+    try {
+      return dotenv.env['GEMINI_API_KEY']?.trim() ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
 
   /// Bangun URL endpoint untuk model tertentu
   String _apiUrlForModel(String model) =>
@@ -80,11 +85,23 @@ ATURAN PENTING:
       timestamp: DateTime.now(),
     ));
 
+    if (_apiKey.isEmpty) {
+      const msg =
+          'Asisten AI Tiko belum terkonfigurasi. Pastikan GEMINI_API_KEY tersedia di file .env.';
+      _history.add(TikoChatMessage(
+        text: msg,
+        isUser: false,
+        timestamp: DateTime.now(),
+      ));
+      return msg;
+    }
+
     try {
-      // Bangun contents array dari history (batasi 10 pesan terakhir agar ringan)
+      // Bangun contents array dari history (batasi jumlah pesan konteks dari AppConstants)
       final List<Map<String, dynamic>> contents = [];
-      final recentHistory = _history.length > 10
-          ? _history.sublist(_history.length - 10)
+      const maxHistory = AppConstants.tikoMaxHistoryMessages;
+      final recentHistory = _history.length > maxHistory
+          ? _history.sublist(_history.length - maxHistory)
           : _history;
 
       for (final msg in recentHistory) {
@@ -104,10 +121,10 @@ ATURAN PENTING:
         },
         'contents': contents,
         'generationConfig': {
-          'temperature': 0.5,
-          'topP': 0.85,
-          'topK': 20,
-          'maxOutputTokens': 350,
+          'temperature': AppConstants.tikoTemperature,
+          'topP': AppConstants.tikoTopP,
+          'topK': AppConstants.tikoTopK,
+          'maxOutputTokens': AppConstants.tikoMaxOutputTokens,
         },
         'safetySettings': [
           {
@@ -130,7 +147,7 @@ ATURAN PENTING:
       });
 
       // Coba setiap model — fallback jika 503/404/429
-      for (final model in _models) {
+      for (final model in AppConstants.tikoModels) {
         debugPrint('🤖 [TikoChatService] Mencoba model: $model');
 
         final response = await http.post(

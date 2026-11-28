@@ -20,7 +20,7 @@ class ReservationDetailScreen extends StatefulWidget {
 class _ReservationDetailScreenState extends State<ReservationDetailScreen> {
   BookingModel? _booking;
   BookingArgs? _args;
-  bool _isLoading = false;
+  final bool _isLoading = false;
   bool _isCancelled = false;
 
   @override

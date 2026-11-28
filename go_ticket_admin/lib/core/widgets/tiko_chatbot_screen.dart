@@ -87,7 +87,7 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -112,7 +112,7 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w400,
-                    color: Colors.white.withOpacity(0.85),
+                    color: Colors.white.withValues(alpha: 0.85),
                   ),
                 ),
               ],
@@ -188,7 +188,7 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, -2),
                 ),
@@ -274,7 +274,7 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: _tikoPrimary.withOpacity(0.1),
+                color: _tikoPrimary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -330,10 +330,10 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
           color: _tikoDark,
         ),
       ),
-      backgroundColor: _tikoPrimary.withOpacity(0.08),
+      backgroundColor: _tikoPrimary.withValues(alpha: 0.08),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: _tikoPrimary.withOpacity(0.2)),
+        side: BorderSide(color: _tikoPrimary.withValues(alpha: 0.2)),
       ),
       onPressed: () {
         _messageController.text = text;
@@ -387,7 +387,7 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 6,
                     offset: const Offset(0, 2),
                   ),
@@ -441,7 +441,7 @@ class _TikoChatbotScreenState extends State<TikoChatbotScreen> {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),
@@ -518,7 +518,7 @@ class _TypingDotsState extends State<_TypingDots>
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF00B4D8).withOpacity(0.6),
+                    color: const Color(0xFF00B4D8).withValues(alpha: 0.6),
                     shape: BoxShape.circle,
                   ),
                 ),

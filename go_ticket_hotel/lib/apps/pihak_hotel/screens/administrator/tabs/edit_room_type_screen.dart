@@ -7,6 +7,7 @@ import '../../../../../../core/services/supabase_service.dart';
 import '../../../services/hotel_image_upload_service.dart';
 import 'add_room_type_screen.dart';
 
+/// Halaman penyuntingan spesifikasi, kuota unit, tarif, dan foto tipe kamar yang sudah ada.
 class EditRoomTypeScreen extends StatefulWidget {
   final String? roomId;
   final String roomName;

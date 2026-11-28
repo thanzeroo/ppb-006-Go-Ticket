@@ -115,6 +115,7 @@ class ApiException implements Exception {
 // EXTENSION — Tambahan helper untuk ApiException
 // =============================================================================
 
+/// Extension helper UI untuk memetakan [ApiException] ke ikon & saran aksi.
 extension ApiExceptionExtension on ApiException {
   /// Mendapatkan ikon yang sesuai dengan tipe error (untuk UI display)
   String get errorIcon {

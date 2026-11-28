@@ -36,6 +36,7 @@ coverage/
 **/android/app/debug
 **/android/app/profile
 **/android/app/release
+apk/
 *.apk
 *.aab
 

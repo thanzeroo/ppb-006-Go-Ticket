@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:go_ticket_user/core/services/auth_service.dart';
 import 'package:go_ticket_user/core/services/customer_data_service.dart';
 import 'package:go_ticket_user/core/widgets/gt_ui.dart';
 
@@ -78,45 +77,11 @@ class _SavedGuestsScreenState extends State<SavedGuestsScreen> {
           _isLoading = false;
         });
       } else {
-        // Jika belum ada data tamu di cloud
-        if (CustomerDataService.instance.isFreshUser) {
-          setState(() {
-            _guests = [];
-            _isLoading = false;
-          });
-        } else {
-          // Inisialisasi tamu utama dari akun login
-          final user = AuthService.instance.currentUser;
-          if (user != null && user.fullName.isNotEmpty) {
-            final added = await CustomerDataService.instance.addSavedGuest(
-              name: user.fullName,
-              phone: user.phoneNumber,
-              email: user.email,
-              relation: 'Akun Utama',
-              isChild: false,
-            );
-            if (added != null && mounted) {
-              setState(() {
-                _guests = [
-                  _Guest(
-                    id: added['id_saved_guest'] as int?,
-                    name: user.fullName,
-                    relation: 'Akun Utama',
-                    phone: user.phoneNumber ?? '',
-                    email: user.email ?? '',
-                    isMain: true,
-                  ),
-                ];
-                _isLoading = false;
-              });
-              return;
-            }
-          }
-          setState(() {
-            _guests = [];
-            _isLoading = false;
-          });
-        }
+        // Belum ada data tamu tersimpan di cloud maupun cache lokal
+        setState(() {
+          _guests = [];
+          _isLoading = false;
+        });
       }
     } catch (e) {
       debugPrint('⚠️ Error loading guests: $e');

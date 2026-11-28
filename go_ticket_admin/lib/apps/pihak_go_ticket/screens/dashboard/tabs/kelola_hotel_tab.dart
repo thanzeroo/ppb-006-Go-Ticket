@@ -197,7 +197,7 @@ class _KelolaHotelTabState extends State<KelolaHotelTab> {
                     height: 140,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (_, _, _) => Container(
                       height: 90,
                       color: const Color(0xFFE2E8F0),
                       child: const Center(
@@ -659,7 +659,7 @@ class _KelolaHotelTabState extends State<KelolaHotelTab> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.12) : Colors.white,
+          color: isSelected ? color.withValues(alpha: 0.12) : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? color : const Color(0xFFCBD5E1),
@@ -688,7 +688,7 @@ class _KelolaHotelTabState extends State<KelolaHotelTab> {
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.015),
+            color: Colors.black.withValues(alpha: 0.015),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -710,7 +710,7 @@ class _KelolaHotelTabState extends State<KelolaHotelTab> {
                     width: 72,
                     height: 72,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (_, _, _) => Container(
                       width: 72,
                       height: 72,
                       color: const Color(0xFFE2E8F0),

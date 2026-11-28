@@ -310,7 +310,7 @@ class _MaintenanceOverviewTabState extends State<MaintenanceOverviewTab> {
 
                               if (!ctx.mounted) return;
                               Navigator.pop(ctx);
-                              ScaffoldMessenger.of(context).showSnackBar(
+                              ScaffoldMessenger.of(ctx).showSnackBar(
                                 SnackBar(
                                   content: Text(
                                       'Data pengecekan Kamar $roomNo disimpan!'),
@@ -320,8 +320,8 @@ class _MaintenanceOverviewTabState extends State<MaintenanceOverviewTab> {
                               _loadData();
                             } catch (e) {
                               setSheetState(() => isSaving = false);
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
+                              if (ctx.mounted) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
                                   SnackBar(
                                     content: Text('Gagal menyimpan: $e'),
                                     backgroundColor: Colors.red,

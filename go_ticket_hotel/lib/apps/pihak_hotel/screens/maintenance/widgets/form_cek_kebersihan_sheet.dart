@@ -20,6 +20,7 @@ void showFormCekKebersihanModal(
   );
 }
 
+/// Konten bottom sheet checklist sanitasi dan kebersihan kamar untuk tim Maintenance.
 class FormCekKebersihanSheet extends StatefulWidget {
   final CleaningTaskItem task;
   final VoidCallback? onFinished;

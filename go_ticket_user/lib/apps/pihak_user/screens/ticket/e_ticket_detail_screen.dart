@@ -339,7 +339,7 @@ class ETicketDetailScreen extends StatelessWidget {
                     height: 130,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _fallbackHeader(),
+                    errorBuilder: (_, _, _) => _fallbackHeader(),
                   )
                 else if (photo.isNotEmpty && isLocal)
                   Image.file(
@@ -347,7 +347,7 @@ class ETicketDetailScreen extends StatelessWidget {
                     height: 130,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _fallbackHeader(),
+                    errorBuilder: (_, _, _) => _fallbackHeader(),
                   )
                 else
                   _fallbackHeader(),

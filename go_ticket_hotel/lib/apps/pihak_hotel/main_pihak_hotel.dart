@@ -15,6 +15,7 @@ void main() async {
   runApp(const PihakHotelApp());
 }
 
+/// Root widget aplikasi Mitra Hotel (`go_ticket_hotel`) untuk Administrator, Front Office, dan Maintenance.
 class PihakHotelApp extends StatelessWidget {
   const PihakHotelApp({super.key});
 

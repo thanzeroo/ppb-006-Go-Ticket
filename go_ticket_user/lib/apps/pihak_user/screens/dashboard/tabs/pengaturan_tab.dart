@@ -344,7 +344,7 @@ class _PengaturanTabState extends State<PengaturanTab> {
             Image.asset(
               'assets/logo.png',
               height: 28,
-              errorBuilder: (_, __, ___) => Row(
+              errorBuilder: (_, _, _) => Row(
                 children: [
                   Container(
                     padding:
@@ -409,7 +409,7 @@ class _PengaturanTabState extends State<PengaturanTab> {
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withOpacity(0.04),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -499,7 +499,7 @@ class _PengaturanTabState extends State<PengaturanTab> {
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withOpacity(0.04),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),

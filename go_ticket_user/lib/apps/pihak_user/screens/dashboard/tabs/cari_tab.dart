@@ -279,7 +279,7 @@ class _CariTabState extends State<CariTab> {
                   title: const Text('Promo'),
                   subtitle: const Text('Tampilkan penginapan berdiskon'),
                   value: promotionsOnly,
-                  activeColor: const Color(0xFF00B4D8),
+                  activeThumbColor: const Color(0xFF00B4D8),
                   onChanged: (value) =>
                       setSheetState(() => promotionsOnly = value),
                 ),
@@ -288,7 +288,7 @@ class _CariTabState extends State<CariTab> {
                   title: const Text('Rating 4 ke atas'),
                   subtitle: const Text('Skor ulasan minimal 4.0 ⭐'),
                   value: rating4Plus,
-                  activeColor: const Color(0xFF00B4D8),
+                  activeThumbColor: const Color(0xFF00B4D8),
                   onChanged: (value) =>
                       setSheetState(() => rating4Plus = value),
                 ),
@@ -297,7 +297,7 @@ class _CariTabState extends State<CariTab> {
                   title: const Text('Rating 4.5 ke atas'),
                   subtitle: const Text('Skor ulasan istimewa minimal 4.5 ⭐'),
                   value: rating45Plus,
-                  activeColor: const Color(0xFF00B4D8),
+                  activeThumbColor: const Color(0xFF00B4D8),
                   onChanged: (value) =>
                       setSheetState(() => rating45Plus = value),
                 ),
@@ -438,7 +438,7 @@ class _CariTabState extends State<CariTab> {
               Row(
                 children: [
                   Image.asset('assets/logo.png', height: 28,
-                      errorBuilder: (_, __, ___) => Row(
+                      errorBuilder: (_, _, _) => Row(
                             children: [
                               Container(
                                 padding: const EdgeInsets.all(4),
@@ -554,7 +554,7 @@ class _CariTabState extends State<CariTab> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -574,7 +574,7 @@ class _CariTabState extends State<CariTab> {
                   height: 180,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
+                  errorBuilder: (_, _, _) => Container(
                     height: 180,
                     color: const Color(0xFFE5E7EB),
                     child:
@@ -612,7 +612,7 @@ class _CariTabState extends State<CariTab> {
                     width: 34,
                     height: 34,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withValues(alpha: 0.9),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -868,7 +868,7 @@ class _CariTabState extends State<CariTab> {
         borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),

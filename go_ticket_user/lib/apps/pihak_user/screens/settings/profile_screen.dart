@@ -327,7 +327,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Expanded(
             child: Text(text,
                 style: const TextStyle(fontSize: 14, color: GT.ink))),
-        if (trailing != null) trailing,
+        ?trailing,
       ]),
     );
   }

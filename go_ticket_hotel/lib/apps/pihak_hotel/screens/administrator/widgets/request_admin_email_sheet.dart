@@ -15,6 +15,7 @@ void showRequestAdminEmailModal(BuildContext context, {VoidCallback? onSuccess})
   );
 }
 
+/// Modal bottom sheet untuk mengajukan permohonan akun Administrator Hotel tambahan ke tim Go Ticket.
 class RequestAdminEmailSheet extends StatefulWidget {
   final VoidCallback? onSuccess;
 

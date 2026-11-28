@@ -349,7 +349,7 @@ class _GuestDetailFormScreenState extends State<GuestDetailFormScreen> {
             ],
           ),
         ),
-        if (trailing != null) trailing,
+        ?trailing,
       ]),
     );
   }
@@ -534,7 +534,8 @@ class _GuestDetailFormScreenState extends State<GuestDetailFormScreen> {
             ),
             Switch(
               value: _forSelf,
-              activeColor: Colors.white,
+              // ignore: deprecated_member_use
+              activeThumbColor: Colors.white,
               activeTrackColor: GT.primary,
               onChanged: (v) => setState(() => _forSelf = v),
             ),

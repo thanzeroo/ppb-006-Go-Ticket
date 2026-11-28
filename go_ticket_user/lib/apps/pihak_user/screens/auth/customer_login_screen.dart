@@ -6,6 +6,7 @@ import '../../../../core/widgets/auth_logo_header.dart';
 import '../../router/customer_router.dart';
 import 'terms_screen.dart';
 
+/// Halaman autentikasi pelanggan (Masuk & Daftar akun baru) berbasis Supabase Auth.
 class CustomerLoginScreen extends StatefulWidget {
   const CustomerLoginScreen({super.key});
 

@@ -18,6 +18,7 @@ class _Voucher {
       this.valid, this.code, this.image);
 }
 
+/// Halaman daftar voucher dan kampanye promo yang tersedia maupun sudah digunakan oleh pelanggan.
 class VoucherScreen extends StatefulWidget {
   const VoucherScreen({super.key});
 

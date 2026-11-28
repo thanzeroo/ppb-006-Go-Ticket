@@ -339,7 +339,7 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
                       Image.asset(
                         'assets/logo.png',
                         height: 28,
-                        errorBuilder: (_, __, ___) => Row(
+                        errorBuilder: (_, _, _) => Row(
                           children: [
                             Container(
                               padding: const EdgeInsets.all(4),
@@ -557,7 +557,7 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -577,7 +577,7 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
                   height: 180,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
+                  errorBuilder: (_, _, _) => Container(
                     height: 180,
                     color: const Color(0xFFE5E7EB),
                     child: const Icon(
@@ -597,7 +597,7 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.55),
+                    color: Colors.black.withValues(alpha: 0.55),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Row(
@@ -663,7 +663,7 @@ class _SavedHotelScreenState extends State<SavedHotelScreen> {
                     width: 34,
                     height: 34,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.92),
+                      color: Colors.white.withValues(alpha: 0.92),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(

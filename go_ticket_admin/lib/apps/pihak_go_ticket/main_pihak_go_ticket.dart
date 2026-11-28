@@ -15,6 +15,7 @@ void main() async {
   runApp(const PihakGoTicketApp());
 }
 
+/// Root widget aplikasi Super Admin (`go_ticket_admin`) untuk pengelolaan platform Go Ticket.
 class PihakGoTicketApp extends StatelessWidget {
   const PihakGoTicketApp({super.key});
 

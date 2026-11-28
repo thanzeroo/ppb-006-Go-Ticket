@@ -15,6 +15,7 @@ void main() async {
   runApp(const PihakUserApp());
 }
 
+/// Root widget aplikasi Customer (`go_ticket_user`) dengan tema terang dan [CustomerRouter].
 class PihakUserApp extends StatelessWidget {
   const PihakUserApp({super.key});
 

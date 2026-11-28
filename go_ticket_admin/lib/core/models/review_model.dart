@@ -176,9 +176,9 @@ class ReviewModel {
     final cId = int.tryParse(customerId);
 
     return {
-      if (bId != null) 'id_booking': bId,
-      if (hId != null) 'id_penginapan': hId,
-      if (cId != null) 'id_user': cId,
+      'id_booking': ?bId,
+      'id_penginapan': ?hId,
+      'id_user': ?cId,
       'rating_bintang': overallRating.toInt(),
       'rating_kebersihan': cleanlinessRating ?? overallRating.toInt(),
       'rating_pelayanan': serviceRating ?? overallRating.toInt(),

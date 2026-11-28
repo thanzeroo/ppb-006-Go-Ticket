@@ -1,3 +1,4 @@
+// ignore_for_file: use_build_context_synchronously
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -24,6 +25,7 @@ void showLaporKerusakanModal(BuildContext context, {VoidCallback? onTicketCreate
   );
 }
 
+/// Konten bottom sheet pelaporan kerusakan fasilitas kamar lengkap dengan unggah foto bukti.
 class LaporKerusakanModalContent extends StatefulWidget {
   final VoidCallback? onTicketCreated;
 
@@ -74,9 +76,10 @@ class _LaporKerusakanModalContentState extends State<LaporKerusakanModalContent>
         });
       }
     } catch (e) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Gagal mengambil foto: $e'),
+          content: Text('Gagal mengambil foto: \$e'),
           backgroundColor: const Color(0xFFEF4444),
         ),
       );
@@ -338,7 +341,7 @@ class _LaporKerusakanModalContentState extends State<LaporKerusakanModalContent>
                   ),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<String>(
-                    value: _selectedCategory,
+                    initialValue: _selectedCategory,
                     items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                     onChanged: (val) => setState(() => _selectedCategory = val ?? _selectedCategory),
                     decoration: InputDecoration(

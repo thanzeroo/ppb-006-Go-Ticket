@@ -235,7 +235,7 @@ class _UserTabState extends State<UserTab> {
                         style: TextStyle(fontWeight: FontWeight.w600)),
                     Switch(
                       value: isActive,
-                      activeColor: const Color(0xFF00C2FF),
+                      activeThumbColor: const Color(0xFF00C2FF),
                       onChanged: (val) {
                         setModalState(() => isActive = val);
                       },
@@ -261,7 +261,7 @@ class _UserTabState extends State<UserTab> {
                         phoneNumber: phoneCtrl.text.trim(),
                         status: isActive ? 'aktif' : 'tersuspend',
                       );
-                      if (mounted) {
+                      if (mounted && context.mounted) {
                         Navigator.pop(ctx);
                         if (ok) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -434,7 +434,7 @@ class _UserTabState extends State<UserTab> {
                       )
                     else
                       DropdownButtonFormField<String>(
-                        value: selectedHotelId,
+                        initialValue: selectedHotelId,
                         decoration: InputDecoration(
                           labelText: 'Mitra Penginapan / Hotel *',
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
@@ -458,7 +458,7 @@ class _UserTabState extends State<UserTab> {
 
                     // Role / Jabatan
                     DropdownButtonFormField<String>(
-                      value: selectedRoleJabatan,
+                      initialValue: selectedRoleJabatan,
                       decoration: InputDecoration(
                         labelText: 'Jabatan / Posisi *',
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
@@ -560,7 +560,7 @@ class _UserTabState extends State<UserTab> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: selectedShift,
+                            initialValue: selectedShift,
                             decoration: InputDecoration(
                               labelText: 'Shift Tugas',
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
@@ -1122,7 +1122,7 @@ class _UserTabState extends State<UserTab> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.12) : Colors.white,
+          color: isSelected ? color.withValues(alpha: 0.12) : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? color : const Color(0xFFCBD5E1),
@@ -1571,7 +1571,7 @@ class _UserTabState extends State<UserTab> {
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.015),
+            color: Colors.black.withValues(alpha: 0.015),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),

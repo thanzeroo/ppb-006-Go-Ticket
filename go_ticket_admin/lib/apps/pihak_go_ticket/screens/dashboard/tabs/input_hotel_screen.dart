@@ -2853,15 +2853,17 @@ class _InputHotelScreenState extends State<InputHotelScreen> {
             ),
           );
         } else {
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                  'Berhasil! Mitra hotel baru dengan ${roomTypesPayload.length} tipe kamar berhasil disimpan ke database.'),
+                  'Berhasil! Mitra hotel baru dengan \${roomTypesPayload.length} tipe kamar berhasil disimpan ke database.'),
               backgroundColor: const Color(0xFF00758F),
             ),
           );
         }
 
+        if (!mounted) return;
         Navigator.pop(context, true);
       }
     } catch (e) {

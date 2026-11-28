@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 // - TransactionData: mutasi kas, reservasi kamar, dan metode pembayaran
 // =============================================================================
 
+/// Model ringkas tipe kamar, tingkat okupansi, dan tarif untuk Administrator Hotel.
 class RoomTypeData {
   final String badge;
   final String? secondaryBadge;
@@ -41,6 +42,7 @@ class RoomTypeData {
   });
 }
 
+/// Model data profil staf hotel, shift kerja, status tugas, dan hak akses.
 class StaffData {
   final String name;
   final String id;
@@ -77,6 +79,7 @@ class StaffData {
   }) : statusLabel = statusLabel ?? status ?? 'Aktif Bertugas';
 }
 
+/// Model data mutasi transaksi kamar dan metode pembayaran di portal hotel.
 class TransactionData {
   final String name;
   final String amount;

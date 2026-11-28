@@ -300,7 +300,7 @@ class _PesananTabState extends State<PesananTab>
                       Image.asset(
                         'assets/logo.png',
                         height: 28,
-                        errorBuilder: (_, __, ___) => Row(
+                        errorBuilder: (_, _, _) => Row(
                           children: [
                             Container(
                               padding: const EdgeInsets.all(4),
@@ -728,7 +728,7 @@ class _PesananTabState extends State<PesananTab>
                           width: 80,
                           height: 70,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
+                          errorBuilder: (_, _, _) => Container(
                             width: 80,
                             height: 70,
                             color: const Color(0xFFE5E7EB),
@@ -1103,7 +1103,7 @@ class _PesananTabState extends State<PesananTab>
       decoration: BoxDecoration(
         color: const Color(0xFFE0F7FA),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF00B4D8).withOpacity(0.3)),
+        border: Border.all(color: const Color(0xFF00B4D8).withValues(alpha: 0.3)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),

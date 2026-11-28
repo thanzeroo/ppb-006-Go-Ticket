@@ -81,8 +81,8 @@ class _HotelDetailScreenState extends State<HotelDetailScreen> {
       PageRouteBuilder(
         opaque: false,
         barrierDismissible: true,
-        barrierColor: Colors.black.withOpacity(0.94),
-        pageBuilder: (context, _, __) => _PhotoGalleryScreen(
+        barrierColor: Colors.black.withValues(alpha: 0.94),
+        pageBuilder: (context, _, _) => _PhotoGalleryScreen(
           photos: photos,
           initialIndex: index,
           title: _args.hotelName,
